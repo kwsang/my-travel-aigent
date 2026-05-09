@@ -8,8 +8,9 @@ Built with Gemini’s advanced reasoning and our technology partners' solutions,
 Turn your ideas into agents that solve real-world problems.
 
 ## Goals
-Pick a Partner: Choose the partner technology that best fits the mission you want to accomplish.
-Look at PARTNERS.md for more information on partners.
+For the My Travel Aigent project, MongoDB is the ideal choice for our agent's database and persistent memory layer.
+
+Here's MongoDB's data: .gemini\.partners\MONGODB.md
 
 Build Your Agent: Create your agent—built with Gemini 3—using Google Cloud Agent Builder. Integrate the partner’s Model Context Protocol (MCP) server to give your agent the superpowers to finish the job.
 
