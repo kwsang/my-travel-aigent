@@ -14,6 +14,8 @@
 
 ### Phase 3: MCP Server Integration
 - **Task:** Deploy the MongoDB MCP server.
+- **Task:** Integrate Google Maps API for distance and traffic matrix calculations.
+- **Task:** Integrate Google Places API to fetch ratings and social proof for events.
 - **Tool Mapping:**
     - `create_itinerary`: Write new plans to Atlas.
     - `query_preferences`: Fetch user context.
@@ -23,9 +25,9 @@
 - **Logic Flow:**
     1. **Elicitation:** Gemini asks clarifying questions to narrow down the intent.
     2. **Research:** Query MongoDB via Vector Search for destinations matching the user's "vibe."
-    3. **Planning:** Sequence segments (`FLIGHT`, `ACCOMMODATION`, `EXPERIENCE`) into a logical order.
+    3. **Planning:** Sequence segments into a logical order, applying UTC normalization for all duration and buffer calculations.
     4. **Persistence:** Save the resulting document to the `itineraries` collection via the MCP tool.
-    5. **Confirmation:** Present the plan to the user for final approval or iteration.
+    5. **Confirmation:** Present the plan, explicitly highlighting "Top Recommendations" vs. "Budget Alternatives" for the user to review.
 
 ---
 **Navigation:**
