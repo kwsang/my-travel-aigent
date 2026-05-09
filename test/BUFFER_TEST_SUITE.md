@@ -61,3 +61,29 @@ This test suite is designed to verify that the Gemini reasoning engine correctly
 
 ---
 **Verification Task:** Ensure the `applied_buffer_minutes` in the itinerary JSON matches the values above during integration testing.
+
+## Scenario 5: Multi-Location Relaxed Night Owl (Bachelor Party)
+**Input:** 
+- **User Profile:** Relaxed, Night Owl.
+- **Party Size:** 12 Adults.
+- **Budget:** 15,000 USD.
+- **Locations:** Positano (City A) and Amalfi (City B).
+- **Activities (10 requested):** 
+  - Positano: Brunch, Private Boat Tour (from Positano), Beach Club, Gourmet Dinner, Nightclub.
+  - Amalfi: Group Lunch, Cathedral Visit, Paper Museum, Seafood Dinner, Bar Crawl.
+
+| Target Logic | Expected Reasoning & Output |
+| :--- | :--- |
+| **Temporal Consistency** | **Night Owl:** Start times must be $\ge$ 10:00 AM. Dinner must be scheduled between 20:00 and 23:00 local time. |
+| **Location Clustering** | **Relaxed Pace:** The agent MUST split these 10 activities into at least two days. Day 1 should cluster all Positano activities; Day 2 should cluster all Amalfi activities. |
+| **The "Retreat" Rule** | **Hotel Re-centering:** A mandatory 2+ hour block must be inserted between afternoon experiences and dinner (e.g., 17:00 - 19:30) for rest. |
+| **Scale & Capacity** | **12 Adults:** All prices must be scaled (12x). The agent must verify if venues (e.g., "Private Boat Tour") can accommodate a group of 12. |
+
+**Expected Itinerary Structure:**
+1. **Day 1 (Positano Hub):**
+   - 11:00 AM: Brunch -> 01:30 PM: Boat Tour -> 04:00 PM: Beach Club -> **Retreat to Hotel** -> 08:30 PM: Dinner -> 11:00 PM: Nightclub.
+2. **Day 2 (Amalfi Hub):**
+   - 12:00 PM: Group Lunch -> 02:30 PM: Cathedral -> 04:00 PM: Museum -> **Retreat to Hotel** -> 09:00 PM: Dinner -> 11:30 PM: Bar Crawl.
+
+---
+**Verification Task:** Ensure the `applied_buffer_minutes` in the itinerary JSON matches the values above during integration testing.

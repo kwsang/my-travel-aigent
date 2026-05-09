@@ -41,6 +41,65 @@ def calculate_buffer(traffic_estimate: int, local_time_str: str, risk_tolerance:
     else:
         raise ValueError("Invalid risk_tolerance. Must be 'strict' or 'relaxed'.")
 
+def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian_pref: str):
+    """
+    Validates the high-level structure of an itinerary based on Scenario 5 requirements:
+    Clustering, Night Owl hours, and the Retreat Rule.
+    """
+    print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Vibe: {circadian_pref})...")
+    errors = []
+    
+    events = itinerary.get("events", [])
+    events_by_day = {}
+    
+    for event in events:
+        dt = datetime.datetime.fromisoformat(event["schedule"]["local_start_time"])
+        day = dt.date()
+        if day not in events_by_day:
+            events_by_day[day] = []
+        events_by_day[day].append(event)
+
+    # 1. Multi-day check for Relaxed
+    if risk_tolerance.lower() == "relaxed" and len(events_by_day) < 2:
+        errors.append("FAIL: Relaxed itineraries with many activities should be split across multiple days.")
+
+    for day, day_events in events_by_day.items():
+        # 2. Night Owl Check
+        if circadian_pref.lower() == "night_owl":
+            first_event_dt = datetime.datetime.fromisoformat(day_events[0]["schedule"]["local_start_time"])
+            if first_event_dt.hour < 10:
+                errors.append(f"FAIL: Night Owl violation on {day}. First activity starts at {first_event_dt.time()}.")
+
+        # 3. Location Clustering Check (Relaxed)
+        if risk_tolerance.lower() == "relaxed":
+            locations = {e["details"].get("location") for e in day_events if "location" in e["details"]}
+            if len(locations) > 1:
+                errors.append(f"FAIL: Clustering violation on {day}. Found multiple locations: {locations}")
+
+        # 4. The "Retreat" Rule Check (Relaxed)
+        if risk_tolerance.lower() == "relaxed":
+            # Find dinner index
+            dinner_idx = next((i for i, e in enumerate(day_events) 
+                             if e["segment"] == "DINING" and e["details"].get("category") == "Dinner"), -1)
+            
+            if dinner_idx > 0:
+                dinner_start = datetime.datetime.fromisoformat(day_events[dinner_idx]["schedule"]["local_start_time"])
+                # Check if the event immediately preceding dinner is an ACCOMMODATION or if there is a significant time gap
+                # For the sake of this validation, we check for a 2+ hour gap before dinner start
+                prev_event_end = datetime.datetime.fromisoformat(day_events[dinner_idx-1]["schedule"]["local_start_time"])
+                # Note: In a real scenario, we'd use end_time_utc, but here we estimate from start times
+                gap = (dinner_start - prev_event_end).total_seconds() / 3600
+                
+                if gap < 2.0:
+                    errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap}h gap before dinner.")
+
+    if not errors:
+        print("  Result: PASS - Structure adheres to clustering and temporal rules.\n")
+    else:
+        for err in errors:
+            print(f"  {err}")
+        print("")
+
 def run_buffer_test_suite():
     """
     Runs the buffer test suite scenarios and validates the calculated buffers.

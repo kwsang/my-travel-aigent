@@ -16,6 +16,7 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 #### Metadata Standards
 - **Itinerary Duration:** The root itinerary must include `duration_days` representing the total length of the trip.
 - **ACCOMMODATION Metadata:** Must include `stay_duration_nights`, `property_type` (e.g., Hotel, House Rental), `beds` (count), `amenities` (list), and `policies` for early check-in/checkout.
+- **TRANSPORT Metadata:** Must include `vehicle_type`, `vehicle_count`, and `provider`.
 
 #### Market Segments
 - `FLIGHT`: Commercial air travel.
@@ -133,6 +134,23 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
         "destination_geo": { "type": "Point", "coordinates": [14.2908, 40.8860] },
         "airline": "United",
         "price": { "amount": 2400.00, "currency": "USD", "is_estimated": false }
+      }
+    },
+    {
+      "segment": "TRANSPORT",
+      "schedule": {
+        "start_time_utc": "2024-07-01T21:15:00Z",
+        "end_time_utc": "2024-07-01T21:45:00Z",
+        "timezone": "Europe/Rome",
+        "local_start_time": "2024-07-01T23:15:00"
+      },
+      "details": {
+        "vehicle_type": "Private Van",
+        "vehicle_count": 2,
+        "provider": "Amalfi Transfers",
+        "from": "NAP Airport",
+        "to": "Hotel Positano",
+        "price": { "amount": 200.00, "currency": "EUR", "is_estimated": true }
       }
     },
     {
