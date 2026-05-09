@@ -40,6 +40,25 @@ def find_place_id(query):
         print(f"Search failed for '{query}': {e}")
     return None
 
+def is_open_at_requested_time(periods, day_of_week, requested_time_str):
+    """
+    Checks if the requested HH:MM time falls within the venue's periods for that day.
+    day_of_week: 0 (Sunday) to 6 (Saturday)
+    """
+    req_h, req_m = map(int, requested_time_str.split(':'))
+    req_total_mins = req_h * 60 + req_m
+
+    for period in periods:
+        if period.open.day == day_of_week:
+            open_mins = period.open.hour * 60 + period.open.minute
+            # Handle close time (could be on the same day or next day/midnight)
+            close_mins = period.close.hour * 60 + period.close.minute
+            
+            # Basic check: assumes open/close on same day for simplicity in this test
+            if open_mins <= req_total_mins <= close_mins:
+                return True
+    return False
+
 def validate_venue_availability(place_id, requested_time_str, min_rating=4.5):
     """
     Fetches place details and validates opening hours and rating.
@@ -72,11 +91,19 @@ def validate_venue_availability(place_id, requested_time_str, min_rating=4.5):
         else:
             print(f"STATUS: [Top Recommendation] - Rating {rating} meets threshold.")
 
-        # 2. Closed Door Rule Check (New API logic)
+        # 2. Closed Door Rule Check
         if result.regular_opening_hours:
-            is_open_now = result.regular_opening_hours.open_now
-            status_str = "OPEN" if is_open_now else "CLOSED"
-            print(f"Current Status: {status_str}")
+            # For testing, we use the current day of the week
+            today = datetime.now().weekday()
+            # Python weekday is 0=Mon, 6=Sun. Google is 0=Sun, 6=Sat.
+            google_day = (today + 1) % 7
+            
+            is_available = is_open_at_requested_time(result.regular_opening_hours.periods, google_day, requested_time_str)
+            
+            status_str = "AVAILABLE" if is_available else "CLOSED/UNAVAILABLE"
+            print(f"Availability for {requested_time_str} (Day {google_day}): {status_str}")
+            if not is_available:
+                print(f"WARNING: Venue might be closed at the requested time.")
 
         if result.business_status.name != 'OPERATIONAL':
             print(f"WARNING: Venue status is {result.business_status.name}")

@@ -18,13 +18,13 @@
 - **DONE:** Deploy the MongoDB MCP server and create `vector_index`.
 - **DONE:** Seed `destinations` collection with Voyage AI embeddings.
 - **DONE:** Integrate Google Maps API for real-time `duration_in_traffic` calculations.
-- **IN PROGRESS:** Integrate Google Places API to enforce "Closed Door" rules and rating thresholds.
+- **DONE:** Integrate Google Places API to enforce "Closed Door" rules and rating thresholds.
 - **Tool Mapping:**
     - `create_itinerary`: Write new plans to Atlas.
     - `query_preferences`: Fetch user context.
     - `search_activities`: Semantic search via Vector Search.
 
-### Phase 4: Multi-Step Mission Logic (The "Action")
+### Phase 4: Multi-Step Mission Logic (IN PROGRESS)
 - **Logic Flow:**
     1. **Elicitation:** Gemini asks clarifying questions to narrow down the intent.
     2. **Research:** Query MongoDB via Vector Search for destinations matching the user's "vibe."

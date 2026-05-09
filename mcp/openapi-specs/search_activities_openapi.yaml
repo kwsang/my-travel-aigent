@@ -1,0 +1,61 @@
+openapi: 3.0.0
+info:
+  title: Search Activities Vector Search Tool
+  version: 1.0.0
+  description: Tool for performing semantic vector searches on travel destinations using MongoDB Atlas and Voyage AI embeddings.
+paths:
+  /search_activities:
+    post:
+      summary: Search for travel activities and destinations using semantic "vibe" queries.
+      operationId: search_activities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: The semantic search query or "vibe" (e.g., "hidden surf spots in Portugal" or "romantic palaces").
+                limit:
+                  type: integer
+                  description: The maximum number of results to return.
+                  default: 5
+                min_rating:
+                  type: number
+                  description: The minimum rating threshold for destinations.
+                  default: 4.5
+              required:
+                - query
+      responses:
+        '200':
+          description: A list of destinations matching the semantic intent and filters.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Destination'
+components:
+  schemas:
+    Destination:
+      type: object
+      properties:
+        name:
+          type: string
+        country:
+          type: string
+        description:
+          type: string
+        location:
+          type: object
+          description: GeoJSON Point representation of the destination.
+        vibe_tags:
+          type: array
+          items:
+            type: string
+        price_tier:
+          type: string
+        rating:
+          type: number
