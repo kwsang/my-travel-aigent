@@ -13,6 +13,10 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 - **ISO 4217 Currency:** All prices must specify a 3-letter currency code (e.g., `USD`, `EUR`).
 - **Price Object:** Every cost-bearing detail should use the structure: `{ "amount": float, "currency": "ISO_CODE", "is_estimated": boolean }`.
 
+#### Metadata Standards
+- **Itinerary Duration:** The root itinerary must include `duration_days` representing the total length of the trip.
+- **ACCOMMODATION Metadata:** Must include `stay_duration_nights`, `property_type` (e.g., Hotel, House Rental), `beds` (count), `amenities` (list), and `policies` for early check-in/checkout.
+
 #### Market Segments
 - `FLIGHT`: Commercial air travel.
 - `ACCOMMODATION`: Hotels, resorts, rentals (e.g., Airbnb), or hostels.
@@ -51,7 +55,8 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
    - If a result is semantically relevant but its rating is below `min_rating`, it must be proposed as a **"Budget Alternative"**.
    - The agent must explicitly flag these items with a "Review Alert" describing the rating discrepancy so the user can decide.
 10. **Risk Tolerance:**
-   - **Relaxed:** Prioritize comfort by adding 15 minutes to all calculated transit buffers and setting a 40-minute Minimum Floor.
+   - **Relaxed:** Plan by "Days" rather than linear events. Cluster activities within a single geographic area per day to minimize travel. Include a mandatory "Retreat to Hotel" block after primary daily activities.
+   - **Comfort Buffers (Relaxed):** Add 15 minutes to all calculated transit buffers and enforce a 40-minute Minimum Floor.
    - **Strict:** Prioritize efficiency by using the calculated buffers with no additional padding (minimizing dead time).
 
 ---
@@ -110,6 +115,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
 {
   "user_id": "user_123",
   "trip_name": "Summer in Amalfi",
+  "duration_days": 7,
   "status": "draft",
   "events": [
     {
@@ -144,6 +150,14 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
         "geo": {
           "type": "Point",
           "coordinates": [14.4840, 40.6280]
+        },
+        "stay_duration_nights": 4,
+        "property_type": "Hotel",
+        "beds": 2,
+        "amenities": ["pool", "wifi", "terrace", "gym"],
+        "policies": {
+          "early_checkin_available": true,
+          "early_checkout_available": true
         },
         "type": "Boutique Hotel",
         "rating": 4.8,
