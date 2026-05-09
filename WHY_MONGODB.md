@@ -18,3 +18,7 @@ The MongoDB MCP server allows Gemini to interact with your data dynamically. Ins
 - Create new itinerary documents.
 - Query existing travel history to provide context.
 - Update plans in real-time as the user makes decisions.
+
+---
+**Navigation:**
+- [Back to Implementation Plan](IMPLEMENTATION_PLAN.md)
