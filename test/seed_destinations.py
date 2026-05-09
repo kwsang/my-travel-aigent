@@ -1,10 +1,20 @@
 import os
+import sys
 import google.generativeai as genai
 from pymongo import MongoClient
+from dotenv import load_dotenv
 
 # 1. Setup Gemini Embeddings
+# Load variables from .env file
+load_dotenv()
+
 # Make sure GOOGLE_API_KEY is in your environment variables
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+api_key = os.environ.get("GOOGLE_API_KEY")
+if not api_key:
+    print("Error: GOOGLE_API_KEY not found in environment or .env file.")
+    sys.exit(1)
+
+genai.configure(api_key=api_key)
 
 def get_embedding(text):
     result = genai.embed_content(
