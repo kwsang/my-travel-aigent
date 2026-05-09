@@ -2,3 +2,5 @@ google-generativeai
 pymongo
 python-dotenv
 voyageai
+googlemaps
+google-maps-places

@@ -16,8 +16,9 @@
 ### Phase 3: MCP Server Integration (IN PROGRESS)
 - **DONE:** Configure MongoDB MCP server for `travel-aigent-cluster`.
 - **DONE:** Deploy the MongoDB MCP server and create `vector_index`.
-- **Task:** Integrate Google Maps API for real-time `duration_in_traffic` calculations.
-- **Task:** Integrate Google Places API to enforce "Closed Door" rules and rating thresholds.
+- **DONE:** Seed `destinations` collection with Voyage AI embeddings.
+- **DONE:** Integrate Google Maps API for real-time `duration_in_traffic` calculations.
+- **IN PROGRESS:** Integrate Google Places API to enforce "Closed Door" rules and rating thresholds.
 - **Tool Mapping:**
     - `create_itinerary`: Write new plans to Atlas.
     - `query_preferences`: Fetch user context.

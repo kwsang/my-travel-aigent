@@ -52,9 +52,10 @@ This integration enforces the **"Closed Door" Rule** and the **Transparency Rule
 
 ### Functional Requirements
 - **Operating Window Validation**: Cross-reference the `local_start_time` of `DINING` and `EXPERIENCE` segments with the venue's `opening_hours`.
+    - *Note*: Target the **Places API (New)** in the Google Cloud Console for enhanced field data like `regularOpeningHours`.
 - **Rating Thresholds**: 
     - If `rating` < `min_rating`, the agent must flag the event as a **"Budget Alternative"**.
-    - Use the `user_ratings_total` to verify the credibility of the recommendation.
+    - Use the `userRatingCount` to verify the credibility of the recommendation.
 - **Amenity Verification**: For `ACCOMMODATION`, verify that requested amenities (e.g., "pool", "gym") exist before confirming the selection.
 
 ## 4. Integration Checklist (Agent Builder)
