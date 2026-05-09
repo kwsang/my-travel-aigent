@@ -19,8 +19,8 @@ The MCP server acts as the persistent memory layer for Gemini, allowing it to re
 
 ### 1.1 Embedding Strategy
 To ensure semantic consistency with the Gemini "Brain":
-- **Model**: Use Google's `text-embedding-004`.
-- **Vector Size**: 768 dimensions (matches `vector_index` configuration).
+- **Model**: Use Voyage AI `voyage-4`.
+- **Vector Size**: 1024 dimensions (matches `vector_index` configuration).
 
 ### 1.1 Technical Implementation (MCP Config)
 To enable these tools, the MCP server configuration (typically `mcp-config.json`) should map these functions to specific Atlas collections:

@@ -1,3 +1,4 @@
 google-generativeai
 pymongo
 python-dotenv
+voyageai
