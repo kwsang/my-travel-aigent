@@ -1,0 +1,46 @@
+openapi: 3.0.0
+info:
+  title: Save Itinerary MCP Tool
+  version: 1.0.0
+  description: Tool for persisting a validated, multi-day travel itinerary to MongoDB Atlas.
+paths:
+  /save_itinerary:
+    post:
+      summary: Save a finalized itinerary document.
+      operationId: save_itinerary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                trip_name:
+                  type: string
+                duration_days:
+                  type: integer
+                events:
+                  type: array
+                  items:
+                    type: object
+                    description: A travel segment (FLIGHT, ACCOMMODATION, etc.)
+                metadata:
+                  type: object
+              required:
+                - user_id
+                - trip_name
+                - events
+      responses:
+        '200':
+          description: Success message confirming the itinerary was saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  id:
+                    type: string

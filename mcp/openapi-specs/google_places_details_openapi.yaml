@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Google Places API (New) Tool
+  version: 1.0.0
+paths:
+  /get_place:
+    post:
+      summary: Get details for a specific place
+      operationId: google_places_details
+      parameters:
+        - name: x-goog-fieldmask
+          in: header
+          required: true
+          schema:
+            type: string
+            default: "displayName,rating,userRatingCount,regularOpeningHours,businessStatus"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The resource name of the place (e.g., places/PLACE_ID)
+      responses:
+        '200':
+          description: Successful response containing place details.

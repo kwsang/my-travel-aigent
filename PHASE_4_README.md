@@ -14,6 +14,7 @@ To satisfy complex scenarios (like the "Relaxed Night Owl Bachelor Party"), Gemi
 ## 2. Research & Discovery (The "Finder")
 1. **Semantic Search**: Invoke `search_activities` using Voyage AI embeddings to find venues matching the user's "vibe."
 2. **Distance Anchoring**: Group venues by proximity to minimize travel (especially for "Relaxed" users).
+3. **Contextual Retrieval**: Use `query_user_profile` at the start of every session to ensure logic is tailored to the user's specific circadian and risk profiles.
 
 ## 3. The Planning & Verification Loop (The "Architect")
 This is where the agent applies the rules from `SYSTEM_PROMPT.md`:
@@ -21,38 +22,10 @@ This is where the agent applies the rules from `SYSTEM_PROMPT.md`:
 2. **Buffer Injection**: Call `google_maps_matrix` to get real traffic, then apply the `calculate_buffer` logic.
 3. **Venue Check**: Call `google_places_details` to verify the "Closed Door" rule.
 4. **Retreat Rule**: For "Relaxed" users, ensure the 2-hour accommodation block exists before dinner.
+5. **Persistence**: Invoke `save_itinerary` once the user approves the draft to ensure the mission is recorded.
 
 ## 4. Tool Specification (OpenAPI)
-To integrate with Google Cloud Agent Builder, we must provide OpenAPI specs for our MCP tools.
-
-### Example: `google_places_details` Tool
-```yaml
-openapi: 3.0.0
-info:
-  title: Google Places API (New) Tool
-  version: 1.0.0
-paths:
-  /get_place:
-    post:
-      summary: Get details for a specific place
-      operationId: google_places_details
-      parameters:
-        - name: x-goog-fieldmask
-          in: header
-          required: true
-          schema:
-            type: string
-            default: "displayName,rating,userRatingCount,regularOpeningHours,businessStatus"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: The resource name of the place (e.g., places/PLACE_ID)
-```
+To integrate with Google Cloud Agent Builder, we must provide OpenAPI specs for our MCP tools. All specifications are maintained in `\mcp\openapi-specs`.
 
 ## 5. Success Criteria
 - [ ] Agent handles a missing preference by asking a follow-up question instead of hallucinating.

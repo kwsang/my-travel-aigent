@@ -1,0 +1,54 @@
+openapi: 3.0.0
+info:
+  title: Query User Profile MCP Tool
+  version: 1.0.0
+  description: Tool for retrieving persistent user preferences, budget constraints, and circadian profiles from MongoDB Atlas.
+paths:
+  /query_user_profile:
+    post:
+      summary: Fetch a user's travel profile and preferences.
+      operationId: query_user_profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  description: The unique identifier for the user.
+              required:
+                - user_id
+      responses:
+        '200':
+          description: The user's profile containing preferences and constraints.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+components:
+  schemas:
+    UserProfile:
+      type: object
+      properties:
+        user_id:
+          type: string
+        preferences:
+          type: object
+          properties:
+            circadian_preference:
+              type: string
+              enum: [early_bird, night_owl, standard]
+            risk_tolerance:
+              type: string
+              enum: [relaxed, strict]
+            min_rating:
+              type: number
+            budget:
+              type: object
+              properties:
+                total_limit:
+                  type: number
+                currency:
+                  type: string
