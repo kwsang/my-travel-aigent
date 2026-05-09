@@ -52,6 +52,8 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
    - The agent must maintain a running total of the itinerary cost.
    - For `DINING` and `EXPERIENCE` segments, the agent must scale per-person price estimates by the total `party_size` (adults + children).
    - If the total exceeds the `budget_limit` in the `UserProfile`, the agent must prioritize finding "Budget Alternatives" for the remaining unbooked segments.
+      - **Per-Person Toggle:** If `group_planning_per_person` is enabled, the budget limit comparison and final reporting must be calculated as `Total Cost / Total People`.
+   - **Room Sharing:** When `room_sharing` is enabled, calculate the number of rooms needed (Total People / `people_per_room`, rounded up) and multiply by the per-room price before dividing by the total party size for the per-person estimate.
 9. **Quality vs. Value (Transparency Rule):**
    - If a result is semantically relevant but its rating is below `min_rating`, it must be proposed as a **"Budget Alternative"**.
    - The agent must explicitly flag these items with a "Review Alert" describing the rating discrepancy so the user can decide.
@@ -74,6 +76,9 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     "min_rating": 4.5, // Treated as a soft threshold for highlighting vs. budget alternatives.
     "circadian_preference": "night_owl", // Supported values: "early_bird", "night_owl", "standard"
     "risk_tolerance": "relaxed", // Supported values: "relaxed", "strict"
+    "group_planning_per_person": true,
+    "room_sharing": true,
+    "people_per_room": 2,
     "budget": {
       "total_limit": 5000,
       "currency": "USD"

@@ -1,4 +1,5 @@
 import datetime
+import math
 
 def calculate_buffer(traffic_estimate: int, local_time_str: str, risk_tolerance: str) -> int:
     """
@@ -70,28 +71,41 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
             if first_event_dt.hour < 10:
                 errors.append(f"FAIL: Night Owl violation on {day}. First activity starts at {first_event_dt.time()}.")
 
+            # Night Owl Dinner Window: 20:00 - 23:00
+            dinner_event = next((e for e in day_events if e["segment"] == "DINING" and e["details"].get("category") == "Dinner"), None)
+            if dinner_event:
+                dinner_time = datetime.datetime.fromisoformat(dinner_event["schedule"]["local_start_time"]).time()
+                if not (datetime.time(20, 0) <= dinner_time <= datetime.time(23, 0)):
+                    errors.append(f"FAIL: Night Owl dinner violation on {day}. Dinner at {dinner_time} (expected 20:00-23:00).")
+
         # 3. Location Clustering Check (Relaxed)
         if risk_tolerance.lower() == "relaxed":
-            locations = {e["details"].get("location") for e in day_events if "location" in e["details"]}
-            if len(locations) > 1:
-                errors.append(f"FAIL: Clustering violation on {day}. Found multiple locations: {locations}")
+            # Clustering refers to the city or travel zone, not individual venues
+            zones = {e["details"].get("city") or e["details"].get("travel_zone") 
+                     for e in day_events if "city" in e["details"] or "travel_zone" in e["details"]}
+            if len(zones) > 1:
+                errors.append(f"FAIL: Clustering violation on {day}. Found multiple zones: {zones}")
 
         # 4. The "Retreat" Rule Check (Relaxed)
         if risk_tolerance.lower() == "relaxed":
-            # Find dinner index
             dinner_idx = next((i for i, e in enumerate(day_events) 
                              if e["segment"] == "DINING" and e["details"].get("category") == "Dinner"), -1)
             
             if dinner_idx > 0:
                 dinner_start = datetime.datetime.fromisoformat(day_events[dinner_idx]["schedule"]["local_start_time"])
-                # Check if the event immediately preceding dinner is an ACCOMMODATION or if there is a significant time gap
-                # For the sake of this validation, we check for a 2+ hour gap before dinner start
-                prev_event_end = datetime.datetime.fromisoformat(day_events[dinner_idx-1]["schedule"]["local_start_time"])
-                # Note: In a real scenario, we'd use end_time_utc, but here we estimate from start times
-                gap = (dinner_start - prev_event_end).total_seconds() / 3600
                 
-                if gap < 2.0:
-                    errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap}h gap before dinner.")
+                # Check for an explicit accommodation retreat or a 2+ hour gap from the last activity's end
+                prev_event = day_events[dinner_idx-1]
+                is_retreat = prev_event["segment"] == "ACCOMMODATION"
+                
+                # Fallback to start_time if end_time isn't present, though end_time is preferred for gap logic
+                prev_end_str = prev_event["schedule"].get("local_end_time") or prev_event["schedule"]["local_start_time"]
+                prev_end = datetime.datetime.fromisoformat(prev_end_str)
+                
+                gap = (dinner_start - prev_end).total_seconds() / 3600
+                
+                if gap < 2.0 and not is_retreat:
+                    errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap:.1f}h gap and no accommodation block.")
 
     if not errors:
         print("  Result: PASS - Structure adheres to clustering and temporal rules.\n")
@@ -99,6 +113,53 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         for err in errors:
             print(f"  {err}")
         print("")
+
+def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
+    """
+    Validates budget adherence based on group size, per-person toggle, and room sharing.
+    """
+    print(f"Validating Budget (Group Size: {user_prefs['party_size']['adults']}, Per-Person: {user_prefs['group_planning_per_person']})...")
+    
+    total_people = user_prefs['party_size']['adults'] + user_prefs['party_size']['children']
+    total_cost = 0.0
+    limit = user_prefs['budget']['total_limit']
+    per_person_toggle = user_prefs.get('group_planning_per_person', False)
+    room_sharing = user_prefs.get('room_sharing', False)
+    people_per_room = user_prefs.get('people_per_room', 2)
+
+    # Validate people_per_room
+    if not isinstance(people_per_room, int) or people_per_room <= 0:
+        print(f"  FAIL: Invalid 'people_per_room' value. Must be a positive integer. Found: {people_per_room}\n")
+        return False
+
+
+    for event in itinerary.get("events", []):
+        price_data = event["details"].get("price", {})
+        base_amt = price_data.get("amount", 0.0)
+        
+        if event["segment"] == "ACCOMMODATION":
+            if room_sharing:
+                # Account for specific room density
+                num_rooms = math.ceil(total_people / people_per_room)
+                total_cost += (base_amt * num_rooms)
+            else:
+                # No sharing: one room per person
+                total_cost += (base_amt * total_people)
+        else:
+            # Dining/Experience usually scaled by party size
+            total_cost += (base_amt * total_people)
+
+    final_val = total_cost / total_people if per_person_toggle else total_cost
+    
+    print(f"  Calculated Value: {final_val:.2f} {user_prefs['budget']['currency']}")
+    print(f"  Budget Limit:     {limit:.2f} {user_prefs['budget']['currency']}")
+
+    if final_val > limit:
+        print(f"  FAIL: Budget exceeded. {final_val} > {limit}\n")
+        return False
+    
+    print("  Result: PASS - Budget is within limits.\n")
+    return True
 
 def run_buffer_test_suite():
     """
@@ -166,5 +227,197 @@ def run_buffer_test_suite():
                 
     print("Buffer Test Suite Finished.")
 
+def run_scenario_5_validation():
+    """
+    Runs the validation for Scenario 5: Multi-Location Relaxed Night Owl (Bachelor Party).
+    """
+    print("Running Scenario 5: Multi-Location Relaxed Night Owl (Bachelor Party) Validation...\n")
+
+    mock_itinerary_scenario_5 = {
+        "user_id": "user_bachelor_party",
+        "trip_name": "Bachelor Party Amalfi Coast",
+        "duration_days": 2,
+        "status": "draft",
+        "events": [
+            # Day 1: Positano Hub
+            {
+                "segment": "DINING",
+                "schedule": {
+                    "local_start_time": "2024-07-01T11:00:00",
+                    "local_end_time": "2024-07-01T12:30:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Positano Brunch Spot",
+                    "category": "Brunch",
+                    "city": "Positano"
+                }
+            },
+            {
+                "segment": "EXPERIENCE",
+                "schedule": {
+                    "local_start_time": "2024-07-01T13:00:00",
+                    "local_end_time": "2024-07-01T16:00:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Private Boat Tour",
+                    "category": "Nautical",
+                    "city": "Positano"
+                }
+            },
+            {
+                "segment": "EXPERIENCE",
+                "schedule": {
+                    "local_start_time": "2024-07-01T16:30:00",
+                    "local_end_time": "2024-07-01T18:00:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Arienzo Beach Club",
+                    "category": "Beach",
+                    "city": "Positano"
+                }
+            },
+            {
+                "segment": "ACCOMMODATION", # Explicit retreat
+                "schedule": {
+                    "local_start_time": "2024-07-01T18:00:00",
+                    "local_end_time": "2024-07-01T20:00:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Hotel Positano",
+                    "category": "Retreat",
+                    "city": "Positano"
+                }
+            },
+            {
+                "segment": "DINING",
+                "schedule": {
+                    "local_start_time": "2024-07-01T20:30:00",
+                    "local_end_time": "2024-07-01T22:00:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Gourmet Dinner Positano",
+                    "category": "Dinner",
+                    "city": "Positano"
+                }
+            },
+            {
+                "segment": "EXPERIENCE",
+                "schedule": {
+                    "local_start_time": "2024-07-01T22:30:00",
+                    "local_end_time": "2024-07-02T01:00:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Positano Nightclub",
+                    "category": "Nightlife",
+                    "city": "Positano"
+                }
+            },
+            # Day 2: Amalfi Hub
+            {
+                "segment": "DINING",
+                "schedule": {
+                    "local_start_time": "2024-07-02T12:00:00",
+                    "local_end_time": "2024-07-02T13:30:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Amalfi Group Lunch",
+                    "category": "Lunch",
+                    "city": "Amalfi"
+                }
+            },
+            {
+                "segment": "EXPERIENCE",
+                "schedule": {
+                    "local_start_time": "2024-07-02T14:30:00",
+                    "local_end_time": "2024-07-02T15:30:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Amalfi Cathedral Visit",
+                    "category": "Sightseeing",
+                    "city": "Amalfi"
+                }
+            },
+            {
+                "segment": "EXPERIENCE",
+                "schedule": {
+                    "local_start_time": "2024-07-02T16:00:00",
+                    "local_end_time": "2024-07-02T17:30:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Paper Museum",
+                    "category": "Museum",
+                    "city": "Amalfi"
+                }
+            },
+            {
+                "segment": "ACCOMMODATION", # Explicit retreat
+                "schedule": {
+                    "local_start_time": "2024-07-02T17:30:00",
+                    "local_end_time": "2024-07-02T20:30:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Hotel Amalfi",
+                    "category": "Retreat",
+                    "city": "Amalfi"
+                }
+            },
+            {
+                "segment": "DINING",
+                "schedule": {
+                    "local_start_time": "2024-07-02T21:00:00",
+                    "local_end_time": "2024-07-02T22:30:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Seafood Dinner Amalfi",
+                    "category": "Dinner",
+                    "city": "Amalfi"
+                }
+            },
+            {
+                "segment": "EXPERIENCE",
+                "schedule": {
+                    "local_start_time": "2024-07-02T23:00:00",
+                    "local_end_time": "2024-07-03T01:30:00",
+                    "timezone": "Europe/Rome"
+                },
+                "details": {
+                    "name": "Amalfi Bar Crawl",
+                    "category": "Nightlife",
+                    "city": "Amalfi"
+                }
+            }
+        ]
+    }
+
+    user_prefs = {
+        "party_size": {"adults": 12, "children": 0},
+        "group_planning_per_person": True,
+        "room_sharing": True,
+        "people_per_room": 3,
+        "budget": {
+            "total_limit": 1500, # 1500 per person
+            "currency": "USD"
+        }
+    }
+
+    # Mock adding prices for the validation
+    for event in mock_itinerary_scenario_5["events"]:
+        event["details"]["price"] = {"amount": 100.0, "currency": "USD"}
+
+    validate_itinerary_budget(mock_itinerary_scenario_5, user_prefs)
+    validate_itinerary_structure(mock_itinerary_scenario_5, "relaxed", "night_owl")
+
 if __name__ == "__main__":
     run_buffer_test_suite()
+    run_scenario_5_validation()
