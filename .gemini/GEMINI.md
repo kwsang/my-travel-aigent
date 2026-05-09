@@ -18,6 +18,8 @@ As a user, I want to avoid wasting time, like in heavy commute traffic or spendi
 
 As a user, I want to plan trips for large parties, like bachelors parties in another town, sharing rooms to lower costs while being able to specify costs per person.
 
+As a user, I usually want to plan trips for my significant other and myself, traveling as a party of 2 but accommodated by 1 bed. In this case, we prefer seeing the total price, not per person.
+
 ## Out of Scope
 International Travel
 Currency Conversion

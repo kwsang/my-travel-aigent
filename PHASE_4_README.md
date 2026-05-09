@@ -30,9 +30,10 @@ To integrate with Google Cloud Agent Builder, we must provide OpenAPI specs for 
 ## 5. Success Criteria
 - [x] All OpenAPI specifications pass the validation script.
 - [x] Architect System Prompt drafted for the planning loop.
+- [ ] Mission Simulation script created to verify tool orchestration.
 - [ ] Agent handles a missing preference by asking a follow-up question instead of hallucinating.
 - [ ] Agent correctly identifies a "Closed Door" conflict and suggests an alternative.
 - [ ] The final JSON saved to MongoDB Atlas passes the `validate_buffers.py` script.
 
 ## Next Action: Orchestration
-Import validated specs into Agent Builder, configure the Elicitation and Architect prompts, and begin the first integrated test.
+Run the `test/simulate_mission.py` script to verify the logic flow, then proceed to Agent Builder integration.

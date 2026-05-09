@@ -48,16 +48,37 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     Clustering, Night Owl hours, and the Retreat Rule.
     """
     print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Vibe: {circadian_pref})...")
+
+    def to_utc_aware(ts):
+        """Helper to ensure timestamps are offset-aware UTC for comparison."""
+        dt = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return dt.replace(tzinfo=datetime.timezone.utc) if dt.tzinfo is None else dt
+
     errors = []
     
     events = itinerary.get("events", [])
-    # Determine total group size for logistics checks
-    # Note: In a real scenario, this would come from the user profile context passed to the validator
+    if not events:
+        return True
+
+    # Establish the trip's start date to verify the 'day' property increments correctly
+    start_date = min(datetime.datetime.fromisoformat(e["schedule"]["local_start_time"]).date() for e in events)
+
     events_by_day = {}
     
     for event in events:
-        dt = datetime.datetime.fromisoformat(event["schedule"]["local_start_time"])
-        day = dt.date()
+        current_dt = datetime.datetime.fromisoformat(event["schedule"]["local_start_time"]).date()
+        # Use explicit day if provided for better grouping and overlap detection
+        day = event.get("day")
+
+        # Verify 'day' property correctly increments based on calendar dates
+        if day is not None:
+            expected_day = (current_dt - start_date).days + 1
+            if day != expected_day:
+                errors.append(f"FAIL: Day index mismatch for '{event['details'].get('name', 'Unknown')}'. "
+                              f"Date {current_dt} corresponds to Day {expected_day}, but 'day' property is {day}.")
+        if day is None:
+            day = current_dt
+            
         if day not in events_by_day:
             events_by_day[day] = []
         events_by_day[day].append(event)
@@ -67,11 +88,46 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         errors.append("FAIL: Relaxed itineraries with many activities should be split across multiple days.")
 
     for day, day_events in events_by_day.items():
+        # Ensure chronological order for sequence-based checks
+        # Use UTC for sorting to accurately handle timezone transitions
+        day_events.sort(key=lambda x: to_utc_aware(x["schedule"].get("start_time_utc") or 
+                                                  x["schedule"].get("local_start_time") or 
+                                                  # Fallback for events missing specific keys
+                                                  "1970-01-01T00:00:00Z"))
+
+        # 1.5 Overlap Check
+        for i in range(len(day_events) - 1):
+            current_event = day_events[i]
+            next_event = day_events[i+1]
+            
+            # Use UTC timestamps for precise validation across timezone changes
+            # Logic: If the current event is a long-duration 'Stay', treat it as a point-in-time 
+            # check-in (30 mins) for overlap purposes so it doesn't block the rest of the day.
+            if current_event["segment"] == "ACCOMMODATION" and "Stay" in current_event["details"].get("name", ""):
+                current_start = to_utc_aware(current_event["schedule"].get("start_time_utc") or 
+                                             current_event["schedule"]["local_start_time"])
+                current_end = current_start + datetime.timedelta(minutes=30)
+            else:
+                current_end = to_utc_aware(current_event["schedule"].get("end_time_utc") or 
+                                           current_event["schedule"].get("local_end_time") or 
+                                           current_event["schedule"].get("start_time_utc") or 
+                                           current_event["schedule"]["local_start_time"])
+
+            next_start = to_utc_aware(next_event["schedule"].get("start_time_utc") or 
+                                      next_event["schedule"]["local_start_time"])
+            
+            if current_end > next_start:
+                errors.append(f"FAIL: Overlap on {day}. {current_event['details'].get('name')} ends at {current_end.time()}, but {next_event['details'].get('name')} starts at {next_start.time()}.")
+
         # 2. Night Owl Check
         if circadian_pref.lower() == "night_owl":
-            first_event_dt = datetime.datetime.fromisoformat(day_events[0]["schedule"]["local_start_time"])
-            if first_event_dt.hour < 10:
-                errors.append(f"FAIL: Night Owl violation on {day}. First activity starts at {first_event_dt.time()}.")
+            # Night Owls avoid non-essential segments before 10:00 AM. 
+            # Logistical transitions (TRANSPORT/FLIGHT) are considered essential and excluded from this check.
+            activities = [e for e in day_events if e["segment"] not in ["TRANSPORT", "FLIGHT"]]
+            if activities:
+                first_activity_dt = datetime.datetime.fromisoformat(activities[0]["schedule"]["local_start_time"])
+                if first_activity_dt.hour < 10:
+                    errors.append(f"FAIL: Night Owl violation on {day}. First activity starts at {first_activity_dt.time()}.")
 
             # Night Owl Dinner Window: 20:00 - 23:00
             dinner_event = next((e for e in day_events if e["segment"] == "DINING" and e["details"].get("category") == "Dinner"), None)
@@ -94,17 +150,19 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                              if e["segment"] == "DINING" and e["details"].get("category") == "Dinner"), -1)
             
             if dinner_idx > 0:
-                dinner_start = datetime.datetime.fromisoformat(day_events[dinner_idx]["schedule"]["local_start_time"])
-                
                 # Check for an explicit accommodation retreat or a 2+ hour gap from the last activity's end
                 prev_event = day_events[dinner_idx-1]
                 is_retreat = prev_event["segment"] == "ACCOMMODATION"
                 
-                # Fallback to start_time if end_time isn't present, though end_time is preferred for gap logic
-                prev_end_str = prev_event["schedule"].get("local_end_time") or prev_event["schedule"]["local_start_time"]
-                prev_end = datetime.datetime.fromisoformat(prev_end_str)
+                # Physical duration gap calculation using UTC aware datetimes
+                dinner_start_utc = to_utc_aware(day_events[dinner_idx]["schedule"].get("start_time_utc") or 
+                                                day_events[dinner_idx]["schedule"]["local_start_time"])
+                prev_end = to_utc_aware(prev_event["schedule"].get("end_time_utc") or 
+                                        prev_event["schedule"].get("local_end_time") or 
+                                        prev_event["schedule"].get("start_time_utc") or 
+                                        prev_event["schedule"]["local_start_time"])
                 
-                gap = (dinner_start - prev_end).total_seconds() / 3600
+                gap = (dinner_start_utc - prev_end).total_seconds() / 3600
                 
                 if gap < 2.0 and not is_retreat:
                     errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap:.1f}h gap and no accommodation block.")
@@ -122,6 +180,32 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                 # We assume a standard vehicle holds ~5 people. Rule 6 says 6+ needs multiple.
                 if (itinerary.get("party_size_total", 0) >= 6) and vehicle_count < 2:
                     errors.append(f"FAIL: Transport logistics violation on {day}. Party size >= 6 requires multiple vehicles.")
+
+        # 6. Last Day Constraints (Water/Pool Rule)
+        # Ensure all keys are strings for comparison to avoid type errors between int/date
+        day_keys = sorted([str(k) for k in events_by_day.keys()])
+        last_day_key = day_keys[-1]
+
+        if str(day) == last_day_key:
+            # Find checkout time (end of accommodation) that falls on this day
+            checkout_time = None
+            for e in events:
+                e_end_dt = datetime.datetime.fromisoformat(e["schedule"].get("local_end_time") or e["schedule"]["local_start_time"])
+                # Determine day index for the end time to check if it matches the current validation day
+                e_end_day = (e_end_dt.date() - start_date).days + 1
+                
+                # Check if this accommodation ends on the current day we are validating
+                if e["segment"] == "ACCOMMODATION" and str(e_end_day) == str(day):
+                    checkout_time = e_end_dt
+                    break
+            
+            if checkout_time:
+                for event in day_events:
+                    if event["details"].get("category") in ["Water/Pool", "Active/Sports"]:
+                        event_start = datetime.datetime.fromisoformat(event["schedule"]["local_start_time"])
+                        if event_start >= checkout_time:
+                            errors.append(f"FAIL: Last day constraint violation on {day}. "
+                                          f"'{event['details'].get('name')}' (Water/Active) scheduled after checkout ({checkout_time.time()}).")
 
     if not errors:
         print("  Result: PASS - Structure adheres to clustering and temporal rules.\n")
@@ -157,7 +241,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
         
         if event["segment"] == "ACCOMMODATION":
             if room_sharing:
-                # Account for specific room density
+                # Account for specific room density (e.g., 2 people/1 room for couples)
                 num_rooms = math.ceil(total_people / people_per_room)
                 total_cost += (base_amt * num_rooms)
             else:

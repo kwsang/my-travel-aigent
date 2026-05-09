@@ -40,9 +40,32 @@ components:
             circadian_preference:
               type: string
               enum: [early_bird, night_owl, standard]
+            starting_location:
+              type: string
+              description: The user's point of origin (city, airport code, or address).
             risk_tolerance:
               type: string
               enum: [relaxed, strict]
+            target_duration_days:
+              type: integer
+              description: The user's desired length of the trip in days.
+            group_planning_per_person:
+              type: boolean
+              description: Whether to display and calculate costs per person instead of a total.
+            room_sharing:
+              type: boolean
+              description: Whether the party intends to share hotel rooms.
+            people_per_room:
+              type: integer
+              description: Number of people intended to share a single room.
+            party_size:
+              type: object
+              properties:
+                adults: { type: integer }
+                children: { type: integer }
+            activity_density:
+              type: string
+              enum: [low, medium, high]
             min_rating:
               type: number
             budget:

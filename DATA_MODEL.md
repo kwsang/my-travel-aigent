@@ -73,9 +73,12 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     "dietary": ["vegan", "gluten-free"],
     "travel_style": ["luxury", "adventure"],
     "preferred_airlines": ["United", "Lufthansa"],
+    "starting_location": "Duluth, GA",
+    "target_duration_days": 2,
     "min_rating": 4.5, // Treated as a soft threshold for highlighting vs. budget alternatives.
     "circadian_preference": "night_owl", // Supported values: "early_bird", "night_owl", "standard"
     "risk_tolerance": "relaxed", // Supported values: "relaxed", "strict"
+    "activity_density": "medium", // Supported values: "low", "medium", "high"
     "transport_preference": "rideshare", // Supported values: "rental", "rideshare", "neutral"
     "personal_transport_available": false,
     "group_planning_per_person": true,
@@ -127,6 +130,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
   "status": "draft",
   "events": [
     {
+      "day": 1,
       "segment": "FLIGHT",
       "schedule": {
         "start_time_utc": "2024-07-01T13:00:00Z",
@@ -144,6 +148,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       }
     },
     {
+      "day": 1,
       "segment": "TRANSPORT",
       "schedule": {
         "start_time_utc": "2024-07-01T21:15:00Z",
@@ -161,6 +166,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       }
     },
     {
+      "day": 1,
       "segment": "ACCOMMODATION",
       "schedule": {
         "start_time_utc": "2024-07-01T22:00:00Z",
@@ -191,6 +197,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       }
     },
     {
+      "day": 1,
       "segment": "DINING",
       "schedule": {
         "start_time_utc": "2024-07-01T23:00:00Z",
@@ -212,6 +219,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       }
     },
     {
+      "day": 2,
       "segment": "EXPERIENCE",
       "schedule": {
         "start_time_utc": "2024-07-02T12:00:00Z",
