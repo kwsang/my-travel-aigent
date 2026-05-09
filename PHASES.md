@@ -2,6 +2,7 @@
 
 ### Phase 1: Knowledge Base & Vector Search (The "Discovery" Superpower)
 - **Task:** Setup MongoDB Atlas with a `destinations` collection.
+- **Task:** Create a 2dsphere index on location fields for proximity-based filtering.
 - **Vector Search:** Generate embeddings for destination descriptions (beaches, cities, vibes).
 - **Goal:** Allow the agent to handle queries like "find me a hidden gem in Portugal for a surfing trip."
 
@@ -26,8 +27,9 @@
     1. **Elicitation:** Gemini asks clarifying questions to narrow down the intent.
     2. **Research:** Query MongoDB via Vector Search for destinations matching the user's "vibe."
     3. **Planning:** Sequence segments into a logical order, applying UTC normalization for all duration and buffer calculations.
-    4. **Persistence:** Save the resulting document to the `itineraries` collection via the MCP tool.
-    5. **Confirmation:** Present the plan, explicitly highlighting "Top Recommendations" vs. "Budget Alternatives" for the user to review.
+    4. **Verification:** Validate planning logic against the Buffer Test Suite.
+    5. **Persistence:** Save the resulting document to the `itineraries` collection via the MCP tool.
+    6. **Confirmation:** Present the plan, explicitly highlighting "Top Recommendations" vs. "Budget Alternatives" for the user to review.
 
 ---
 **Navigation:**

@@ -15,3 +15,7 @@ As a user, I want to limit my expenses while maximizing my enjoyment. For exampl
 As a user, I want to either choose between luxury or budget, or find a balance. This is especially true for accommodations. I generally prefer accommodations with the nicest possible amenities and good reviews but still within my budget.
 
 As a user, I want to avoid wasting time, like in heavy commute traffic or spending too much time at the airport during layovers.
+
+## Out of Scope
+International Travel
+Currency Conversion

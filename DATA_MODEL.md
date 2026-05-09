@@ -5,8 +5,13 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 
 #### Time & Timezone Standards
 - **UTC Storage:** All absolute timestamps (e.g., `start_time_utc`) must be stored in ISO 8601 UTC format (`YYYY-MM-DDTHH:MM:SSZ`).
+- **Geospatial Standards:** Locations should include a `geo` object following GeoJSON standards: `{ "type": "Point", "coordinates": [longitude, latitude] }`.
 - **IANA Timezone IDs:** Every event must include a `timezone` field using the IANA Timezone Database format (e.g., `America/Los_Angeles`, `Europe/Rome`).
 - **Local Time context:** The agent uses `local_start_time` for reasoning about "morning arrivals" or "dinner times" to match human expectations.
+
+#### Price & Currency Standards
+- **ISO 4217 Currency:** All prices must specify a 3-letter currency code (e.g., `USD`, `EUR`).
+- **Price Object:** Every cost-bearing detail should use the structure: `{ "amount": float, "currency": "ISO_CODE", "is_estimated": boolean }`.
 
 #### Market Segments
 - `FLIGHT`: Commercial air travel.
@@ -29,14 +34,25 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
    - If travel time is < 6 hours and arrival is before 12:00 PM, suggest `TRANSPORT` (Driving) to maximize the hotel stay value.
 4. **Airport Efficiency:** 
    - Layovers for `FLIGHT` segments must be > 2 hours but < 4 hours to avoid wasting time while ensuring reliability.
-5. **Timezone Resilience:**
+5. **Buffer Overrun Protocol:**
+   - If `Estimated Traffic Duration` from API exceeds the `applied_buffer_minutes`:
+     - **Auto-Correction:** Set new buffer to `Estimated Traffic Duration + 15 minutes` (Safety Margin).
+     - **Conflict Flag:** Mark the subsequent event with `status: "time_conflict"` if the new buffer creates an overlap.
+6. **Timezone Resilience:**
    - When calculating buffers between segments, the agent must normalize all times to UTC to ensure mathematical accuracy before converting back to local time for the user.
-6. **Circadian Personalization:**
+7. **Circadian Personalization:**
    - **Early Bird:** Prioritize starts between 06:00-08:00 local time. Shift `DINING` windows earlier (e.g., Dinner at 17:30).
    - **Night Owl:** Avoid any non-essential segments before 10:00 local time. Prioritize `EXPERIENCE` segments with "nightlife" or "late-night" tags.
-7. **Quality vs. Value (Transparency Rule):**
+8. **Budget Adherence & Scaling:**
+   - The agent must maintain a running total of the itinerary cost.
+   - For `DINING` and `EXPERIENCE` segments, the agent must scale per-person price estimates by the total `party_size` (adults + children).
+   - If the total exceeds the `budget_limit` in the `UserProfile`, the agent must prioritize finding "Budget Alternatives" for the remaining unbooked segments.
+9. **Quality vs. Value (Transparency Rule):**
    - If a result is semantically relevant but its rating is below `min_rating`, it must be proposed as a **"Budget Alternative"**.
    - The agent must explicitly flag these items with a "Review Alert" describing the rating discrepancy so the user can decide.
+10. **Risk Tolerance:**
+   - **Relaxed:** Prioritize comfort by adding 15 minutes to all calculated transit buffers and setting a 40-minute Minimum Floor.
+   - **Strict:** Prioritize efficiency by using the calculated buffers with no additional padding (minimizing dead time).
 
 ---
 
@@ -50,7 +66,16 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     "travel_style": ["luxury", "adventure"],
     "preferred_airlines": ["United", "Lufthansa"],
     "min_rating": 4.5, // Treated as a soft threshold for highlighting vs. budget alternatives.
-    "circadian_preference": "night_owl" // Supported values: "early_bird", "night_owl", "standard"
+    "circadian_preference": "night_owl", // Supported values: "early_bird", "night_owl", "standard"
+    "risk_tolerance": "relaxed", // Supported values: "relaxed", "strict"
+    "budget": {
+      "total_limit": 5000,
+      "currency": "USD"
+    },
+    "party_size": {
+      "adults": 2,
+      "children": 2
+    }
   },
   "home_airport": "SFO",
   "loyalty_programs": { "marriott": "gold" },
@@ -68,6 +93,10 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
   "country": "Portugal",
   "description": "A charming fishing village turned world surfing reserve. Known for consistent waves and cobblestone streets.",
   "description_embedding": [0.12, -0.05, ...], 
+  "location": {
+    "type": "Point",
+    "coordinates": [-9.4185, 38.9633]
+  },
   "vibe_tags": ["surfing", "relaxed", "coastal", "authentic"],
   "price_tier": "$$"
 }
@@ -93,8 +122,11 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       },
       "details": { 
         "from": "SFO", 
+        "origin_geo": { "type": "Point", "coordinates": [-122.3748, 37.6188] },
         "to": "NAP", 
-        "airline": "United"
+        "destination_geo": { "type": "Point", "coordinates": [14.2908, 40.8860] },
+        "airline": "United",
+        "price": { "amount": 2400.00, "currency": "USD", "is_estimated": false }
       }
     },
     {
@@ -109,9 +141,14 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       "details": {
         "name": "Hotel Positano",
         "location": "Positano",
+        "geo": {
+          "type": "Point",
+          "coordinates": [14.4840, 40.6280]
+        },
         "type": "Boutique Hotel",
         "rating": 4.8,
-        "review_count": 1240
+        "review_count": 1240,
+        "price": { "amount": 900.00, "currency": "EUR", "is_estimated": true }
       }
     },
     {
@@ -126,6 +163,11 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
         "name": "Lo Guarracino",
         "category": "Lunch",
         "location": "Positano",
+        "geo": {
+          "type": "Point",
+          "coordinates": [14.4850, 40.6270]
+        },
+        "price": { "amount": 150.00, "currency": "EUR", "is_estimated": true },
         "rating": 4.6,
         "review_count": 890
       }
@@ -133,8 +175,10 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     {
       "segment": "EXPERIENCE",
       "schedule": {
-        "start_time": "2024-07-01T14:00:00",
-        "end_time": "2024-07-01T16:00:00",
+        "start_time_utc": "2024-07-02T12:00:00Z",
+        "end_time_utc": "2024-07-02T14:00:00Z",
+        "timezone": "Europe/Rome",
+        "local_start_time": "2024-07-02T14:00:00",
         "commute_metadata": {
           "estimated_traffic_minutes": 25,
           "applied_buffer_minutes": 40,
@@ -145,15 +189,21 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       "details": { 
         "name": "Private Boat Tour", 
         "location": "Amalfi Pier", 
+        "geo": {
+          "type": "Point",
+          "coordinates": [14.6020, 40.6330]
+        },
         "category": "Nautical",
         "rating": 4.9,
-        "review_count": 312
+        "review_count": 312,
+        "price": { "amount": 450.00, "currency": "EUR", "is_estimated": false }
       }
     }
   ],
   "metadata": {
     "created_at": "ISODate(...)",
-    "tags": ["luxury", "coastal"]
+    "tags": ["luxury", "coastal"],
+    "total_estimated_cost": { "amount": 4050.00, "currency": "USD" }
   }
 }
 ```
