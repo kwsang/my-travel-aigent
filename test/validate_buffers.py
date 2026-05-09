@@ -42,7 +42,7 @@ def calculate_buffer(traffic_estimate: int, local_time_str: str, risk_tolerance:
     else:
         raise ValueError("Invalid risk_tolerance. Must be 'strict' or 'relaxed'.")
 
-def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian_pref: str):
+def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian_pref: str, user_prefs: dict = None):
     """
     Validates the high-level structure of an itinerary based on Scenario 5 requirements:
     Clustering, Night Owl hours, and the Retreat Rule.
@@ -51,6 +51,8 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     errors = []
     
     events = itinerary.get("events", [])
+    # Determine total group size for logistics checks
+    # Note: In a real scenario, this would come from the user profile context passed to the validator
     events_by_day = {}
     
     for event in events:
@@ -107,6 +109,20 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                 if gap < 2.0 and not is_retreat:
                     errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap:.1f}h gap and no accommodation block.")
 
+        # 5. Transport Logic Check (Preference & Necessity)
+        if user_prefs and user_prefs.get("personal_transport_available") is True:
+            rentals = [e for e in day_events if e["segment"] == "TRANSPORT" and e["details"].get("is_rental") is True]
+            if rentals:
+                errors.append(f"FAIL: Rental car suggested on {day} despite personal transport being available.")
+
+        # 5. Large Group Transport Check (Rule 6 in SYSTEM_PROMPT.md)
+        for event in day_events:
+            if event["segment"] == "TRANSPORT":
+                vehicle_count = event["details"].get("vehicle_count", 1)
+                # We assume a standard vehicle holds ~5 people. Rule 6 says 6+ needs multiple.
+                if (itinerary.get("party_size_total", 0) >= 6) and vehicle_count < 2:
+                    errors.append(f"FAIL: Transport logistics violation on {day}. Party size >= 6 requires multiple vehicles.")
+
     if not errors:
         print("  Result: PASS - Structure adheres to clustering and temporal rules.\n")
     else:
@@ -120,7 +136,9 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     """
     print(f"Validating Budget (Group Size: {user_prefs['party_size']['adults']}, Per-Person: {user_prefs['group_planning_per_person']})...")
     
-    total_people = user_prefs['party_size']['adults'] + user_prefs['party_size']['children']
+    adults = user_prefs['party_size']['adults']
+    children = user_prefs['party_size']['children']
+    total_people = adults + children
     total_cost = 0.0
     limit = user_prefs['budget']['total_limit']
     per_person_toggle = user_prefs.get('group_planning_per_person', False)
@@ -145,18 +163,28 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
             else:
                 # No sharing: one room per person
                 total_cost += (base_amt * total_people)
+        elif event["segment"] == "DINING":
+            # Apply 50% child pricing rule (Rule 4 in SYSTEM_PROMPT.md)
+            total_cost += (base_amt * adults) + (base_amt * 0.5 * children)
+        elif event["segment"] == "TRANSPORT":
+            # Transport is priced per vehicle, not per person
+            v_count = event["details"].get("vehicle_count", 1)
+            total_cost += (base_amt * v_count)
         else:
-            # Dining/Experience usually scaled by party size
+            # Experience/Logistics usually full price per head
             total_cost += (base_amt * total_people)
 
     final_val = total_cost / total_people if per_person_toggle else total_cost
     
-    print(f"  Calculated Value: {final_val:.2f} {user_prefs['budget']['currency']}")
-    print(f"  Budget Limit:     {limit:.2f} {user_prefs['budget']['currency']}")
+    currency = user_prefs['budget'].get('currency', 'USD')
+    print(f"  Calculated Value: {final_val:.2f} {currency}")
+    print(f"  Budget Limit:     {limit:.2f} {currency}")
 
     if final_val > limit:
-        print(f"  FAIL: Budget exceeded. {final_val} > {limit}\n")
+        print(f"  FAIL: Budget exceeded. {final_val:.2f} > {limit:.2f}\n")
         return False
+    elif final_val > (limit * 0.9):
+        print(f"  WARNING: Budget threshold (90%) reached ({final_val:.2f} / {limit:.2f}).")
     
     print("  Result: PASS - Budget is within limits.\n")
     return True
@@ -237,6 +265,7 @@ def run_scenario_5_validation():
         "user_id": "user_bachelor_party",
         "trip_name": "Bachelor Party Amalfi Coast",
         "duration_days": 2,
+        "party_size_total": 12,
         "status": "draft",
         "events": [
             # Day 1: Positano Hub
@@ -405,6 +434,8 @@ def run_scenario_5_validation():
         "group_planning_per_person": True,
         "room_sharing": True,
         "people_per_room": 3,
+        "transport_preference": "rideshare",
+        "personal_transport_available": False,
         "budget": {
             "total_limit": 1500, # 1500 per person
             "currency": "USD"
@@ -416,7 +447,7 @@ def run_scenario_5_validation():
         event["details"]["price"] = {"amount": 100.0, "currency": "USD"}
 
     validate_itinerary_budget(mock_itinerary_scenario_5, user_prefs)
-    validate_itinerary_structure(mock_itinerary_scenario_5, "relaxed", "night_owl")
+    validate_itinerary_structure(mock_itinerary_scenario_5, "relaxed", "night_owl", user_prefs)
 
 if __name__ == "__main__":
     run_buffer_test_suite()

@@ -16,7 +16,7 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 #### Metadata Standards
 - **Itinerary Duration:** The root itinerary must include `duration_days` representing the total length of the trip.
 - **ACCOMMODATION Metadata:** Must include `stay_duration_nights`, `property_type` (e.g., Hotel, House Rental), `beds` (count), `amenities` (list), and `policies` for early check-in/checkout.
-- **TRANSPORT Metadata:** Must include `vehicle_type`, `vehicle_count`, and `provider`.
+- **TRANSPORT Metadata:** Must include `vehicle_type`, `vehicle_count`, `is_rental`, and `provider`.
 
 #### Market Segments
 - `FLIGHT`: Commercial air travel.
@@ -76,6 +76,8 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     "min_rating": 4.5, // Treated as a soft threshold for highlighting vs. budget alternatives.
     "circadian_preference": "night_owl", // Supported values: "early_bird", "night_owl", "standard"
     "risk_tolerance": "relaxed", // Supported values: "relaxed", "strict"
+    "transport_preference": "rideshare", // Supported values: "rental", "rideshare", "neutral"
+    "personal_transport_available": false,
     "group_planning_per_person": true,
     "room_sharing": true,
     "people_per_room": 2,

@@ -65,6 +65,13 @@ Your planning must optimize for both value and efficiency:
     - You MUST plan for multiple vehicles (e.g., one 8-passenger vans or two SUVs) for every `TRANSPORT` segment.
     - Ensure all vehicles share the same `start_time_utc` and `end_time_utc` to maintain group synchronization.
     - Explicitly state the vehicle count and type in the segment notes.
+4. **Car Rental vs. Rideshare Logic:**
+   - **Necessity:** A car rental is only considered necessary if the user arrives via `FLIGHT` and `personal_transport_available` is `false`.
+   - **Preference Execution:**
+     - If `transport_preference` is "rental", prioritize a single `TRANSPORT` (Rental) segment for the trip duration.
+     - If `transport_preference` is "rideshare", prioritize individual `TRANSPORT` (Rideshare) segments for each commute.
+     - If "neutral", compare total trip costs: `(Daily Rental Rate * Days)` vs. `(Sum of estimated rideshare costs)`. 
+   - **Exclusion:** Do NOT suggest a car rental if `personal_transport_available` is `true`.
 
 ### 7. Traffic-Aware Transparency
 When explaining schedules, be transparent about the "why" behind your timing:
