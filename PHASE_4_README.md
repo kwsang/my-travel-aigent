@@ -25,9 +25,14 @@ This is where the agent applies the rules from `SYSTEM_PROMPT.md`:
 5. **Persistence**: Invoke `save_itinerary` once the user approves the draft to ensure the mission is recorded.
 
 ## 4. Tool Specification (OpenAPI)
-To integrate with Google Cloud Agent Builder, we must provide OpenAPI specs for our MCP tools. All specifications are maintained in `\mcp\openapi-specs`.
+To integrate with Google Cloud Agent Builder, we must provide OpenAPI specs for our MCP tools. All specifications are maintained in `\mcp\openapi-specs` and verified using `test/validate_openapi.py`.
 
 ## 5. Success Criteria
+- [x] All OpenAPI specifications pass the validation script.
+- [x] Architect System Prompt drafted for the planning loop.
 - [ ] Agent handles a missing preference by asking a follow-up question instead of hallucinating.
 - [ ] Agent correctly identifies a "Closed Door" conflict and suggests an alternative.
 - [ ] The final JSON saved to MongoDB Atlas passes the `validate_buffers.py` script.
+
+## Next Action: Orchestration
+Import validated specs into Agent Builder, configure the Elicitation and Architect prompts, and begin the first integrated test.

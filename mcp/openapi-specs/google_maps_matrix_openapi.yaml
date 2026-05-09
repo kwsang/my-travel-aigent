@@ -1,0 +1,41 @@
+openapi: 3.0.0
+info:
+  title: Google Maps Distance Matrix API Tool
+  version: 1.0.0
+  description: Tool for retrieving real-time and predictive travel durations including duration_in_traffic.
+paths:
+  /distance_matrix:
+    post:
+      summary: Calculate travel time and distance between locations.
+      operationId: google_maps_matrix
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origins:
+                  type: array
+                  items:
+                    type: string
+                  description: Starting point coordinates (lat,lng) or address.
+                destinations:
+                  type: array
+                  items:
+                    type: string
+                  description: Ending point coordinates (lat,lng) or address.
+                departure_time:
+                  type: string
+                  description: Desired departure time. Use 'now' for real-time traffic.
+                  default: 'now'
+                traffic_model:
+                  type: string
+                  enum: [best_guess, optimistic, pessimistic]
+                  default: best_guess
+              required:
+                - origins
+                - destinations
+      responses:
+        '200':
+          description: JSON response containing rows/elements with duration_in_traffic values.
