@@ -56,7 +56,7 @@ def simulate_architect_loop():
     user_prefs = {
         "user_id": "user_couple_trip",
         "party_size": {"adults": 2, "children": 0},
-        "group_planning_per_person": True,
+        "group_planning_per_person": False,
         "starting_location": "Duluth, GA",
         "target_duration_days": 2,
         "room_sharing": True,
@@ -86,7 +86,11 @@ def simulate_architect_loop():
         "day": 1,
         "segment": "TRANSPORT" if "TRANSPORT" in mode else "FLIGHT",
         "schedule": {**get_schedule(start_date_str, "07:30", travel_duration), "origin": user_prefs["starting_location"]},
-        "details": {"name": f"Travel to Savannah ({mode})", "is_rental": True if "Driving" in mode else False}
+        "details": {
+            "name": f"Travel to Savannah ({mode})", 
+            "is_rental": True if "Driving" in mode else False,
+            "price": {"amount": 120.0, "currency": "USD", "is_estimated": True}
+        }
     })
 
     # 3. Step 2: Research & Meal Selection
@@ -137,7 +141,7 @@ def simulate_architect_loop():
             "name": "The Gastonian (Stay)", 
             "city": "Savannah, GA", 
             "category": "Stay", 
-            "price": {"amount": 400.0 * (duration - 1), "currency": "USD"}
+            "price": {"amount": 400.0 * (duration - 1), "currency": "USD", "is_estimated": True}
         }
     })
 
@@ -178,7 +182,7 @@ def simulate_architect_loop():
                             "name": event_candidate["name"],
                             "category": event_candidate.get("category", "General"),
                             "city": "Savannah, GA",
-                            "price": {"amount": event_candidate["price"], "currency": "USD"}
+                            "price": {"amount": event_candidate["price"], "currency": "USD", "is_estimated": True}
                         }
                     })
 
@@ -188,7 +192,11 @@ def simulate_architect_loop():
         "day": duration,
         "segment": "LOGISTICS",
         "schedule": get_schedule(return_date_str, "15:15", 45),
-        "details": {"name": "Car Rental Return", "category": "Transport Logistics"}
+        "details": {
+            "name": "Car Rental Return", 
+            "category": "Transport Logistics",
+            "price": {"amount": 0.0, "currency": "USD", "is_estimated": False}
+        }
     })
 
     itinerary_events.append({
@@ -197,7 +205,7 @@ def simulate_architect_loop():
         "schedule": get_schedule(return_date_str, "16:00", 240), # 4 hour return drive
         "details": {
             "name": "Return Journey",
-            "price": {"amount": 50.0, "currency": "USD"}
+            "price": {"amount": 50.0, "currency": "USD", "is_estimated": True}
         }
     })
 

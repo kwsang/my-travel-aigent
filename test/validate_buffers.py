@@ -63,25 +63,28 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     # Establish the trip's start date to verify the 'day' property increments correctly
     start_date = min(datetime.datetime.fromisoformat(e["schedule"]["local_start_time"]).date() for e in events)
 
+    # Determine if a rental is used at any point for Rule 6.5
+    uses_rental = any(e["details"].get("is_rental") is True for e in events)
+
     events_by_day = {}
-    
     for event in events:
         current_dt = datetime.datetime.fromisoformat(event["schedule"]["local_start_time"]).date()
-        # Use explicit day if provided for better grouping and overlap detection
+        expected_day = (current_dt - start_date).days + 1
         day = event.get("day")
 
-        # Verify 'day' property correctly increments based on calendar dates
         if day is not None:
-            expected_day = (current_dt - start_date).days + 1
             if day != expected_day:
                 errors.append(f"FAIL: Day index mismatch for '{event['details'].get('name', 'Unknown')}'. "
                               f"Date {current_dt} corresponds to Day {expected_day}, but 'day' property is {day}.")
-        if day is None:
-            day = current_dt
-            
+        
+        day = expected_day # Force normalized integer day for grouping
         if day not in events_by_day:
             events_by_day[day] = []
         events_by_day[day].append(event)
+
+    # Get sorted days for global sequencing checks
+    sorted_days = sorted(events_by_day.keys())
+    last_day_idx = sorted_days[-1] if sorted_days else 0
 
     # 1. Multi-day check for Relaxed
     if risk_tolerance.lower() == "relaxed" and len(events_by_day) < 2:
@@ -181,21 +184,28 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                 if (itinerary.get("party_size_total", 0) >= 6) and vehicle_count < 2:
                     errors.append(f"FAIL: Transport logistics violation on {day}. Party size >= 6 requires multiple vehicles.")
 
-        # 6. Last Day Constraints (Water/Pool Rule)
-        # Ensure all keys are strings for comparison to avoid type errors between int/date
-        day_keys = sorted([str(k) for k in events_by_day.keys()])
-        last_day_key = day_keys[-1]
+        # 5.5 Transit Realism (Rule 11)
+        for i in range(len(day_events) - 1):
+            if day_events[i]["segment"] == "FLIGHT":
+                arrival_dt = to_utc_aware(day_events[i]["schedule"].get("end_time_utc") or day_events[i]["schedule"].get("local_end_time"))
+                if arrival_dt.hour >= 22:
+                    next_ev = day_events[i+1]
+                    # Skip transport to hotel check
+                    if next_ev["segment"] == "TRANSPORT" and i + 2 < len(day_events):
+                        next_ev = day_events[i+2]
+                    if next_ev["segment"] not in ["ACCOMMODATION", "TRANSPORT"]:
+                        errors.append(f"FAIL: Transit realism on day {day}. Late flight arrival ({arrival_dt.time()}) must be followed by ACCOMMODATION.")
 
-        if str(day) == last_day_key:
+        # 6. Last Day Constraints (Water/Pool Rule)
+        if day == last_day_idx:
             # Find checkout time (end of accommodation) that falls on this day
             checkout_time = None
             for e in events:
                 e_end_dt = datetime.datetime.fromisoformat(e["schedule"].get("local_end_time") or e["schedule"]["local_start_time"])
-                # Determine day index for the end time to check if it matches the current validation day
                 e_end_day = (e_end_dt.date() - start_date).days + 1
                 
                 # Check if this accommodation ends on the current day we are validating
-                if e["segment"] == "ACCOMMODATION" and str(e_end_day) == str(day):
+                if e["segment"] == "ACCOMMODATION" and e_end_day == day:
                     checkout_time = e_end_dt
                     break
             
@@ -206,6 +216,26 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                         if event_start >= checkout_time:
                             errors.append(f"FAIL: Last day constraint violation on {day}. "
                                           f"'{event['details'].get('name')}' (Water/Active) scheduled after checkout ({checkout_time.time()}).")
+
+            # 7. Rental Return Check (Rule 6.5)
+            if uses_rental:
+                final_transport_idx = -1
+                for idx, e in enumerate(day_events):
+                    if e["segment"] in ["TRANSPORT", "FLIGHT"] and "Return" in e["details"].get("name", ""):
+                        final_transport_idx = idx
+                        break
+                
+                if final_transport_idx > 0:
+                    prev_event = day_events[final_transport_idx - 1]
+                    is_return_logistics = prev_event["segment"] == "LOGISTICS" and "Rental Return" in prev_event["details"].get("name", "")
+                    if not is_return_logistics:
+                        errors.append(f"FAIL: Missing mandatory 'Car Rental Return' logistics segment before return journey on day {day}.")
+                    else:
+                        # Verify 45m duration
+                        l_start = to_utc_aware(prev_event["schedule"].get("start_time_utc") or prev_event["schedule"]["local_start_time"])
+                        l_end = to_utc_aware(prev_event["schedule"].get("end_time_utc") or prev_event["schedule"].get("local_end_time") or prev_event["schedule"]["local_start_time"])
+                        if (l_end - l_start).total_seconds() < 2700:
+                             errors.append(f"FAIL: Rental return buffer too short on day {day}. Found {(l_end - l_start).total_seconds()/60:.0f}m, expected 45m.")
 
     if not errors:
         print("  Result: PASS - Structure adheres to clustering and temporal rules.\n")
@@ -229,14 +259,20 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     room_sharing = user_prefs.get('room_sharing', False)
     people_per_room = user_prefs.get('people_per_room', 2)
 
+    errors = []
+
     # Validate people_per_room
     if not isinstance(people_per_room, int) or people_per_room <= 0:
         print(f"  FAIL: Invalid 'people_per_room' value. Must be a positive integer. Found: {people_per_room}\n")
         return False
 
-
     for event in itinerary.get("events", []):
         price_data = event["details"].get("price", {})
+        if price_data:
+            # Ensure 'is_estimated' flag is correctly set
+            if "is_estimated" not in price_data or not isinstance(price_data["is_estimated"], bool):
+                errors.append(f"FAIL: 'is_estimated' flag missing or invalid in price object for '{event['details'].get('name', 'Unknown')}'.")
+
         base_amt = price_data.get("amount", 0.0)
         
         if event["segment"] == "ACCOMMODATION":
@@ -257,6 +293,11 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
         else:
             # Experience/Logistics usually full price per head
             total_cost += (base_amt * total_people)
+
+    if errors:
+        for err in errors:
+            print(f"  {err}")
+        return False
 
     final_val = total_cost / total_people if per_person_toggle else total_cost
     
@@ -528,7 +569,7 @@ def run_scenario_5_validation():
 
     # Mock adding prices for the validation
     for event in mock_itinerary_scenario_5["events"]:
-        event["details"]["price"] = {"amount": 100.0, "currency": "USD"}
+        event["details"]["price"] = {"amount": 100.0, "currency": "USD", "is_estimated": True}
 
     validate_itinerary_budget(mock_itinerary_scenario_5, user_prefs)
     validate_itinerary_structure(mock_itinerary_scenario_5, "relaxed", "night_owl", user_prefs)
