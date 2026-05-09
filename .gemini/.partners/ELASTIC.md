@@ -1,0 +1,3 @@
+## Elastic
+
+Elastic, the Search AI Company, integrates its deep expertise in search technology with artificial intelligence to help everyone transform all of their data into answers, actions, and outcomes. Elastic's Search AI Platform — the foundation for its search, observability, and security solutions — is used by thousands of companies, including more than 50% of the Fortune 500. Learn more at elastic.co.
