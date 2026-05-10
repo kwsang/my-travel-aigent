@@ -3,6 +3,7 @@ import json
 import yaml
 from google.adk.agents import Agent
 from google.adk.apps.app import App
+from google.genai import types as genai_types
 from google.adk.agents.context_cache_config import ContextCacheConfig
 from google.adk.agents.invocation_context import InvocationContext as Context
 from google.adk.tools.function_tool import FunctionTool
@@ -49,6 +50,14 @@ def create_travel_agent():
     traffic_tool = FunctionTool(func=google_maps_matrix)
     details_tool = FunctionTool(func=google_places_details)
 
+    # 2.2 Shared Model Configuration
+    # Increase max remote calls to 20 to handle complex multi-step planning and tool use.
+    model_config = genai_types.GenerateContentConfig(
+        automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(
+            maximum_remote_calls=20
+        )
+    )
+
     # 3. Load Instruction Prompts
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
 
@@ -68,6 +77,7 @@ def create_travel_agent():
         name="concierge",
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
+        config=model_config,
         instruction=concierge_goal,
         tools=[
             record_profile_tool, 
@@ -95,6 +105,7 @@ def create_travel_agent():
         name="architect",
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
+        config=model_config,
         instruction=get_architect_instructions,
         tools=[
             search_tool, 
@@ -122,8 +133,20 @@ def create_travel_agent():
                 "Transfer the user to the 'concierge' to begin the intake process."
             )
         
+        # Contextual Handoff: Mention if we are resuming a draft
+        handoff_context = "The user's preferences are recorded."
+        if "active_itinerary" in ctx.state:
+            # Conflict Detection: Check for Starting Location mismatch
+            profile_start = ctx.state.get("user_profile_data", {}).get("preferences", {}).get("starting_location")
+            itinerary_start = ctx.state.get("active_itinerary", {}).get("metadata", {}).get("starting_location")
+            
+            if profile_start and itinerary_start and profile_start != itinerary_start:
+                handoff_context += f" [CONFLICT ALERT] The user profile starting location is '{profile_start}', but this draft itinerary starts from '{itinerary_start}'."
+
+            handoff_context += " A draft itinerary exists in 'active_itinerary'. Instruct the 'architect' to resume from this version."
+
         return (
-            "You are the Travel Supervisor. The user's preferences are recorded. "
+            f"You are the Travel Supervisor. {handoff_context} "
             "Transfer the user to the 'architect' to handle research and itinerary building. "
             "Once an itinerary is built, ensure the user is satisfied."
         )
@@ -131,6 +154,7 @@ def create_travel_agent():
     supervisor = Agent(
         name="travel_supervisor",
         model="gemini-2.5-flash",
+        config=model_config,
         instruction=supervisor_instructions,
         sub_agents=[concierge_agent, architect_agent],
         description="Orchestrates the travel planning process between the Concierge and the Architect."

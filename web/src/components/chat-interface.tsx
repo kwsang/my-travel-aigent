@@ -5,8 +5,9 @@ import { useChat } from '@/hooks/use-chat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import ReactMarkdown from 'react-markdown';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot } from 'lucide-react';
+import { Send, Bot, AlertTriangle } from 'lucide-react';
 
 export function ChatInterface() {
   const { messages, sendMessage, isLoading } = useChat();
@@ -45,13 +46,25 @@ export function ChatInterface() {
                 <div className={`p-3 rounded-2xl max-w-[80%] ${
                   m.role === 'user' 
                     ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                    : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-tl-none shadow-sm'
+                    : m.is_conflict
+                      ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-tl-none shadow-sm'
+                      : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-tl-none shadow-sm'
                 }`}>
-                  <p className="text-sm leading-relaxed">{m.text}</p>
+                  {m.is_conflict && (
+                    <div className="flex items-center gap-2 mb-2 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-tight">
+                      <AlertTriangle className="w-4 h-4" />
+                      Conflict Detected
+                    </div>
+                  )}
+                  <div className="text-base leading-relaxed prose dark:prose-invert max-w-none prose-p:leading-relaxed prose-sm md:prose-base">
+                    <ReactMarkdown>
+                      {m.text || ''}
+                    </ReactMarkdown>
+                  </div>
                   {m.thought && (
                     <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                      <p className="text-[10px] uppercase tracking-wider font-semibold opacity-40 mb-1">Agent Thought</p>
-                      <p className="text-xs italic opacity-70">{m.thought}</p>
+                      <p className="text-xs uppercase tracking-wider font-semibold opacity-40 mb-1">Agent Thought</p>
+                      <p className="text-sm italic opacity-70 whitespace-pre-wrap font-mono">{m.thought}</p>
                     </div>
                   )}
                 </div>
@@ -59,7 +72,7 @@ export function ChatInterface() {
             ))}
             {isLoading && (
               <div className="flex gap-3">
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 rounded-2xl rounded-tl-none animate-pulse text-sm">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 rounded-2xl rounded-tl-none animate-pulse text-base">
                   Architect is thinking...
                 </div>
               </div>

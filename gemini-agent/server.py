@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -8,6 +9,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Any
 from google.genai import types as genai_types
 from google.adk.runners import InMemoryRunner
+from google.adk.errors.already_exists_error import AlreadyExistsError
 from dotenv import load_dotenv
 import agent_definition
 
@@ -18,7 +20,19 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="My Travel Aigent - Brain API")
+# Shared app instance
+travel_agent_app = agent_definition.create_travel_agent()
+
+# Initialize the InMemoryRunner once globally
+runner = InMemoryRunner(app=travel_agent_app, app_name="my_travel_aigent")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # This starts the global runner once when the server starts
+    async with runner:
+        yield
+
+app = FastAPI(title="My Travel Aigent - Brain API", lifespan=lifespan)
 
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
@@ -30,9 +44,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Shared app instance
-travel_agent_app = agent_definition.create_travel_agent()
-
 class ChatRequest(BaseModel):
     user_id: str
     session_id: str
@@ -43,6 +54,7 @@ class ChatResponse(BaseModel):
     text: Optional[str] = None
     thought: Optional[str] = None
     role: str = "model"
+    is_conflict: bool = False
 
 @app.get("/health")
 async def health():
@@ -61,38 +73,81 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail="Cloud credentials not configured.")
 
     async def event_generator():
-        async with InMemoryRunner(app=travel_agent_app, app_name="my_travel_aigent") as runner:
-            # UPSERT LOGIC: Ensure the session exists in this runner instance before execution
+        # UPSERT LOGIC: Only create the session if it doesn't already exist.
+        # This allows the global runner to maintain context across multiple chat turns.
+        # Context Re-hydration: If the runner is missing the profile, load it from MongoDB
+        try:
             await runner.session_service.create_session(
                 app_name="my_travel_aigent",
                 user_id=request.user_id,
                 session_id=request.session_id
             )
+            # If create_session succeeds, it's a new session for this runner instance.
+            # Attempt to re-hydrate from the persistent store (MongoDB).
+            from clients import db as mongodb
+            if mongodb is not None:
+                persistent_profile = mongodb["user_profiles"].find_one({"user_id": request.user_id})
+                if persistent_profile:
+                    logger.info(f"Re-hydrating context for user: {request.user_id}")
+                    persistent_profile.pop("_id", None)
+                    if request.state_delta is None:
+                        request.state_delta = {}
+                    request.state_delta["user_profile_data"] = persistent_profile
+                
+                # Itinerary Re-hydration: Load the most recent draft to allow seamless resumption
+                latest_itinerary = mongodb["itineraries"].find_one(
+                    {"user_id": request.user_id, "status": "draft"},
+                    sort=[("metadata.created_at", -1)]
+                )
+                if latest_itinerary:
+                    logger.info(f"Re-hydrating latest draft itinerary for user: {request.user_id}")
+                    latest_itinerary.pop("_id", None)
+                    if request.state_delta is None:
+                        request.state_delta = {}
+                    request.state_delta["active_itinerary"] = latest_itinerary
 
-            message = genai_types.Content(
-                role="user", 
-                parts=[genai_types.Part(text=request.message)]
-            )
-            
-            yielded_any = False
-            try:
-                async for event in runner.run_async(
-                    user_id=request.user_id,
-                    session_id=request.session_id,
-                    new_message=message,
-                    state_delta=request.state_delta or {}
-                ):
-                    if event.content and event.content.parts:
-                        for part in event.content.parts:
-                            if part.text or part.thought:
-                                chunk = ChatResponse(text=part.text, thought=part.thought)
-                                yield json.dumps(chunk.model_dump()) + "\n"
-                                yielded_any = True
-                if not yielded_any:
-                    yield json.dumps({"text": "The agent did not return a response.", "role": "model"}) + "\n"
-            except Exception as e:
-                logger.error(f"Error running agent: {str(e)}")
-                yield json.dumps({"text": f"Error: {str(e)}", "role": "system"}) + "\n"
+                # UI Conflict Alert: Detect mismatches during re-hydration to signal the frontend
+                profile_data = request.state_delta.get("user_profile_data", {})
+                active_itinerary = request.state_delta.get("active_itinerary", {})
+                p_start = profile_data.get("preferences", {}).get("starting_location")
+                i_start = active_itinerary.get("metadata", {}).get("starting_location")
+
+                if p_start and i_start and p_start != i_start:
+                    conflict_msg = ChatResponse(
+                        text=f"**Starting Location Discrepancy**: This trip starts from **{i_start}**, which differs from your profile default (**{p_start}**).",
+                        role="system",
+                        is_conflict=True
+                    )
+                    yield json.dumps(conflict_msg.model_dump()) + "\n"
+
+        except AlreadyExistsError:
+            # Session already exists in the global runner, which is expected for multi-turn chat.
+            pass
+
+        message = genai_types.Content(
+            role="user", 
+            parts=[genai_types.Part(text=request.message)]
+        )
+        
+        yielded_any = False
+        try:
+            async for event in runner.run_async(
+                user_id=request.user_id,
+                session_id=request.session_id,
+                new_message=message,
+                state_delta=request.state_delta or {}
+            ):
+                if event.content and event.content.parts:
+                    for part in event.content.parts:
+                        if part.text or part.thought:
+                            chunk = ChatResponse(text=part.text, thought=part.thought)
+                            yield json.dumps(chunk.model_dump()) + "\n"
+                            yielded_any = True
+            if not yielded_any:
+                yield json.dumps({"text": "The agent did not return a response.", "role": "model"}) + "\n"
+        except Exception as e:
+            logger.error(f"Error running agent: {str(e)}")
+            yield json.dumps({"text": f"Error: {str(e)}", "role": "system"}) + "\n"
 
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 

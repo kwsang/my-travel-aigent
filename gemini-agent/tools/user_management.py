@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import Any
 from clients import destinations_collection
 from .models import UserProfile
+
+logger = logging.getLogger(__name__)
 
 def record_user_profile(profile: UserProfile, tool_context: Any) -> str:
     """
@@ -30,6 +33,17 @@ def record_user_profile(profile: UserProfile, tool_context: Any) -> str:
         prefs.room_sharing = False
     if prefs.people_per_room is None:
         prefs.people_per_room = 1
+
+    # 3. Persistence: Save to MongoDB for future session re-hydration
+    try:
+        db = destinations_collection.database
+        db["user_profiles"].update_one(
+            {"user_id": profile.user_id},
+            {"$set": profile.model_dump()},
+            upsert=True
+        )
+    except Exception as e:
+        logger.error(f"Failed to persist user profile to DB: {e}")
 
     tool_context.state.update({"user_profile_data": profile.model_dump()})
     return "User profile recorded successfully. Transitioning to Architect mode."
