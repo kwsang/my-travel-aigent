@@ -11,10 +11,14 @@ export function useChat() {
     let storedSessionId = window.localStorage.getItem('chat_session_id');
     if (!storedSessionId) {
       storedSessionId = uuidv4();
-      console.log("Generated NEW session_id:", storedSessionId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Generated NEW session_id:", storedSessionId);
+      }
       window.localStorage.setItem('chat_session_id', storedSessionId);
     } else {
-      console.log("Using EXISTING session_id from localStorage:", storedSessionId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Using EXISTING session_id from localStorage:", storedSessionId);
+      }
     }
     return storedSessionId;
   });
@@ -37,7 +41,9 @@ export function useChat() {
         session_id: id,
         message: text,
       };
-      console.log("Sending message with session_id:", id);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Sending message with session_id:", id);
+      }
       return fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
