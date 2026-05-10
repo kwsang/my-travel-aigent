@@ -31,7 +31,7 @@
     3. **Architect (DONE):** Conducts semantic search for destinations and builds logistically sound itineraries.
     4. **Logistics Monitor (DONE):** ADK Plugin providing real-time proximity enforcement and constraint injection.
     5. **Analytics (DONE):** BigQuery integration for full observability of agent behavior and tool usage.
-    6. **Persistence:** Save finalized itineraries to MongoDB Atlas.
+    6. **Persistence (DONE):** Save finalized itineraries to MongoDB Atlas.
 
 ### Phase 5: Visual Planning Dashboard (IN PROGRESS)
 - **Frontend Stack:** Develop a responsive web application (e.g., Next.js/React).

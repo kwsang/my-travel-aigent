@@ -16,6 +16,11 @@ from .tools.tools import (
     discover_new_destination, 
     search_places,
     query_user_profile,
+    get_itinerary,
+    list_trip_versions,
+    delete_itinerary,
+    update_itinerary_status,
+    clone_itinerary,
     save_itinerary,
     google_maps_matrix,
     google_places_details,
@@ -33,6 +38,11 @@ def create_travel_agent():
     discovery_tool = FunctionTool(func=discover_new_destination)
     places_search_tool = FunctionTool(func=search_places)
     events_tool = FunctionTool(func=search_local_events)
+    retrieve_itinerary_tool = FunctionTool(func=get_itinerary)
+    list_versions_tool = FunctionTool(func=list_trip_versions)
+    delete_itinerary_tool = FunctionTool(func=delete_itinerary)
+    update_status_tool = FunctionTool(func=update_itinerary_status)
+    clone_tool = FunctionTool(func=clone_itinerary)
     
     # Local Python-based versions of the MCP/API tools to avoid Protocol errors
     get_profile_tool = FunctionTool(func=query_user_profile)
@@ -60,7 +70,16 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=concierge_goal,
-        tools=[record_profile_tool, get_profile_tool, events_tool],
+        tools=[
+            record_profile_tool, 
+            get_profile_tool, 
+            events_tool, 
+            retrieve_itinerary_tool,
+            list_versions_tool,
+            delete_itinerary_tool,
+            update_status_tool,
+            clone_tool
+        ],
         description="Welcomes the user, gathers travel preferences, and proactively suggests local events to improve engagement."
     )
 
@@ -84,7 +103,12 @@ def create_travel_agent():
             places_search_tool, 
             persist_tool, 
             traffic_tool, 
-            details_tool
+            details_tool,
+            retrieve_itinerary_tool,
+            list_versions_tool,
+            delete_itinerary_tool,
+            update_status_tool,
+            clone_tool
         ],
         output_key="final_itinerary",
         description="Expert travel planner. Researches destinations, venues, and travel times to build high-fidelity itineraries."

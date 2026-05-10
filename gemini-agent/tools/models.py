@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Literal
+from typing import List, Optional, Dict, Literal, Any
 from pydantic import BaseModel, Field
 
 class Budget(BaseModel):
@@ -44,3 +44,11 @@ class Destination(BaseModel):
     description: str
     location: GeoPoint
     vibe_tags: List[str]
+
+class Itinerary(BaseModel):
+    user_id: str
+    trip_name: str
+    duration_days: int
+    status: Literal["draft", "final"] = "draft"
+    events: List[Dict[str, Any]] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)

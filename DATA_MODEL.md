@@ -15,6 +15,7 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 
 #### Metadata Standards
 - **Itinerary Duration:** The root itinerary must include `duration_days` representing the total length of the trip.
+- **Itinerary Status:** The root itinerary must include a `status` field. Supported values: `draft` (initial research or visual modification) and `final` (approved by user and committed).
 - **ACCOMMODATION Metadata:** Must include `stay_duration_nights`, `property_type` (e.g., Hotel, House Rental), `beds` (count), `amenities` (list), and `policies` for early check-in/checkout.
 - **TRANSPORT Metadata:** Must include `vehicle_type`, `vehicle_count`, `is_rental`, and `provider`.
 - **VENUE Metadata:** For `DINING` and `EXPERIENCE`, include boolean flags for service options: `dineIn`, `servesVegetarianFood`, `servesBreakfast`, `servesLunch`, `servesDinner`, `goodForChildren`, and `wheelchairAccessibleEntrance`.
