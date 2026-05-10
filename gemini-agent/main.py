@@ -4,7 +4,7 @@ import asyncio
 import logging
 from google.genai import types as genai_types
 from google.adk.runners import InMemoryRunner
-from .agent_definition import create_travel_agent
+import agent_definition
 
 # Suppress the noisy SDK warning about non-text parts in responses
 logging.getLogger('google_genai.types').setLevel(logging.ERROR)
@@ -21,7 +21,7 @@ async def start_interactive_session():
         print(f"Error: Missing environment variables: {', '.join(missing)}")
         return
 
-    my_app = create_travel_agent()
+    my_app = agent_definition.create_travel_agent()
     user_id, session_id = "user_savannah_test", "session_001"
 
     async with InMemoryRunner(app=my_app, app_name="my_travel_aigent") as runner:
