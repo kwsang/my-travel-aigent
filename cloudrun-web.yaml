@@ -2,15 +2,13 @@ apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
   name: travel-aigent-web
-  labels:
-    cloudobjs.com/managed: "true"
 spec:
   template:
     spec:
-      # Using the same service account as the API for consistency
-      serviceAccountName: travel-aigent-runner@${PROJECT_ID}.iam.gserviceaccount.com
+      # Placeholders to be replaced by sed in cloudbuild.yaml
+      serviceAccountName: travel-aigent-runner@PROJECT_ID_PLACEHOLDER.iam.gserviceaccount.com
       containers:
-        - image: us-central1-docker.pkg.dev/${PROJECT_ID}/travel-aigent/web:latest
+        - image: us-central1-docker.pkg.dev/PROJECT_ID_PLACEHOLDER/travel-aigent/web:latest
           ports:
             - containerPort: 3000
           resources:
@@ -20,9 +18,9 @@ spec:
           env:
             - name: HOSTNAME
               value: "0.0.0.0"
-            # Point this to your actual deployed API URL
+            # Placeholders replaced dynamically during build
             - name: NEXT_PUBLIC_API_URL
-              value: "https://travel-aigent-api-xyz-uc.a.run.app"
+              value: "API_URL_PLACEHOLDER"
             # If you implement NextAuth, map the secret here
             - name: NEXTAUTH_SECRET
               valueFrom:
@@ -30,4 +28,4 @@ spec:
                   name: NEXTAUTH_SECRET
                   key: latest
             - name: NEXTAUTH_URL
-              value: "https://travel-aigent-web-xyz-uc.a.run.app"
+              value: "WEB_URL_PLACEHOLDER"

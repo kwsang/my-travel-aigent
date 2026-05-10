@@ -2,15 +2,13 @@ apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
   name: travel-aigent-api
-  labels:
-    cloudobjs.com/managed: "true"
 spec:
   template:
     spec:
-      # Use a service account with 'Vertex AI User' and 'Secret Manager Secret Accessor' roles
-      serviceAccountName: travel-aigent-runner@${PROJECT_ID}.iam.gserviceaccount.com
+      # Placeholders to be replaced by sed in cloudbuild.yaml
+      serviceAccountName: travel-aigent-runner@PROJECT_ID_PLACEHOLDER.iam.gserviceaccount.com
       containers:
-        - image: us-central1-docker.pkg.dev/${PROJECT_ID}/travel-aigent/api:latest
+        - image: us-central1-docker.pkg.dev/PROJECT_ID_PLACEHOLDER/travel-aigent/api:latest
           ports:
             - containerPort: 8000
           resources:
@@ -19,7 +17,7 @@ spec:
               memory: 1Gi
           env:
             - name: GOOGLE_CLOUD_PROJECT
-              value: "${PROJECT_ID}"
+              value: "PROJECT_ID_PLACEHOLDER"
             - name: GOOGLE_CLOUD_LOCATION
               value: "us-central1"
             - name: VOYAGE_API_KEY
@@ -33,7 +31,7 @@ spec:
                   name: GOOGLE_MAPS_API_KEY
                   key: latest
             - name: FRONTEND_URL
-              value: "https://travel-aigent-web-xyz-uc.a.run.app"
+              value: "FRONTEND_URL_PLACEHOLDER"
             # We map the secret directly to the env var for the code to consume
             - name: MONGODB_URI
               valueFrom:

@@ -24,6 +24,11 @@ def get_secret(secret_id: str, default: str = None) -> str:
     Helper to fetch secrets from Google Cloud Secret Manager.
     Falls back to environment variables for local development compatibility.
     """
+    # Optimization: Check environment first (Cloud Run injected or local .env)
+    env_val = os.getenv(secret_id)
+    if env_val:
+        return env_val
+
     # If we don't have a project ID, we are likely local; skip API call.
     if not PROJECT_ID:
         return os.getenv(secret_id, default)

@@ -1,40 +1,66 @@
 steps:
-  # 1. Build and push Backend
+  # 1. Build and push Backend image
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-api'
     args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:latest', '-f', 'gemini_agent/Dockerfile', '.']
     env: ['DOCKER_BUILDKIT=1']
   
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-api'
     args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:latest']
 
-  # 2. Build and push Frontend
-  # Note: NEXT_PUBLIC_API_URL is passed as a build arg for Next.js bundle baking
-  - name: 'gcr.io/cloud-builders/docker'
-    args: 
-      - 'build'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest'
-      - '--build-arg'
-      - 'NEXT_PUBLIC_API_URL=$_API_URL'
-      - './web'
-    env: ['DOCKER_BUILDKIT=1']
-  
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest']
-
-  # 3. Deploy using YAML configurations (The "Source of Truth")
+  # 2. Initial API Deployment (Sets up the service to get a URL)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-api-initial'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Replace ${PROJECT_ID} in YAML files before deployment
-        sed -i "s/\${PROJECT_ID}/$PROJECT_ID/g" cloudrun-api.yml
-        sed -i "s/\${PROJECT_ID}/$PROJECT_ID/g" cloudrun-web.yaml
+        # Discover existing web URL or use a local placeholder for the first run
+        WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)' 2>/dev/null || echo "http://localhost:3000")
         
-        # Deploy services
+        # Use single $ for PROJECT_ID so Cloud Build injects the value.
+        # Use double $$ for WEB_URL so the shell resolves the local variable.
+        sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-api.yml
+        sed -i "s|FRONTEND_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-api.yml
+        
         gcloud run services replace cloudrun-api.yml --region=us-central1
-        gcloud run services replace cloudrun-web.yaml --region=us-central1
 
-substitutions:
-  _API_URL: "https://travel-aigent-api-your-id-uc.a.run.app"
+  # 3. Build and push Frontend (Now fetching the real API_URL dynamically)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'build-web'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Fetch the real backend URL established in the previous step
+        API_URL=$(gcloud run services describe travel-aigent-api --region us-central1 --format='value(status.url)')
+        
+        docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest \
+          --build-arg NEXT_PUBLIC_API_URL=$$API_URL ./web
+    env: ['DOCKER_BUILDKIT=1']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-web'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest']
+
+  # 4. Final Deployment (Linking Frontend to Backend URLs)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-web-and-link'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        API_URL=$(gcloud run services describe travel-aigent-api --region us-central1 --format='value(status.url)')
+        
+        # Update Web YAML and Deploy
+        sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-web.yaml
+        sed -i "s|API_URL_PLACEHOLDER|$$API_URL|g" cloudrun-web.yaml
+        sed -i "s|WEB_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-web.yaml
+        gcloud run services replace cloudrun-web.yaml --region=us-central1
+        
+        # Link Backend CORS to real Web URL
+        # Fetch final frontend URL to link CORS
+        WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)')
+        sed -i "s|FRONTEND_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-api.yml
+        gcloud run services replace cloudrun-api.yml --region=us-central1

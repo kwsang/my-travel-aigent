@@ -49,12 +49,10 @@ class MongoDBSessionService(BaseSessionService):
         )
         return [doc["session_id"] async for doc in cursor]
 
-from gemini_agent.logic.validate_buffers import validate_itinerary_structure, validate_itinerary_budget
-from gemini_agent.logic.models import ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
+from gemini_agent.logic.models import (
+    ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
+)
 from gemini_agent import agent_definition
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
