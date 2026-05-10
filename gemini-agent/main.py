@@ -5,7 +5,7 @@ import logging
 from google.genai import types as genai_types
 from google.adk.runners import InMemoryRunner
 from .agent_definition import create_travel_agent
-from .tools import calculate_travel_time
+from .tools.utils import calculate_travel_time
 
 # Suppress the noisy SDK warning about non-text parts in responses
 logging.getLogger('google_genai.types').setLevel(logging.ERROR)

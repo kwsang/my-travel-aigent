@@ -1,52 +1,44 @@
 import json
 import datetime
 from typing import Any
-from .clients import voyage_client, destinations_collection, places_client, gmaps_client
+from ..clients import voyage_client, destinations_collection, places_client, gmaps_client
+from .models import UserProfile, Destination
 from google.adk.agents.invocation_context import InvocationContext as Context
 from vertexai.generative_models import GenerativeModel
 
-def record_user_profile(profile: dict, tool_context: Any) -> str:
+def record_user_profile(profile: UserProfile, tool_context: Any) -> str:
     """
     Saves the gathered user travel preferences into the session state.
-    Enforces Couple-First Pricing Logic.
+    Enforces Couple-First Pricing Logic and strict schema adherence.
     """
-    prefs = profile.get("preferences", {})
-    party = prefs.get("party_size", {})
-    total_people = int(party.get("adults", 0)) + int(party.get("children", 0))
-    
-    # Default currency to USD if not specified
-    budget = prefs.get("budget", {})
-    if not budget.get("currency"):
-        budget["currency"] = "USD"
-    prefs["budget"] = budget
+    # Enforce defaults and business rules on the validated model instance
+    prefs = profile.preferences
+    total_people = prefs.party_size.adults + prefs.party_size.children
 
-    # Enforce Couple Assumption Logic (2 people = 1 bed/room shared)
+    # 1. Enforce Couple Assumption Logic (2 people = 1 bed/room shared)
     if total_people == 2:
-        if "group_planning_per_person" not in prefs:
-            prefs["group_planning_per_person"] = False
-        if "room_sharing" not in prefs:
-            prefs["room_sharing"] = True
-        if "people_per_room" not in prefs:
-            prefs["people_per_room"] = 2
+        if prefs.group_planning_per_person is None:
+            prefs.group_planning_per_person = False
+        if prefs.room_sharing is None:
+            prefs.room_sharing = True
+        if prefs.people_per_room is None:
+            prefs.people_per_room = 2
         
         # Assume romantic trip for couples sharing a bed
-        styles = prefs.get("travel_style", [])
-        if not any("romantic" in s.lower() for s in styles):
-            styles.append("romantic")
-        prefs["travel_style"] = styles
+        if not any("romantic" in s.lower() for s in prefs.travel_style):
+            prefs.travel_style.append("romantic")
 
-    # Default risk tolerance to relaxed (don't ask initially)
-    if "risk_tolerance" not in prefs:
-        prefs["risk_tolerance"] = "relaxed"
+    # 2. General Fallbacks for fields that might be missing from the model input
+    if prefs.group_planning_per_person is None:
+        prefs.group_planning_per_person = True
+    if prefs.room_sharing is None:
+        prefs.room_sharing = False
+    if prefs.people_per_room is None:
+        prefs.people_per_room = 1
 
-    # Default activity density to medium if not provided
-    if "activity_density" not in prefs:
-        prefs["activity_density"] = "medium"
-
-    # If you need the Artifact Service, access it via the context:
-    # artifact_service = tool_context.artifact_service
-    
-    tool_context.state.update({"user_profile_data": profile})
+    # Note: Access to system services is via the tool_context:
+    # Save the strictly validated profile dictionary to the context state
+    tool_context.state.update({"user_profile_data": profile.model_dump()})
     return "User profile recorded successfully. Transitioning to Architect mode."
 
 def query_user_profile(user_id: str, tool_context: Any) -> str:
@@ -77,10 +69,6 @@ def save_itinerary(itinerary: dict, tool_context: Any) -> str:
 def google_maps_matrix(origins: list[str], destinations: list[str]) -> str:
     """
     Calculates real-time driving time and distance between locations.
-    
-    Args:
-        origins: List of starting point coordinates or addresses.
-        destinations: List of destination coordinates or addresses.
     """
     try:
         matrix = gmaps_client.distance_matrix(
@@ -96,9 +84,6 @@ def google_maps_matrix(origins: list[str], destinations: list[str]) -> str:
 def google_places_details(name: str) -> str:
     """
     Retrieves detailed information (rating, business status, opening hours) for a specific place.
-    
-    Args:
-        name: The resource name of the place (e.g., 'places/PLACE_ID').
     """
     try:
         mask = "displayName,rating,userRatingCount,regularOpeningHours,businessStatus,currentOpeningHours"
@@ -106,7 +91,6 @@ def google_places_details(name: str) -> str:
             request={"name": name},
             metadata=[("x-goog-fieldmask", mask)]
         )
-        # Convert the proto message to a dict
         details = {
             "name": result.display_name.text,
             "rating": result.rating,
@@ -140,7 +124,9 @@ def search_destinations(query: str) -> str:
         results = list(destinations_collection.aggregate(pipeline))
         if not results:
             return f"No destinations found matching '{query}'. Try a different vibe or invoke discover_new_destination."
-        return json.dumps(results, default=str)
+
+        validated_destinations = [Destination.model_validate(res).model_dump() for res in results]
+        return json.dumps(validated_destinations)
     except Exception as e:
         return f"Error during semantic search: {str(e)}"
 
@@ -184,20 +170,9 @@ def discover_new_destination(vibe_or_city: str) -> str:
     except Exception as e:
         return f"Discovery failed: {str(e)}"
 
-def search_places(
-    text_query: str,
-    location_bias: str = None,
-    location_type: str = None,
-    serves_vegetarian_food: bool = None,
-    dine_in: bool = None,
-    serves_breakfast: bool = None,
-    serves_lunch: bool = None,
-    serves_dinner: bool = None,
-    good_for_children: bool = None,
-    wheelchair_accessible_entrance: bool = None
-) -> str:
+def search_places(text_query: str, location_bias: str = None, **kwargs) -> str:
     """
-    Searches for venues using the Google Places API with hard requirement filtering.
+    Searches for venues using the Google Places API.
     """
     try:
         mask = ("places.displayName,places.id,places.editorialSummary,places.rating,"
@@ -208,22 +183,11 @@ def search_places(
                 "places.goodForChildren,places.accessibilityOptions")
         query = f"{text_query} in {location_bias}" if location_bias else text_query
         request = {"text_query": query, "max_result_count": 8}
-        if location_type: request["included_type"] = location_type
+        if kwargs.get("location_type"): request["included_type"] = kwargs["location_type"]
         response = places_client.search_text(request=request, metadata=[("x-goog-fieldmask", mask)])
         
         venues = []
         for place in response.places:
-            if serves_vegetarian_food is not None and place.serves_vegetarian_food != serves_vegetarian_food: continue
-            if dine_in is not None and place.dine_in != dine_in: continue
-            if serves_breakfast is not None and place.serves_breakfast != serves_breakfast: continue
-            if serves_lunch is not None and place.serves_lunch != serves_lunch: continue
-            if serves_dinner is not None and place.serves_dinner != serves_dinner: continue
-            if good_for_children is not None and place.good_for_children != good_for_children: continue
-
-            # Accessibility options are nested in the New Places API response
-            has_accessible_entrance = place.accessibility_options.wheelchair_accessible_entrance if place.accessibility_options else None
-            if wheelchair_accessible_entrance is not None and has_accessible_entrance != wheelchair_accessible_entrance: continue
-
             venues.append({
                 "name": place.display_name.text,
                 "place_id": place.id,
@@ -232,50 +196,8 @@ def search_places(
                 "description": place.editorial_summary.text if place.editorial_summary else place.formatted_address,
                 "geo": {"latitude": place.location.latitude, "longitude": place.location.longitude},
                 "types": place.types,
-                "currentOpeningHours": str(place.current_opening_hours) if place.current_opening_hours else None,
-                "takeout": place.takeout,
-                "delivery": place.delivery,
-                "dineIn": place.dine_in,
-                "curbsidePickup": place.curbside_pickup,
-                "servesBreakfast": place.serves_breakfast,
-                "servesLunch": place.serves_lunch,
-                "servesDinner": place.serves_dinner,
-                "servesBeer": place.serves_beer,
-                "servesWine": place.serves_wine,
-                "servesVegetarianFood": place.serves_vegetarian_food,
-                "goodForChildren": place.good_for_children,
-                "wheelchairAccessibleEntrance": has_accessible_entrance
+                "currentOpeningHours": str(place.current_opening_hours) if place.current_opening_hours else None
             })
         return json.dumps(venues, default=str)
     except Exception as e:
         return f"Error searching Google Places: {str(e)}"
-
-def calculate_travel_time(origin: Any, destination: Any) -> tuple[int, float, str]:
-    """Helper to calculate travel duration, distance in miles, and mode (walking/driving)."""
-    try:
-        # Handle dict coordinates or raw address strings
-        orig = f"{origin['latitude']},{origin['longitude']}" if isinstance(origin, dict) else origin
-        dest = f"{destination['latitude']},{destination['longitude']}" if isinstance(destination, dict) else destination
-
-        # 1. Driving check to get initial distance and traffic duration
-        matrix = gmaps_client.distance_matrix(origins=[orig], destinations=[dest], mode="driving", departure_time="now")
-        if matrix['status'] == 'OK':
-            element = matrix['rows'][0]['elements'][0]
-            if element['status'] == 'OK':
-                distance_meters = element['distance']['value']
-                distance_miles = distance_meters * 0.000621371
-                
-                # 2. Walking logic: if < 0.5 miles, fetch walking duration
-                if distance_miles < 0.5:
-                    walking_matrix = gmaps_client.distance_matrix(origins=[orig], destinations=[dest], mode="walking")
-                    if walking_matrix['status'] == 'OK':
-                        w_element = walking_matrix['rows'][0]['elements'][0]
-                        if w_element['status'] == 'OK':
-                            return w_element['duration']['value'] // 60, distance_miles, "walking"
-                
-                # 3. Default to driving results
-                duration_mins = element['duration_in_traffic']['value'] // 60
-                return duration_mins, distance_miles, "driving"
-    except Exception:
-        pass
-    return 0, 0.0, "unknown"

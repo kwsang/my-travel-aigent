@@ -8,7 +8,7 @@ from google.adk.agents.invocation_context import InvocationContext as Context
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
-from .tools import (
+from .tools.tools import (
     record_user_profile, 
     search_destinations, 
     discover_new_destination, 
