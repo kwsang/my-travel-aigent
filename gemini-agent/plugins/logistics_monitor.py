@@ -56,9 +56,15 @@ class LogisticsMonitorPlugin(BasePlugin):
                 anchor_name = state.get("anchor_name")
                 
                 if anchor_geo:
+                    # Resolve personalized proximity threshold from user preferences
+                    prefs = state.get("user_profile_data", {}).get("preferences", {})
+                    density = prefs.get("activity_density", "medium")
+                    threshold_map = {"high": 15, "medium": 30, "low": 60}
+                    threshold = threshold_map.get(density, 30)
+
                     # Calculate travel time from the established anchor
                     travel_mins, travel_dist, travel_mode = calculate_travel_time(anchor_geo, top_venue["geo"])
-                    if travel_mins > 30:
+                    if travel_mins > threshold:
                         msg = f"- '{top_venue['name']}' is {travel_mins} mins {travel_mode} from {anchor_name} ({travel_dist:.1f} miles)."
                         
                         # Update state with the violation so the Agent can see it in get_instructions

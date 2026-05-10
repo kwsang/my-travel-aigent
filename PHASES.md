@@ -24,14 +24,14 @@
     - `query_preferences`: Fetch user context.
     - `search_activities`: Semantic search via Vector Search.
 
-### Phase 4: Multi-Step Mission Logic (ADK Visual Builder)
+### Phase 4: Multi-Step Mission Logic (ADK & Specialized Agents)
 - **Logic Flow:**
-    1. **Elicitation:** Gemini asks clarifying questions to narrow down the intent.
-    2. **Research:** Query MongoDB via Vector Search for destinations matching the user's "vibe."
-    3. **Planning:** Sequence segments into a logical order, applying UTC normalization for all duration and buffer calculations.
-    4. **Verification:** Validate planning logic against the Buffer Test Suite.
-    5. **Persistence:** Save the resulting document to the `itineraries` collection via the MCP tool.
-    6. **Confirmation:** Present the plan, explicitly highlighting "Top Recommendations" vs. "Budget Alternatives" for the user to review.
+    1. **Supervisor Orchestration:** Root agent manages handoffs between specialists based on session state.
+    2. **Concierge (DONE):** Gathers user preferences and build profile state. Proactively suggests local events.
+    3. **Architect (DONE):** Conducts semantic search for destinations and builds logistically sound itineraries.
+    4. **Logistics Monitor (DONE):** ADK Plugin providing real-time proximity enforcement and constraint injection.
+    5. **Analytics (DONE):** BigQuery integration for full observability of agent behavior and tool usage.
+    6. **Persistence:** Save finalized itineraries to MongoDB Atlas.
 
 ### Phase 5: Visual Planning Dashboard (IN PROGRESS)
 - **Frontend Stack:** Develop a responsive web application (e.g., Next.js/React).

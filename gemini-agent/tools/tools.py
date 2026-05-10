@@ -14,4 +14,4 @@ from .discovery import (
 
 # Placeholder for itinerary and geo tools (to be implemented similarly)
 from .itinerary_tools import save_itinerary
-from .geo_tools import google_maps_matrix, google_places_details, search_places
+from .geo_tools import google_maps_matrix, google_places_details, search_places, search_local_events

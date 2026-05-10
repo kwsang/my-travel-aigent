@@ -11,7 +11,12 @@ logging.getLogger('google_genai.types').setLevel(logging.ERROR)
 
 async def start_interactive_session():
     """Main async entry point for the local test session."""
-    required_vars = ["GOOGLE_CLOUD_PROJECT", "VOYAGE_API_KEY", "GOOGLE_MAPS_API_KEY"]
+    required_vars = [
+        "GOOGLE_CLOUD_PROJECT", 
+        "VOYAGE_API_KEY", 
+        "GOOGLE_MAPS_API_KEY", 
+        "BIGQUERY_DATASET"
+    ]
     if missing := [v for v in required_vars if not os.getenv(v)]:
         print(f"Error: Missing environment variables: {', '.join(missing)}")
         return

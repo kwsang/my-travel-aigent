@@ -9,6 +9,7 @@ from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
 from .plugins.logistics_monitor import LogisticsMonitorPlugin
+from google.adk.plugins.bigquery_agent_analytics_plugin import BigQueryAgentAnalyticsPlugin
 from .tools.tools import (
     record_user_profile, 
     search_destinations, 
@@ -17,7 +18,8 @@ from .tools.tools import (
     query_user_profile,
     save_itinerary,
     google_maps_matrix,
-    google_places_details
+    google_places_details,
+    search_local_events
 )
 
 def create_travel_agent():
@@ -30,6 +32,7 @@ def create_travel_agent():
     search_tool = FunctionTool(func=search_destinations)
     discovery_tool = FunctionTool(func=discover_new_destination)
     places_search_tool = FunctionTool(func=search_places)
+    events_tool = FunctionTool(func=search_local_events)
     
     # Local Python-based versions of the MCP/API tools to avoid Protocol errors
     get_profile_tool = FunctionTool(func=query_user_profile)
@@ -49,56 +52,83 @@ def create_travel_agent():
     with open(os.path.join(prompts_dir, "ARCHITECT_PROMPT.md"), "r") as f:
         architect_goal = f.read()
 
-    # 4. Define Instruction Provider using Context
-    def get_instructions(ctx: Context) -> str:
-        """
-        Dynamic instruction provider that utilizes Context to manage session-wide state.
-        """
-        # 1. Mission State Machine
-        if "user_profile_data" not in ctx.state:
-            return concierge_goal
+    # 4. Define specialized Agents
+    
+    # 4.1 Concierge: Focused on user profiling and data gathering
+    concierge_agent = Agent(
+        name="concierge",
+        model="gemini-2.5-flash",
+        static_instruction=system_instructions,
+        instruction=concierge_goal,
+        tools=[record_profile_tool, get_profile_tool, events_tool],
+        description="Welcomes the user, gathers travel preferences, and proactively suggests local events to improve engagement."
+    )
 
-        # 2. Architect Mode
-        # Remove concierge_goal to prevent redundant elicitation behavior during planning.
-        prompt = f"{system_instructions}\n\n{architect_goal}"
-
-        # 3. Dynamic Injection: Check for Proximity Violations in State
+    # 4.2 Architect: Focused on logistics, search, and planning
+    def get_architect_instructions(ctx: Context) -> str:
+        prompt = architect_goal
+        # Dynamic Injection: Check for Proximity Violations in State
         violations = ctx.state.get("proximity_violations")
         if violations:
             prompt += f"\n\n[SYSTEM MONITOR ALERT]\nThe following logistical violations were detected:\n{violations}\nYou MUST address these by finding closer alternatives."
-
         return prompt
 
-    # 5. Initialize the Agent
-    agent = Agent(
-        name="my_travel_aigent_brain",
-        model="gemini-2.5-flash", # Aligned with ADK samples
-        static_instruction=system_instructions, # Optimized for context caching
-        instruction=get_instructions,
+    architect_agent = Agent(
+        name="architect",
+        model="gemini-2.5-flash",
+        static_instruction=system_instructions,
+        instruction=get_architect_instructions,
         tools=[
             search_tool, 
             discovery_tool, 
             places_search_tool, 
-            record_profile_tool, 
-            get_profile_tool, 
             persist_tool, 
             traffic_tool, 
             details_tool
         ],
         output_key="final_itinerary",
-        description="A high-fidelity travel planner and concierge."
+        description="Expert travel planner. Researches destinations, venues, and travel times to build high-fidelity itineraries."
+    )
+
+    # 4.3 Supervisor: The Root Agent that orchestrates handoffs
+    def supervisor_instructions(ctx: Context) -> str:
+        # Decide which specialist should handle the turn based on the existence of profile data
+        if "user_profile_data" not in ctx.state:
+            return (
+                "You are the Travel Supervisor. We do not have the user's travel preferences yet. "
+                "Transfer the user to the 'concierge' to begin the intake process."
+            )
+        
+        return (
+            "You are the Travel Supervisor. The user's preferences are recorded. "
+            "Transfer the user to the 'architect' to handle research and itinerary building. "
+            "Once an itinerary is built, ensure the user is satisfied."
+        )
+
+    supervisor = Agent(
+        name="travel_supervisor",
+        model="gemini-2.5-flash",
+        instruction=supervisor_instructions,
+        sub_agents=[concierge_agent, architect_agent],
+        description="Orchestrates the travel planning process between the Concierge and the Architect."
     )
 
     # 6. Create the App with Context Caching (as seen in samples)
     # This stores the large SYSTEM_PROMPT in cache to reduce latency.
     app = App(
         name="my_travel_aigent_app",
-        root_agent=agent,
+        root_agent=supervisor,
         context_cache_config=ContextCacheConfig(
             min_tokens=2048,
             ttl_seconds=600,
         ),
-        plugins=[LogisticsMonitorPlugin()]
+        plugins=[
+            LogisticsMonitorPlugin(),
+            BigQueryAgentAnalyticsPlugin(
+                project_id=os.getenv("GOOGLE_CLOUD_PROJECT"),
+                dataset_id=os.getenv("BIGQUERY_DATASET", "travel_agent_analytics")
+            )
+        ]
     )
     
     return app

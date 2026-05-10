@@ -1,12 +1,13 @@
 # Implementation Plan: My Travel Aigent
 
 ## 1. Project Overview
-**My Travel Aigent** is an AI-powered travel assistant built using Gemini 3 and Google Cloud Agent Builder. It leverages MongoDB Atlas via the Model Context Protocol (MCP) to act as a persistent memory layer and a semantic discovery engine, moving beyond simple chat to execute complex, multi-step travel planning.
+**My Travel Aigent** is a high-fidelity, autonomous travel assistant built using **Gemini 2.5 Flash** and the **Google Cloud Agent Development Kit (ADK)**. It leverages a multi-agent architecture and modular toolsets to provide personalized, logistically-sound travel planning.
 
 ## 2. System Architecture
-- **Brain:** Gemini 1.5/3 (Reasoning and Planning).
-- **Orchestration:** ADK Visual Builder (Task flow and tool invocation).
-- **Superpowers (MCP):** MongoDB MCP Server.
+- **Brain:** Gemini 2.5 Flash (Reasoning, Planning, and Elicitation).
+- **Orchestration:** ADK Framework using a **Supervisor Pattern** (Supervisor, Concierge, and Architect agents).
+- **Monitoring & Analytics:** Custom ADK Plugins for real-time logistics (proximity checks) and BigQuery analytics.
+- **Tooling:** Modular domain-specific tools (Discovery, Geo, User Management, Itinerary).
 - **Data Layer:** MongoDB Atlas (Operational data, Vector Search, and User History).
 
 ## 3. Project Roadmap

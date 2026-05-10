@@ -78,3 +78,11 @@ def search_places(text_query: str, location_bias: str = None, **kwargs) -> str:
         return json.dumps(venues, default=str)
     except Exception as e:
         return f"Error searching Google Places: {str(e)}"
+
+def search_local_events(location: str, query: str = "festivals and events") -> str:
+    """
+    Searches for current local events, festivals, and happenings in a specific city.
+    Useful for providing real-time value and engagement during the user intake process.
+    """
+    # Leverages the robust search_places logic with a specialized event-centric query
+    return search_places(text_query=f"{query} in {location}")

@@ -14,14 +14,14 @@ Phase 5 transforms "My Travel Aigent" into a high-fidelity web application. It m
 2. **Data Fetching Layer:** Create API routes to proxy requests between the UI and your MongoDB/Agent Builder tools.
 3. **The Timeline Builder:** Map the `itinerary.events` array to a chronological vertical list.
 4. **Map Orchestration:** Synchronize the Map markers with the Timeline selection.
-5. **Validation Hook:** Integrate the logic from `validate_buffers.py` into a client-side validator to show real-time "Conflict" warnings.
+5. **Validation Hook:** Integrate the `LogisticsMonitorPlugin` violations from the session state to show real-time "Conflict" warnings.
 6. **Budget Engine:** Implement the "Per-Person" vs "Total" switch logic in the UI state.
 
 ## 2. Core Dashboard Components
 
 ### A. The Interactive Timeline
 - **Visualization:** Render itinerary events as vertical cards or a Gantt-style timeline.
-- **Conflict Highlighting:** Use a visual indicator (red border/shading) if `validate_buffers.py` logic detects an overlap or a missing "Retreat Rule" block.
+- **Conflict Highlighting:** Use a visual indicator (red border/shading) if the session state contains proximity violations detected by the Logistics Monitor.
 - **Direct Manipulation:** Support drag-and-drop to reorder events, which triggers the "Architect" logic to recalculate transit buffers.
 
 ### B. Geospatial Route View
@@ -36,7 +36,7 @@ Phase 5 transforms "My Travel Aigent" into a high-fidelity web application. It m
 
 ## 3. Integration & Persistence
 - **API Layer:** Use the official `@google-cloud/adk` client or Vertex AI SDKs in your Next.js API routes to communicate with the session orchestrated by the **ADK Visual Builder**.
-- **Session Management:** Maintain `sessionId` in the browser to ensure Gemini remembers the Elicitation context during the visual planning phase.
+- **Session Management:** Maintain `sessionId` and `userId` in the browser to ensure the Supervisor remembers the context during the visual planning phase.
 - **Mission Save:** A "Commit to Atlas" button that invokes the `save_itinerary` tool once the user is satisfied with the visual draft.
 - **Version Control:** Allow users to "Clone" a trip to create a new "Draft" variant for comparison.
 
