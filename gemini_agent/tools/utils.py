@@ -1,5 +1,5 @@
 from typing import Any
-from clients import gmaps_client
+from gemini_agent.clients import gmaps_client
 
 def calculate_travel_time(origin: Any, destination: Any) -> tuple[int, float, str]:
     """Helper to calculate travel duration, distance in miles, and mode (walking/driving)."""

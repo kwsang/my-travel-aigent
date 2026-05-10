@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Any
-from clients import destinations_collection
+from gemini_agent.clients import destinations_collection
 from .models import UserProfile
 
 logger = logging.getLogger(__name__)

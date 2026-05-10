@@ -9,10 +9,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from google.adk.runners import Runner
-from google.adk.sessions import SessionService
+from google.adk.sessions import BaseSessionService
 
-class MongoDBSessionService(SessionService):
+class MongoDBSessionService(BaseSessionService):
     def __init__(self, uri, db_name, collection_name):
+        super().__init__()
         self.client = AsyncIOMotorClient(uri)
         self.collection = self.client[db_name][collection_name]
 
@@ -40,7 +41,7 @@ class MongoDBSessionService(SessionService):
         await self.collection.delete_one({"user_id": user_id, "session_id": session_id, "app_name": app_name})
 
 from gemini_agent.logic.validate_buffers import validate_itinerary_structure, validate_itinerary_budget
-from gemini_agent.logic.models import ItineraryPatchRequest, ValidationResponse, ItineraryModel, ChatRequest, ChatResponse
+from gemini_agent.logic.models import ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
 from gemini_agent import agent_definition
 from dotenv import load_dotenv
 
@@ -110,28 +111,76 @@ client = AsyncIOMotorClient(MONGODB_URI)
 # Assumes the database name matches your implementation plan
 db = client["my-travel-aigent"]
 
+@app.get("/health")
+async def health_check():
+    """
+    Active health check endpoint.
+    Verifies MongoDB connectivity and the presence of the Agent Application.
+    Returns 503 if critical services are unreachable.
+    """
+    health_report = {"mongodb": "offline", "agent_app": "offline"}
+    try:
+        # Perform a low-latency ping to the MongoDB cluster
+        await client.admin.command('ping')
+        health_report["mongodb"] = "online"
+    except Exception as e:
+        logger.error(f"Health Check: MongoDB connection error: {e}")
+
+    if agent_app is not None:
+        health_report["agent_app"] = "online"
+
+    if any(status == "offline" for status in health_report.values()):
+        # Cloud Run uses non-2xx codes to detect unhealthy instances
+        raise HTTPException(status_code=503, detail=health_report)
+
+    return {"status": "healthy", "checks": health_report}
+
 @app.get("/itinerary/{session_id}", response_model=ItineraryModel)
-async def get_itinerary(session_id: str):
+async def get_itinerary(
+    session_id: str,
+    user_id: str = Depends(get_current_user)
+):
     """
     Endpoint for the Visual Dashboard to retrieve the structured itinerary JSON.
-    Queries the 'Itineraries' collection for the matching session_id.
+    Queries the 'Itineraries' collection, scoped to the current user.
     """
     try:
         # Retrieve the latest draft for the given session
-        itinerary = await db.Itineraries.find_one(
-            {"session_id": session_id},
+        itinerary_doc = await db.Itineraries.find_one(
+            {"session_id": session_id, "user_id": user_id},
             sort=[("_id", -1)] # Get the most recent update
         )
 
-        if not itinerary:
+        if not itinerary_doc:
             raise HTTPException(
                 status_code=404, 
                 detail=f"Itinerary for session '{session_id}' not found."
             )
 
+        # Fetch user profile to provide context for re-validation (Rule 6 and Scenario 5)
+        user_profile = await db.UserProfiles.find_one({"user_id": itinerary_doc["user_id"]})
+        
+        is_conflict = False
+        all_errors = []
+
+        if user_profile:
+            prefs = user_profile.get("preferences", {})
+            risk = prefs.get("risk_tolerance", "relaxed")
+            vibe = prefs.get("circadian_preference", "night_owl")
+            
+            # Run validation logic against the current persisted state
+            struct_errors = validate_itinerary_structure(itinerary_doc, risk, vibe, user_profile)
+            _, budget_errors = validate_itinerary_budget(itinerary_doc, user_profile)
+            
+            all_errors = struct_errors + budget_errors
+            is_conflict = len(all_errors) > 0
+
         # Clean up the MongoDB internal _id for JSON response compatibility
-        itinerary["_id"] = str(itinerary["_id"])
-        return itinerary
+        itinerary_doc["_id"] = str(itinerary_doc["_id"])
+        itinerary_doc["is_conflict"] = is_conflict
+        itinerary_doc["validation_errors"] = all_errors
+        
+        return itinerary_doc
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -182,7 +231,7 @@ async def chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent execution error: {str(e)}")
 
-@app.patch("/itinerary/{session_id}", response_model=ValidationResponse)
+@app.patch("/itinerary/{session_id}", response_model=ItineraryModel)
 async def update_itinerary(session_id: str, updates: ItineraryPatchRequest):
     """
     Direct manipulation endpoint. Re-validates the entire itinerary structure
@@ -211,19 +260,24 @@ async def update_itinerary(session_id: str, updates: ItineraryPatchRequest):
         budget_ok, budget_errors = validate_itinerary_budget(itinerary, user_profile)
 
         all_errors = struct_errors + budget_errors
+        is_conflict = len(all_errors) > 0
+        update_time = datetime.now(timezone.utc)
 
         # 4. Persistence: Update MongoDB if there are no blocking errors
         # We still save even with warnings/errors but return them to the UI for display
         await db.Itineraries.update_one(
             {"session_id": session_id},
-            {"$set": {"events": proposed_events, "updated_at": datetime.now(timezone.utc)}}
+            {"$set": {"events": proposed_events, "updated_at": update_time}}
         )
 
-        return {
-            "status": "success" if not all_errors else "warning",
-            "validation_errors": all_errors,
-            "itinerary_id": str(itinerary_doc["_id"])
-        }
+        # 5. Prepare and return the full updated itinerary
+        itinerary_doc["events"] = proposed_events
+        itinerary_doc["is_conflict"] = is_conflict
+        itinerary_doc["validation_errors"] = all_errors
+        itinerary_doc["updated_at"] = update_time
+        itinerary_doc["_id"] = str(itinerary_doc["_id"])
+
+        return itinerary_doc
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

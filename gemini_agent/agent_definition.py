@@ -9,8 +9,8 @@ from google.adk.agents.invocation_context import InvocationContext as Context
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
-from plugins.logistics_monitor import LogisticsMonitorPlugin
-from tools.tools import (
+from gemini_agent.plugins.logistics_monitor import LogisticsMonitorPlugin
+from gemini_agent.tools.tools import (
     record_user_profile, 
     search_destinations, 
     discover_new_destination, 
@@ -53,12 +53,9 @@ def create_travel_agent():
     details_tool = FunctionTool(func=google_places_details)
 
     # 2.2 Shared Model Configuration
-    # Increase max remote calls to 20 to handle complex multi-step planning and tool use.
-    model_config = genai_types.GenerateContentConfig(
-        automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(
-            maximum_remote_calls=20
-        )
-    )
+    # Note: Generation parameters like temperature are often handled via defaults 
+    # in the ADK to satisfy strict Pydantic V2 validation in the Agent constructor.
+    model_config = {}
 
     # 3. Load Instruction Prompts
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
@@ -77,7 +74,7 @@ def create_travel_agent():
     # 4.1 Concierge: Focused on user profiling and data gathering
     concierge_agent = Agent(
         name="concierge",
-        model="gemini-2.5-flash",
+        model="gemini-1.5-flash",
         static_instruction=system_instructions,
         config=model_config,
         instruction=concierge_goal,
@@ -106,7 +103,7 @@ def create_travel_agent():
 
     architect_agent = Agent(
         name="architect",
-        model="gemini-2.5-flash",
+        model="gemini-1.5-flash",
         static_instruction=system_instructions,
         config=model_config,
         instruction=get_architect_instructions,
@@ -157,7 +154,7 @@ def create_travel_agent():
 
     supervisor = Agent(
         name="travel_supervisor",
-        model="gemini-2.5-flash",
+        model="gemini-1.5-flash",
         config=model_config,
         instruction=supervisor_instructions,
         sub_agents=[concierge_agent, architect_agent],
@@ -169,7 +166,7 @@ def create_travel_agent():
     plugins = [LogisticsMonitorPlugin()]
 
     app = App(
-        name="my_travel_aigent_app",
+        name="my_travel_aigent",
         root_agent=supervisor,
         context_cache_config=ContextCacheConfig(
             min_tokens=2048,

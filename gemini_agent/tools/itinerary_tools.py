@@ -1,7 +1,7 @@
 import json
 import datetime
 from typing import Any, Optional
-from clients import destinations_collection
+from gemini_agent.clients import destinations_collection
 from .models import Itinerary
 
 def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
@@ -159,38 +159,52 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
             
         db = destinations_collection.database
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        state = tool_context.state
         
-        # 1. Get the current active itinerary from state if it matches the trip being finalized
-        active = tool_context.state.get("active_itinerary")
+        # 1. Search for the itinerary in agent memory
+        # Architect agent uses 'final_itinerary', general tools might use 'active_itinerary'
+        raw_itinerary = state.get("final_itinerary") or state.get("active_itinerary")
         
-        if active and active.get("trip_name") == trip_name:
-            active["status"] = "final"
-            active.setdefault("metadata", {})["updated_at"] = now
+        # If the data in memory matches the requested trip_name, use it for persistence
+        if isinstance(raw_itinerary, dict) and raw_itinerary.get("trip_name") == trip_name:
+            # Validate/Hydrate into the Pydantic model for schema consistency
+            itinerary = Itinerary.model_validate(raw_itinerary)
+            
+            # Transition to 'final'
+            itinerary.status = "final"
+            itinerary.metadata["finalized_at"] = now
+            itinerary.metadata["updated_at"] = now
+            itinerary.user_id = user_id # Ensure ownership
             
             # Upsert into MongoDB to ensure latest edits are captured
             db["itineraries"].update_one(
                 {"user_id": user_id, "trip_name": trip_name},
-                {"$set": active},
+                {"$set": itinerary.model_dump()},
                 upsert=True
             )
             
-            # Sync back to state
-            tool_context.state.update({"active_itinerary": active})
-            return f"SUCCESS: Active itinerary '{trip_name}' has been finalized and persisted."
+            # Sync the finalized version back to state keys to avoid stale memory
+            final_data = itinerary.model_dump()
+            state.update({
+                "active_itinerary": final_data,
+                "final_itinerary": final_data
+            })
+            return f"SUCCESS: Active itinerary '{trip_name}' has been finalized and persisted to your profile."
         
-        # 2. Fallback: If not in state, just update status of the existing record in DB
+        # 2. Fallback: If not in memory, just update the status of the existing record in DB
         result = db["itineraries"].update_one(
             {"user_id": user_id, "trip_name": trip_name},
             {"$set": {
                 "status": "final",
+                "metadata.finalized_at": now,
                 "metadata.updated_at": now
             }}
         )
         
         if result.matched_count == 0:
-            return f"Error: No itinerary found with name '{trip_name}' for user '{user_id}' to finalize."
+            return f"Error: No saved itinerary found with name '{trip_name}' to finalize."
             
-        return f"SUCCESS: Itinerary '{trip_name}' status updated to 'final' in the atlas."
+        return f"SUCCESS: Saved itinerary '{trip_name}' marked as final in the database."
         
     except Exception as e:
         return f"Error finalizing itinerary: {str(e)}"

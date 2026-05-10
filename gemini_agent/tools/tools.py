@@ -13,5 +13,5 @@ from .discovery import (
 )
 
 # Placeholder for itinerary and geo tools (to be implemented similarly)
-from .itinerary_tools import save_itinerary, get_itinerary, list_trip_versions, delete_itinerary, update_itinerary_status, clone_itinerary
+from .itinerary_tools import save_itinerary, get_itinerary, list_trip_versions, delete_itinerary, update_itinerary_status, clone_itinerary, finalize_itinerary
 from .geo_tools import google_maps_matrix, google_places_details, search_places, search_local_events

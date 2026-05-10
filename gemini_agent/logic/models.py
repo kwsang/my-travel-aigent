@@ -44,6 +44,8 @@ class ItineraryModel(BaseModel):
     party_size_total: int
     events: List[EventModel]
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
+    validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
 
 class ItineraryPatchRequest(BaseModel):
     events: List[EventModel] = Field(..., description="The complete set of updated events from the UI.")
