@@ -5,7 +5,7 @@
 
 ## 2. System Architecture
 - **Brain:** Gemini 1.5/3 (Reasoning and Planning).
-- **Orchestration:** Google Cloud Agent Builder (Task flow and tool invocation).
+- **Orchestration:** ADK Visual Builder (Task flow and tool invocation).
 - **Superpowers (MCP):** MongoDB MCP Server.
 - **Data Layer:** MongoDB Atlas (Operational data, Vector Search, and User History).
 

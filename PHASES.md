@@ -13,18 +13,18 @@
     - `Itineraries`: Use MongoDB's flexible document model to handle varying activity types (flights, stay, dining).
 - **Goal:** Ensure the agent remembers the user's budget and past preferences across sessions.
 
-### Phase 3: MCP Server Integration (IN PROGRESS)
+### Phase 3: MCP Server Integration (DONE)
 - **DONE:** Configure MongoDB MCP server for `travel-aigent-cluster`.
 - **DONE:** Deploy the MongoDB MCP server and create `vector_index`.
 - **DONE:** Seed `destinations` collection with Voyage AI embeddings.
 - **DONE:** Integrate Google Maps API for real-time `duration_in_traffic` calculations.
 - **DONE:** Integrate Google Places API to enforce "Closed Door" rules and rating thresholds.
 - **Tool Mapping:**
-    - `create_itinerary`: Write new plans to Atlas.
+    - `save_itinerary`: Write new plans to Atlas.
     - `query_preferences`: Fetch user context.
     - `search_activities`: Semantic search via Vector Search.
 
-### Phase 4: Multi-Step Mission Logic (IN PROGRESS)
+### Phase 4: Multi-Step Mission Logic (ADK Visual Builder)
 - **Logic Flow:**
     1. **Elicitation:** Gemini asks clarifying questions to narrow down the intent.
     2. **Research:** Query MongoDB via Vector Search for destinations matching the user's "vibe."
@@ -32,6 +32,15 @@
     4. **Verification:** Validate planning logic against the Buffer Test Suite.
     5. **Persistence:** Save the resulting document to the `itineraries` collection via the MCP tool.
     6. **Confirmation:** Present the plan, explicitly highlighting "Top Recommendations" vs. "Budget Alternatives" for the user to review.
+
+### Phase 5: Visual Planning Dashboard (IN PROGRESS)
+- **Frontend Stack:** Develop a responsive web application (e.g., Next.js/React).
+- **Visualization:**
+    - **Interactive Timeline:** View segments chronologically with overlap warnings.
+    - **Map Integration:** Visualize the route and proximity clustering using Google Maps JS API.
+- **Direct Manipulation:** Allow users to adjust start times or swap activities visually rather than through chat.
+- **Budget Transparency:** Real-time toggles for "Per-Person" vs. "Total" views and "Budget Alternative" highlighting.
+- **Goal:** Provide a high-fidelity planning surface that replaces the chat-centric model.
 
 ---
 **Navigation:**

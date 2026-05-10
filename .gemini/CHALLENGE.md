@@ -12,7 +12,7 @@ For the My Travel Aigent project, MongoDB is the ideal choice for our agent's da
 
 Here's MongoDB's data: .gemini\.partners\MONGODB.md
 
-Build Your Agent: Create your agent—built with Gemini 3—using Google Cloud Agent Builder. Integrate the partner’s Model Context Protocol (MCP) server to give your agent the superpowers to finish the job.
+Build Your Agent: Create your agent—built with Gemini 3—using the **ADK Visual Builder**. Integrate the partner’s Model Context Protocol (MCP) server to give your agent the superpowers to finish the job.
 
 Win Your Track: You’ll be judged specifically against other builders within that same partner category.
 
@@ -26,7 +26,7 @@ The Multi-Step Mission: Build a system that can handle complex goals. Your agent
 Partner Power: Your solution must demonstrate a meaningful integration with at least one participating partner’s solution using MCP to give your agent its "superpowers."
 
 ### How to Build:
-Google Cloud Agent Builder: Ideal for rapid prototyping, building, and scaling. Use this low-code, high-power environment to build and orchestrate agents with grounding in your own data.
+ADK Visual Builder: Ideal for rapid prototyping, building, and scaling. Use this low-code, high-power environment to build and orchestrate agents with grounding in your own data.
  
 ## What to Build
 💥 Build a functional agent—powered by Gemini and Google Cloud Agent Builder—that integrates a Partner Entity’s MCP server to solve a real challenge.

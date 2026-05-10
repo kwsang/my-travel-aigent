@@ -7,9 +7,9 @@ Phase 3 focuses on transforming the "My Travel Aigent" from a local reasoning en
 The MCP server acts as the persistent memory layer for Gemini, allowing it to read user context and write finalized missions.
 
 ### Tool Definitions
-- **`query_user_profile`**: Fetches the User Document from the `UserProfiles` collection. 
+- **`query_user_profile`**: Fetches the User Document. 
     - **Input Schema**: `{ "user_id": "string" }`
-    - **Logic**: Retrieves preferences like `circadian_preference`, `risk_tolerance`, and `budget` to seed the temporal and financial reasoning.
+    - **Logic**: Retrieves the full profile including `starting_location`, `target_duration_days`, `activity_density`, and budget presentation toggles.
 - **`save_itinerary`**: Persists the generated JSON to the `Itineraries` collection.
     - **Input Schema**: An `itinerary` object following the schema in `DATA_MODEL.md`.
     - **Logic**: Ensures the "mission" is saved for cross-session retrieval.
@@ -44,15 +44,16 @@ We are replacing the mock buffer estimates with ground-truth data to satisfy the
 ### Implementation Steps
 1. **Distance Matrix API**: Use the `geo` coordinates from the itinerary segments to request `duration_in_traffic`.
 2. **Buffer Calculation**: Pass the real-time traffic duration into our validated `calculate_buffer` function.
-3. **Driving vs. Flying Logic**:
-    - If `duration_in_traffic` < 360 mins (6 hours), the agent must propose a `TRANSPORT (Driving)` segment to maximize hotel value, per `SYSTEM_PROMPT.md`.
+3. **Route Evaluation (Rule 6.1)**:
+    - Use the `starting_location` from the user profile as the origin for the first segment.
+    - If `duration_in_traffic` < 6 hours and arrival < 12:00 PM, prioritize `TRANSPORT (Driving)`.
 
 ## 3. Google Places API (Operating Hours & Social Proof)
 This integration enforces the **"Closed Door" Rule** and the **Transparency Rule**.
 
 ### Functional Requirements
 - **Operating Window Validation**: Cross-reference the `local_start_time` of `DINING` and `EXPERIENCE` segments with the venue's `opening_hours`.
-    - *Note*: Target the **Places API (New)** in the Google Cloud Console for enhanced field data like `regularOpeningHours`.
+    - *Note*: Use `regular_opening_hours.periods` to validate future `local_start_time` compatibility (Rule 2).
 - **Rating Thresholds**: 
     - If `rating` < `min_rating`, the agent must flag the event as a **"Budget Alternative"**.
     - Use the `userRatingCount` to verify the credibility of the recommendation.
@@ -63,10 +64,11 @@ To finalize this phase, the following tools must be mapped in the Google Cloud A
 
 | Tool Name | Provider | Purpose |
 | :--- | :--- | :--- |
-| `mcp_query_profile` | MongoDB MCP | Fetch user constraints and budget. |
-| `mcp_save_plan` | MongoDB MCP | Persist the final validated itinerary. |
-| `google_maps_matrix` | Google Maps API | Get real-time traffic durations between `geo` points. |
-| `google_places_details` | Google Places API | Validate venue hours and ratings. |
+| `query_user_profile` | MongoDB MCP | Fetch user constraints, origin, and budget. |
+| `save_itinerary` | MongoDB MCP | Persist the final validated itinerary. |
+| `search_activities` | MongoDB MCP | Semantic search via Voyage AI embeddings. |
+| `google_maps_matrix` | Google Maps API | Real-time traffic durations (Rule 1). |
+| `google_places_details` | Google Places API | Validate venue periods (Rule 2) and ratings (Rule 5). |
 
 ## 5. Success Criteria
 - [ ] Gemini can correctly identify if a Night Owl's dinner at 10:00 PM is possible based on real Places API data.

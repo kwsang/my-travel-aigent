@@ -6,3 +6,7 @@ googlemaps
 google-maps-places
 openapi-spec-validator
 PyYAML
+# google-adk 1.33.0 requires aiplatform >= 1.148.1
+google-cloud-aiplatform[agent-engines]>=1.148.1
+google-adk>=1.33.0
+google-cloud-storage>=3.0.0

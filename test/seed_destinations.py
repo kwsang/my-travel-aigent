@@ -68,6 +68,24 @@ destinations = [
         "vibe_tags": ["sightseeing", "romantic", "mountains"],
         "price_tier": "$$",
         "rating": 4.7
+    },
+    {
+        "name": "The Gastonian",
+        "country": "USA",
+        "description": "An award-winning historic bed and breakfast in Savannah, GA. Features romantic upscale rooms, gourmet breakfast, and a private courtyard. Perfect for couples.",
+        "location": {"type": "Point", "coordinates": [-81.0912, 32.0781]},
+        "vibe_tags": ["romantic", "historic", "luxury", "upscale"],
+        "price_tier": "$$$",
+        "rating": 4.9
+    },
+    {
+        "name": "The Olde Pink House",
+        "country": "USA",
+        "description": "One of Savannah's most famous dining institutions. Set in a 1771 mansion, offering sophisticated Southern cuisine in a romantic, candlelit atmosphere.",
+        "location": {"type": "Point", "coordinates": [-81.0951, 32.0761]},
+        "vibe_tags": ["romantic", "dining", "Southern", "historic"],
+        "price_tier": "$$$",
+        "rating": 4.8
     }
 ]
 

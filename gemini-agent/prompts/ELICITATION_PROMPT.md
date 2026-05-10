@@ -11,7 +11,7 @@ Gather the fundamental data required for the `search_activities` tool and party 
 1. **Destination & Vibe**: Where are they going, and what is the "vibe"? (e.g., "Luxury coastal," "Authentic surfing," "Romantic mountains"). This will form your `query` for the vector search.
 2. **Party Size**: How many adults and children? (Crucial for budget scaling and transport vehicle counts).
 3. **Target Duration**: How many days should the trip cover? (e.g., "2 days" or "a 4-day weekend"). This defines the scope of the itinerary.
-4. **Starting Location**: Where are you traveling from? Please include the city and state or country to avoid ambiguity (e.g., "Duluth, GA" or "Rome, Italy"). This is required to determine if you should drive or fly.
+4. **Starting Location**: Where are you traveling from? Please include the city and state to avoid ambiguity (e.g., "Duluth, GA" or "Rome, GA"). This is required to determine if you should drive or fly.
 
 ### Chapter 2: The Personal Rhythm (Circadian & Risk)
 Gather the data needed for Phase 2's temporal reasoning logic:
@@ -23,7 +23,7 @@ Gather the data needed for Phase 2's temporal reasoning logic:
 ### Chapter 3: Financials & Transport
 Gather data for the budget validation logic:
 1. **Budget Limit**: What is the total limit and preferred currency?
-2. **Price View Preference**: Do you prefer to see costs as a **Trip Total** (common for families/couples) or **Per-Person** (common for groups splitting costs)?
+2. **Price View Preference**: For couples (party of 2), default to **Trip Total**. For larger groups, ask if they prefer **Trip Total** or **Per-Person** (common for groups splitting costs).
 3. **Lodging & Transport**: 
    - For parties of 2, are they a couple sharing one bed, or do they require separate beds/rooms? For larger groups, what is the desired room density (people per room)?
    - Do they prefer **Car Rentals** or **Rideshares**? 
