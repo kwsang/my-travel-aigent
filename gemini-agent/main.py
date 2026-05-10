@@ -45,7 +45,10 @@ async def start_interactive_session():
             )
             
             # Pass gathered violations to Gemini via state_delta
-            state_delta = {"proximity_violations": "\n".join(pending_violations)} if pending_violations else {}
+            # If violations exist, pass them. If not, explicitly clear the state key.
+            state_delta = {
+                "proximity_violations": "\n".join(pending_violations) if pending_violations else None
+            }
             pending_violations = [] 
 
             print("Agent: ", end="", flush=True)
@@ -86,3 +89,5 @@ async def start_interactive_session():
 
 if __name__ == "__main__":
     asyncio.run(start_interactive_session())
+
+    
