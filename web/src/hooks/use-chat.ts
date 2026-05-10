@@ -69,10 +69,45 @@ export function useChat() {
         }
       }
 
-      const data: ChatResponse[] = await response.json();
-      
-      // Append all parts returned by the agent
-      setMessages((prev) => [...prev, ...data]);
+      if (!response.body) return;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n');
+        buffer = parts.pop() || "";
+
+        for (const line of parts) {
+          if (!line.trim()) continue;
+          try {
+            const chunk: ChatResponse = JSON.parse(line);
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              // If the last message was from the model, append the new text/thought to it
+              if (last && last.role === 'model' && chunk.role === 'model') {
+                return [
+                  ...prev.slice(0, -1),
+                  {
+                    ...last,
+                    text: (last.text || '') + (chunk.text || ''),
+                    thought: (last.thought || '') + (chunk.thought || '')
+                  }
+                ];
+              }
+              // Otherwise, add a new message entry
+              return [...prev, chunk];
+            });
+          } catch (e) {
+            console.error("Error parsing stream chunk:", e);
+          }
+        }
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Could not connect to the agent brain.";
       console.error("Failed to send message for session_id:", sessionId, error);
