@@ -227,5 +227,13 @@ __pycache__/
 
 .adk/
 .adk/*
-samples/*
+gemini-agent/samples/
 */.env.*
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+build/
+.pnp
+.pnp.js
