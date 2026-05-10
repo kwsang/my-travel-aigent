@@ -42,18 +42,48 @@ def calculate_buffer(traffic_estimate: int, local_time_str: str, risk_tolerance:
     else:
         raise ValueError("Invalid risk_tolerance. Must be 'strict' or 'relaxed'.")
 
+def to_utc_aware(ts):
+    """Helper to ensure timestamps are offset-aware UTC for comparison."""
+    dt = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    return dt.replace(tzinfo=datetime.timezone.utc) if dt.tzinfo is None else dt
+
+def check_event_overlap(current_event: dict, next_event: dict):
+    """
+    Determines if two events overlap. 
+    Special Case: Accommodation 'Stay' events are treated as point-in-time check-ins 
+    to allow other activities during the stay.
+    """
+    # 1. Determine End Time of Current Event
+    # If it's a 'Stay', we treat the 'end' as 30 mins after start for overlap purposes.
+    # This prevents the hotel stay from 'blocking' the rest of the trip.
+    if current_event["segment"] == "ACCOMMODATION" and "Stay" in current_event["details"].get("name", ""):
+        current_start = to_utc_aware(current_event["schedule"].get("start_time_utc") or 
+                                     current_event["schedule"]["local_start_time"])
+        current_end = current_start + datetime.timedelta(minutes=30)
+    else:
+        current_end = to_utc_aware(current_event["schedule"].get("end_time_utc") or 
+                                   current_event["schedule"].get("local_end_time") or 
+                                   current_event["schedule"].get("start_time_utc") or 
+                                   current_event["schedule"]["local_start_time"])
+
+    # 2. Determine Start Time of Next Event
+    next_start = to_utc_aware(next_event["schedule"].get("start_time_utc") or 
+                              next_event["schedule"]["local_start_time"])
+
+    # 3. Check for Collision
+    if current_end > next_start:
+        # Calculate the collision duration for a better error message
+        overlap_delta = (current_end - next_start).total_seconds() / 60
+        return True, overlap_delta
+    
+    return False, 0
+
 def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian_pref: str, user_prefs: dict = None):
     """
     Validates the high-level structure of an itinerary based on Scenario 5 requirements:
     Clustering, Night Owl hours, and the Retreat Rule.
     """
     print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Vibe: {circadian_pref})...")
-
-    def to_utc_aware(ts):
-        """Helper to ensure timestamps are offset-aware UTC for comparison."""
-        dt = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
-        return dt.replace(tzinfo=datetime.timezone.utc) if dt.tzinfo is None else dt
-
     errors = []
     
     events = itinerary.get("events", [])
@@ -103,24 +133,12 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
             current_event = day_events[i]
             next_event = day_events[i+1]
             
-            # Use UTC timestamps for precise validation across timezone changes
-            # Logic: If the current event is a long-duration 'Stay', treat it as a point-in-time 
-            # check-in (30 mins) for overlap purposes so it doesn't block the rest of the day.
-            if current_event["segment"] == "ACCOMMODATION" and "Stay" in current_event["details"].get("name", ""):
-                current_start = to_utc_aware(current_event["schedule"].get("start_time_utc") or 
-                                             current_event["schedule"]["local_start_time"])
-                current_end = current_start + datetime.timedelta(minutes=30)
-            else:
-                current_end = to_utc_aware(current_event["schedule"].get("end_time_utc") or 
-                                           current_event["schedule"].get("local_end_time") or 
-                                           current_event["schedule"].get("start_time_utc") or 
-                                           current_event["schedule"]["local_start_time"])
-
-            next_start = to_utc_aware(next_event["schedule"].get("start_time_utc") or 
-                                      next_event["schedule"]["local_start_time"])
-            
-            if current_end > next_start:
-                errors.append(f"FAIL: Overlap on {day}. {current_event['details'].get('name')} ends at {current_end.time()}, but {next_event['details'].get('name')} starts at {next_start.time()}.")
+            is_overlapping, minutes = check_event_overlap(current_event, next_event)
+            if is_overlapping:
+                errors.append(
+                    f"FAIL: Overlap on {day}. '{current_event['details'].get('name')}' overlaps with "
+                    f"'{next_event['details'].get('name')}' by {minutes:.0f} minutes."
+                )
 
         # 2. Night Owl Check
         if circadian_pref.lower() == "night_owl":

@@ -4,6 +4,10 @@ import datetime
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
+# New ADK Imports
+from google.adk.runners import Runner
+from google.adk.agents.llm_agent import LlmAgent
+
 # Import logic from previously validated test scripts
 from validate_buffers import calculate_buffer, validate_itinerary_structure, validate_itinerary_budget
 from test_maps_integration import get_real_traffic_duration
@@ -37,6 +41,26 @@ def evaluate_transport_mode(distance_hours, arrival_time_str):
     if distance_hours < 6 and arrival_time <= cutoff_time:
         return "TRANSPORT (Driving)", "Maximize hotel value and save on airfare."
     return "FLIGHT", "Faster arrival for long-distance travel."
+
+async def simulate_adk_agent_run(user_input: str):
+    """
+    True ADK Simulation: Tests the actual Agent orchestration instead of manual logic.
+    """
+    print("\n--- Starting ADK Agent Runner Simulation ---")
+    # This assumes an 'architect' agent is defined in your package
+    runner = Runner(agents_dir="c:/Users/Kang/github/my-travel-aigent/gemini-agent")
+    
+    # Simulate the start of a session
+    session_id = f"sim_{datetime.datetime.now().timestamp()}"
+    
+    response = await runner.call_agent_async(
+        app_name="travel_aigent",
+        input_text=user_input,
+        session_id=session_id
+    )
+    
+    print(f"Agent Response: {response.text}")
+    return response
 
 def simulate_architect_loop():
     """

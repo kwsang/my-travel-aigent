@@ -11,7 +11,7 @@
 - **Data Layer:** MongoDB Atlas (Operational data, Vector Search, and User History).
 
 ## 3. Project Roadmap
-The project is divided into four distinct phases focusing on Discovery, Context, Tooling, and Execution.
+The project is divided into five distinct phases focusing on Discovery, Context, Tooling, Orchestration, and Visual Interaction.
 
 **Details:** [PHASES.md](PHASES.md)
 

@@ -36,4 +36,4 @@ To ensure standardized tool definitions, we maintain OpenAPI specs for our MCP t
 - [ ] The final JSON saved to MongoDB Atlas passes the `validate_buffers.py` script.
 
 ## Next Action: Transition to UI
-Complete the Agent Builder console setup, then proceed to **Phase 5** to build the interactive dashboard.
+Finalize the programmatic ADK agent orchestration and FastAPI exposure, then proceed to Phase 5 to build the interactive dashboard.
