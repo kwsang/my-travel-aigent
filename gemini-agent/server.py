@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Any
 from google.genai import types as genai_types
 from google.adk.runners import Runner
-from adk_mongodb_session.mongodb.sessions import MongoDBSessionService
+from adk_mongodb_session.mongodb.sessions import MongodbSessionService
 from pymongo import MongoClient
 from google.adk.errors.already_exists_error import AlreadyExistsError
 from dotenv import load_dotenv
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 travel_agent_app = agent_definition.create_travel_agent()
 
 # Initialize persistent MongoDB session storage
-session_service = MongoDBSessionService(
+session_service = MongodbSessionService(
     mongodb_uri=os.getenv("MONGODB_URI"),
     db_name="my_travel_aigent_sessions"
 )
