@@ -1,6 +1,9 @@
 # Stage 1: Build stage
 FROM python:3.12-slim AS builder
 
+# Prevent debconf from prompting for interactive input during build
+ARG DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y \
     build-essential \
     libgeos-dev \
