@@ -47,28 +47,25 @@ def get_embeddings(texts: list[str]) -> list[list[float]]:
             logger.warning("Voyage AI rate limit hit. Consider increasing delay or reducing batch size.")
         raise
 
-def fetch_destinations_from_google(vibe_queries: list[str]):
-    """Uses Google Maps API to find real cities and towns based on search queries."""
+def fetch_destinations_from_google(city_list: list[str]):
+    """Uses Google Maps API to find real cities and towns based on a fixed list."""
     results = []
 
-    for query in vibe_queries:
-        logger.info(f"Searching Google Maps for: '{query}'")
+    for city_query in city_list:
+        logger.info(f"Fetching geographic data for: '{city_query}'")
         try:
-            # Using the Google Maps library for a standard places text search
-            response = gmaps.places(query=query)
+            # Search for specific city/state to ensure domestic accuracy
+            response = gmaps.places(query=f"{city_query}, USA")
             
-            for place in response.get('results', []):
-                # Strict City Filter: allow localities and primary sub-divisions
+            if response.get('results'):
+                # Take the most relevant first result for the specific city name
+                place = response['results'][0]
                 types = place.get('types', [])
-                geographic_types = {
-                    'locality', 'sublocality', 'administrative_area_level_3', 'town'
-                }
+                geographic_types = {'locality', 'sublocality', 'administrative_area_level_3', 'town'}
                 
                 if not any(t in geographic_types for t in types):
-                    logger.debug(f"Skipping POI/Non-city: '{place.get('name')}' (Types: {types})")
+                    logger.debug(f"Skipping non-city result for '{city_query}': {types}")
                     continue
-                
-                logger.info(f"Validating destination: '{place.get('name')}'")
 
                 dest_doc = {
                     "name": place.get('name'),
@@ -80,33 +77,41 @@ def fetch_destinations_from_google(vibe_queries: list[str]):
                         # Map geometry returns lat/lng as discrete fields; GeoJSON standard is [longitude, latitude]
                         "coordinates": [place['geometry']['location']['lng'], place['geometry']['location']['lat']]
                     },
-                    # Clean vibe tags: remove common query words to improve vector search filters
-                    "vibe_tags": [word for word in query.lower().split() 
-                                 if word not in ["cities", "towns", "in", "near", "with", "a", "of", "and", "ga", 
-                                                "united", "states", "usa", "us", "top", "major", "popular", "most", 
-                                                "visited", "destinations", "vacation", "spots", "centers"]],
+                    # Tags derived from the city and state name for filtering
+                    "vibe_tags": [word.lower().strip(',') for word in city_query.split()],
                     "rating": place.get('rating', 4.5)
                 }
                 results.append(dest_doc)
             
-            time.sleep(0.5)
+            time.sleep(0.2) # Minor delay to respect quota
         except Exception as e:
-            logger.error(f"Google Search failed for '{query}': {e}")
+            logger.error(f"Google API call failed for '{city_query}': {e}")
             
     return results
 
-# 2. Comprehensive Vibe Queries for US Major, Tourist, and Popular Cities
-VIBE_QUERIES = [
-    "Major cities in USA",
-    "Tourist cities on the US East Coast",
-    "Coastal cities in California",
-    "Tourist cities in Florida",
-    "Mountain cities in US Rockies",
-    "Historic cities in the Southern US",
-    "Tourist cities in the US Midwest",
-    "Desert cities in the American Southwest",
-    "Major cities in the Pacific Northwest",
-    "Popular cities in New England"
+# 2. Top 100 US Major and Tourist Cities
+TOP_US_CITIES = [
+    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
+    "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
+    "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
+    "Indianapolis, IN", "San Francisco, CA", "Seattle, WA", "Denver, CO", "Oklahoma City, OK",
+    "Nashville, TN", "El Paso, TX", "Washington, DC", "Las Vegas, NV", "Boston, MA",
+    "Portland, OR", "Louisville, KY", "Memphis, TN", "Detroit, MI", "Baltimore, MD",
+    "Milwaukee, WI", "Albuquerque, NM", "Tucson, AZ", "Fresno, CA", "Sacramento, CA",
+    "Mesa, AZ", "Kansas City, MO", "Atlanta, GA", "Colorado Springs, CO", "Omaha, NE",
+    "Raleigh, NC", "Virginia Beach, VA", "Long Beach, CA", "Miami, FL", "Oakland, CA",
+    "Minneapolis, MN", "Tulsa, OK", "Bakersfield, CA", "Wichita, KS", "Arlington, TX",
+    "Aurora, CO", "Tampa, FL", "New Orleans, LA", "Cleveland, OH", "Honolulu, HI",
+    "Anaheim, CA", "Lexington, KY", "Stockton, CA", "Corpus Christi, TX", "Henderson, NV",
+    "Riverside, CA", "Newark, NJ", "Saint Paul, MN", "Santa Ana, CA", "Cincinnati, OH",
+    "Irvine, CA", "Orlando, FL", "Pittsburgh, PA", "St. Louis, MO", "Greensboro, NC",
+    "Jersey City, NJ", "Anchorage, AK", "Lincoln, NE", "Plano, TX", "Durham, NC",
+    "Buffalo, NY", "Chandler, AZ", "Chula Vista, CA", "Toledo, OH", "Madison, WI",
+    "Gilbert, AZ", "Reno, NV", "Fort Wayne, IN", "North Las Vegas, NV", "St. Petersburg, FL",
+    "Lubbock, TX", "Irving, TX", "Laredo, TX", "Winston-Salem, NC", "Chesapeake, VA",
+    "Glendale, AZ", "Scottsdale, AZ", "Garland, TX", "Norfolk, VA", "Boise, ID",
+    "Fremont, CA", "Richmond, VA", "Santa Clarita, CA", "Savannah, GA", "Duluth, GA",
+    "Asheville, NC", "Charleston, SC", "Sedona, AZ", "Key West, FL", "Aspen, CO"
 ]
 
 # 3. Connect to Atlas
@@ -127,8 +132,22 @@ except errors.ConnectionFailure as e:
     sys.exit(1)
 
 def seed():
-    # Fetch fresh, real-world data from Google Places
-    raw_destinations = fetch_destinations_from_google(VIBE_QUERIES)
+    # 1. Identify cities already present in MongoDB to avoid redundant API calls
+    try:
+        existing_names = set(collection.distinct("name"))
+    except Exception as e:
+        logger.error(f"Could not retrieve existing city names from MongoDB: {e}")
+        existing_names = set()
+
+    # 2. Filter the list: only fetch cities whose name isn't already in the database
+    cities_to_fetch = [city for city in TOP_US_CITIES if city.split(',')[0].strip() not in existing_names]
+
+    if not cities_to_fetch:
+        logger.info("All targeted cities already exist in MongoDB. Skipping fetch.")
+        return
+
+    # 3. Fetch fresh data only for missing cities
+    raw_destinations = fetch_destinations_from_google(cities_to_fetch)
     
     if not raw_destinations:
         logger.warning("No destinations found via Google API. Aborting seed.")
