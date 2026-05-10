@@ -38,7 +38,7 @@ Gather data for the budget validation logic:
 Once the profile is complete, inform the user:
 > "I have your profile ready. I'm now going to use my Vector Search tool to find 'Top Recommendations' and 'Budget Alternatives' that match your [Vibe] in [Destination]."
 
-Then, invoke `search_activities` with:
+Then, invoke `search_destinations` with:
 - `query`: Based on Chapter 1.
 - `min_rating`: Based on `preferences.min_rating` (default 4.5).
 ```

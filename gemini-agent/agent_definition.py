@@ -47,16 +47,16 @@ def record_user_profile(profile: dict, ctx: Context) -> str:
     ctx.state.update({"user_profile_data": profile})
     return "User profile recorded successfully. Transitioning to Architect mode."
 
-def search_activities(query: str, min_rating: float = 4.5) -> str:
+def search_destinations(query: str, min_rating: float = 4.0) -> str:
     """
-    Performs a semantic search for travel activities and destinations using MongoDB Vector Search.
+    Performs a semantic search for travel destinations (strictly cities and towns) using MongoDB Vector Search.
 
     Args:
-        query: The semantic search query or 'vibe' (e.g., 'romantic palaces').
-        min_rating: The minimum rating threshold (default 4.5).
+        query: The semantic search query or 'vibe' for a city (e.g., 'historic coastal towns').
+        min_rating: The minimum rating threshold (default 4.0).
 
     Returns:
-        A JSON string containing matching destinations and their metadata.
+        A JSON string containing matching cities/towns and their geographic context.
     """
     try:
         # 2. Generate query embedding
@@ -79,11 +79,44 @@ def search_activities(query: str, min_rating: float = 4.5) -> str:
 
         results = list(destinations_collection.aggregate(pipeline))
         if not results:
-            return f"No activities or destinations found matching '{query}' with a minimum rating of {min_rating}. Please try a different vibe or location."
+            return f"No destinations found matching '{query}'. Please try a different vibe or location."
             
         return json.dumps(results, default=str)
     except Exception as e:
         return f"Error during semantic search: {str(e)}"
+
+def search_places(text_query: str, location_bias: str = None) -> str:
+    """
+    Searches for specific venues (hotels, restaurants, attractions) using the Google Places API.
+
+    Args:
+        text_query: The specific search (e.g., 'romantic hotels in Savannah').
+        location_bias: Optional destination to focus the search.
+
+    Returns:
+        A JSON string of venues including priceLevel, rating, and addresses.
+    """
+    try:
+        mask = "places.displayName,places.id,places.editorialSummary,places.rating,places.priceLevel,places.formattedAddress,places.location"
+        query = f"{text_query} in {location_bias}" if location_bias else text_query
+        
+        request = {"text_query": query, "max_result_count": 8}
+        response = places_client.search_text(request=request, metadata=[("x-goog-fieldmask", mask)])
+        
+        venues = []
+        for place in response.places:
+            venues.append({
+                "name": place.display_name.text,
+                "place_id": place.id,
+                "rating": place.rating,
+                "price_tier": place.price_level,
+                "description": place.editorial_summary.text if place.editorial_summary else place.formatted_address,
+                "geo": {"latitude": place.location.latitude, "longitude": place.location.longitude}
+            })
+        
+        return json.dumps(venues, default=str)
+    except Exception as e:
+        return f"Error searching Google Places: {str(e)}"
 
 def create_travel_agent():
     """
@@ -107,7 +140,11 @@ def create_travel_agent():
     )
 
     search_tool = FunctionTool(
-        func=search_activities
+        func=search_destinations
+    )
+
+    places_search_tool = FunctionTool(
+        func=search_places
     )
 
     # 2.2 OpenAPI-based Toolsets
@@ -148,7 +185,7 @@ def create_travel_agent():
         model="gemini-2.0-flash", # Aligned with ADK samples
         static_instruction=system_instructions, # Optimized for context caching
         instruction=get_instructions,
-        tools=[search_tool, record_profile_tool, maps_toolset, places_toolset, profile_toolset, save_toolset],
+        tools=[search_tool, places_search_tool, record_profile_tool, maps_toolset, places_toolset, profile_toolset, save_toolset],
         output_key="final_itinerary",
         description="A high-fidelity travel planner and concierge."
     )
@@ -182,10 +219,16 @@ async def start_interactive_session():
 
     # InMemoryRunner simplifies session/storage management for the MVP
     async with InMemoryRunner(
-        app=my_app, 
-        app_name="my_travel_aigent",
-        auto_create_session=True
+        app=my_app,
+        app_name="my_travel_aigent"
     ) as runner:
+        # Explicitly create the session since auto_create_session is not supported
+        await runner.session_service.create_session(
+            app_name="my_travel_aigent",
+            user_id=user_id,
+            session_id=session_id
+        )
+
         print("\n--- My-Travel-Aigent-Brain: Interactive MVP Session ---")
         print("Mission: Plan a trip to Savannah for a couple from Duluth, GA.")
         print("Type 'exit' to quit.\n")
