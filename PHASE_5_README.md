@@ -35,8 +35,9 @@ Phase 5 transforms "My Travel Aigent" into a high-fidelity web application. It m
 - **Risk/Density Sliders:** Allow users to adjust `activity_density` (Low/Med/High) and `risk_tolerance` (Relaxed/Strict) with immediate timeline updates.
 
 ## 3. Integration & Persistence
-- **API Layer:** Use the official `@google-cloud/adk` client or Vertex AI SDKs in your Next.js API routes to communicate with the session orchestrated by the **ADK Visual Builder**.
-- **Session Management:** Maintain `sessionId` and `userId` in the browser to ensure the Supervisor remembers the context during the visual planning phase.
+- **API Layer:** Use the official `@google-cloud/adk` client or Vertex AI SDKs in your Next.js API routes to communicate with the session.
+- **Session Management:** Using a persistent **MongoDBSessionService** to ensure chat history and agent state persist across server restarts and deployments.
+
 - **Mission Save:** A "Commit to Atlas" button that invokes the `save_itinerary` tool once the user is satisfied with the visual draft.
 - **Version Control:** Allow users to "Clone" a trip to create a new "Draft" variant for comparison.
 
@@ -45,6 +46,7 @@ Phase 5 transforms "My Travel Aigent" into a high-fidelity web application. It m
 - [ ] Itinerary overlaps are visually distinct and provide tooltips explaining the buffer violation.
 - [ ] Map routes dynamically redraw when an event's location is swapped.
 - [ ] Final visual itineraries pass all `validate_buffers.py` and `validate_itinerary_budget` checks before saving.
+- [ ] Finalized itineraries are correctly updated in MongoDB with `status: "final"` via the `finalize_itinerary` tool.
 
 ---
 **Navigation:**

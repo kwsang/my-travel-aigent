@@ -8,7 +8,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from google.genai import types as genai_types
-from google.adk.runners import InMemoryRunner
+from google.adk.runners import Runner
+from adk_mongodb_session.mongodb.sessions import MongoDBSessionService
+from pymongo import MongoClient
 from google.adk.errors.already_exists_error import AlreadyExistsError
 from dotenv import load_dotenv
 import agent_definition
@@ -23,11 +25,29 @@ logger = logging.getLogger(__name__)
 # Shared app instance
 travel_agent_app = agent_definition.create_travel_agent()
 
-# Initialize the InMemoryRunner once globally
-runner = InMemoryRunner(app=travel_agent_app, app_name="my_travel_aigent")
+# Initialize persistent MongoDB session storage
+session_service = MongoDBSessionService(
+    mongodb_uri=os.getenv("MONGODB_URI"),
+    db_name="my_travel_aigent_sessions"
+)
+runner = Runner(app=travel_agent_app, session_service=session_service)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure TTL index on the session collection for automatic cleanup
+    try:
+        # Using a temporary client to manage indexes on the session database
+        client = MongoClient(os.getenv("MONGODB_URI"))
+        session_db = client["my_travel_aigent_sessions"]
+        
+        # expireAfterSeconds: 2592000 seconds = 30 days
+        # This will automatically delete sessions that haven't been updated in 30 days.
+        session_db["sessions"].create_index("updated_at", expireAfterSeconds=2592000)
+        logger.info("MongoDB TTL index verified for session collection (30-day retention).")
+        client.close()
+    except Exception as e:
+        logger.warning(f"Could not verify MongoDB TTL index: {e}")
+
     # This starts the global runner once when the server starts
     async with runner:
         yield
