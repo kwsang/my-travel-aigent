@@ -1,7 +1,7 @@
 import json
 import logging
 from google.adk.plugins.base_plugin import BasePlugin
-from ..tools.utils import calculate_travel_time
+from tools.utils import calculate_travel_time
 
 logger = logging.getLogger(__name__)
 

@@ -229,8 +229,6 @@ __pycache__/
 .adk/*
 samples/
 **/samples/
-gemini-agent/samples/
-gemini-agent/samples/*
 */.env.*
 
 # Node.js / Next.js
