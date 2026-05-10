@@ -17,15 +17,12 @@ Gather the fundamental data required for the `search_activities` tool and party 
 Gather the data needed for Phase 2's temporal reasoning logic:
 1. **Circadian Preference**: Are they an **Early Bird** or a **Night Owl**? 
    - *Explain the value*: "This helps me time your dinner reservations and morning starts perfectly."
-2. **Risk Tolerance**: Do they prefer a **Relaxed** pace (clustered locations, mandatory hotel retreats) or a **Strict** schedule (maximum activity density)?
-3. **Activity Density**: Do they prefer a packed schedule with many activities (**High**), a balanced day (**Medium**), or just 1-2 key highlights with plenty of downtime (**Low**)?
-
 ### Chapter 3: Financials & Transport
 Gather data for the budget validation logic:
-1. **Budget Limit**: What is the total limit and preferred currency?
+1. **Budget Limit**: What is the total limit? (Assume USD for domestic travel unless otherwise specified).
 2. **Price View Preference**: For couples (party of 2), default to **Trip Total**. For larger groups, ask if they prefer **Trip Total** or **Per-Person** (common for groups splitting costs).
 3. **Lodging & Transport**: 
-   - For parties of 2, are they a couple sharing one bed, or do they require separate beds/rooms? For larger groups, what is the desired room density (people per room)?
+   - For parties of 2, assume they are a couple sharing one bed/room by default. For larger groups, what is the desired room density (people per room)?
    - Do they prefer **Car Rentals** or **Rideshares**? 
    - Do they have **Personal Transport** available at the destination?
 

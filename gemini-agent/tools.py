@@ -1,9 +1,11 @@
 import json
+import datetime
+from typing import Any
 from .clients import voyage_client, destinations_collection, places_client, gmaps_client
 from google.adk.agents.invocation_context import InvocationContext as Context
 from vertexai.generative_models import GenerativeModel
 
-def record_user_profile(profile: dict, ctx: Context) -> str:
+def record_user_profile(profile: dict, tool_context: Any) -> str:
     """
     Saves the gathered user travel preferences into the session state.
     Enforces Couple-First Pricing Logic.
@@ -12,11 +14,110 @@ def record_user_profile(profile: dict, ctx: Context) -> str:
     party = prefs.get("party_size", {})
     total_people = int(party.get("adults", 0)) + int(party.get("children", 0))
     
-    if total_people == 2 and "group_planning_per_person" not in prefs:
-        prefs["group_planning_per_person"] = False
+    # Default currency to USD if not specified
+    budget = prefs.get("budget", {})
+    if not budget.get("currency"):
+        budget["currency"] = "USD"
+    prefs["budget"] = budget
 
-    ctx.state.update({"user_profile_data": profile})
+    # Enforce Couple Assumption Logic (2 people = 1 bed/room shared)
+    if total_people == 2:
+        if "group_planning_per_person" not in prefs:
+            prefs["group_planning_per_person"] = False
+        if "room_sharing" not in prefs:
+            prefs["room_sharing"] = True
+        if "people_per_room" not in prefs:
+            prefs["people_per_room"] = 2
+        
+        # Assume romantic trip for couples sharing a bed
+        styles = prefs.get("travel_style", [])
+        if not any("romantic" in s.lower() for s in styles):
+            styles.append("romantic")
+        prefs["travel_style"] = styles
+
+    # Default risk tolerance to relaxed (don't ask initially)
+    if "risk_tolerance" not in prefs:
+        prefs["risk_tolerance"] = "relaxed"
+
+    # Default activity density to medium if not provided
+    if "activity_density" not in prefs:
+        prefs["activity_density"] = "medium"
+
+    # If you need the Artifact Service, access it via the context:
+    # artifact_service = tool_context.artifact_service
+    
+    tool_context.state.update({"user_profile_data": profile})
     return "User profile recorded successfully. Transitioning to Architect mode."
+
+def query_user_profile(user_id: str, tool_context: Any) -> str:
+    """
+    Retrieves a user's persistent travel profile and preferences from MongoDB.
+    """
+    try:
+        db = destinations_collection.database
+        profile = db["user_profiles"].find_one({"user_id": user_id})
+        if not profile:
+            return f"No profile found for user '{user_id}'."
+        return json.dumps(profile, default=str)
+    except Exception as e:
+        return f"Error retrieving profile: {str(e)}"
+
+def save_itinerary(itinerary: dict, tool_context: Any) -> str:
+    """
+    Persists a finalized, multi-day travel itinerary to MongoDB Atlas.
+    """
+    try:
+        db = destinations_collection.database
+        itinerary["created_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        result = db["itineraries"].insert_one(itinerary)
+        return f"SUCCESS: Itinerary saved with ID {result.inserted_id}."
+    except Exception as e:
+        return f"Error saving itinerary: {str(e)}"
+
+def google_maps_matrix(origins: list[str], destinations: list[str]) -> str:
+    """
+    Calculates real-time driving time and distance between locations.
+    
+    Args:
+        origins: List of starting point coordinates or addresses.
+        destinations: List of destination coordinates or addresses.
+    """
+    try:
+        matrix = gmaps_client.distance_matrix(
+            origins=origins,
+            destinations=destinations,
+            mode="driving",
+            departure_time="now"
+        )
+        return json.dumps(matrix)
+    except Exception as e:
+        return f"Error calculating distance matrix: {str(e)}"
+
+def google_places_details(name: str) -> str:
+    """
+    Retrieves detailed information (rating, business status, opening hours) for a specific place.
+    
+    Args:
+        name: The resource name of the place (e.g., 'places/PLACE_ID').
+    """
+    try:
+        mask = "displayName,rating,userRatingCount,regularOpeningHours,businessStatus,currentOpeningHours"
+        result = places_client.get_place(
+            request={"name": name},
+            metadata=[("x-goog-fieldmask", mask)]
+        )
+        # Convert the proto message to a dict
+        details = {
+            "name": result.display_name.text,
+            "rating": result.rating,
+            "user_rating_count": result.user_rating_count,
+            "status": result.business_status.name,
+            "regular_opening_hours": str(result.regular_opening_hours) if result.regular_opening_hours else "Not available",
+            "current_opening_hours": str(result.current_opening_hours) if result.current_opening_hours else "Not available"
+        }
+        return json.dumps(details)
+    except Exception as e:
+        return f"Error fetching place details: {str(e)}"
 
 def search_destinations(query: str) -> str:
     """
@@ -48,7 +149,7 @@ def discover_new_destination(vibe_or_city: str) -> str:
     Autonomous Producer Tool: Discovers and seeds a new city destination into MongoDB.
     """
     try:
-        discovery_model = GenerativeModel("gemini-1.5-flash")
+        discovery_model = GenerativeModel("gemini-2.5-flash")
         prompt = (
             f"Based on the input '{vibe_or_city}', identify the single most relevant major or popular "
             "city or town in the USA. Return only the name in 'City, State' format."
@@ -103,8 +204,8 @@ def search_places(
                 "places.priceLevel,places.formattedAddress,places.location,places.types,"
                 "places.takeout,places.delivery,places.dineIn,places.curbsidePickup,"
                 "places.servesBreakfast,places.servesLunch,places.servesDinner,"
-                "places.servesBeer,places.servesWine,places.servesVegetarianFood,"
-                "places.goodForChildren,places.wheelchairAccessibleEntrance")
+                "places.servesBeer,places.servesWine,places.servesVegetarianFood,places.currentOpeningHours,"
+                "places.goodForChildren,places.accessibilityOptions")
         query = f"{text_query} in {location_bias}" if location_bias else text_query
         request = {"text_query": query, "max_result_count": 8}
         if location_type: request["included_type"] = location_type
@@ -118,7 +219,10 @@ def search_places(
             if serves_lunch is not None and place.serves_lunch != serves_lunch: continue
             if serves_dinner is not None and place.serves_dinner != serves_dinner: continue
             if good_for_children is not None and place.good_for_children != good_for_children: continue
-            if wheelchair_accessible_entrance is not None and place.wheelchair_accessible_entrance != wheelchair_accessible_entrance: continue
+
+            # Accessibility options are nested in the New Places API response
+            has_accessible_entrance = place.accessibility_options.wheelchair_accessible_entrance if place.accessibility_options else None
+            if wheelchair_accessible_entrance is not None and has_accessible_entrance != wheelchair_accessible_entrance: continue
 
             venues.append({
                 "name": place.display_name.text,
@@ -128,6 +232,7 @@ def search_places(
                 "description": place.editorial_summary.text if place.editorial_summary else place.formatted_address,
                 "geo": {"latitude": place.location.latitude, "longitude": place.location.longitude},
                 "types": place.types,
+                "currentOpeningHours": str(place.current_opening_hours) if place.current_opening_hours else None,
                 "takeout": place.takeout,
                 "delivery": place.delivery,
                 "dineIn": place.dine_in,
@@ -139,18 +244,20 @@ def search_places(
                 "servesWine": place.serves_wine,
                 "servesVegetarianFood": place.serves_vegetarian_food,
                 "goodForChildren": place.good_for_children,
-                "wheelchairAccessibleEntrance": place.wheelchair_accessible_entrance
+                "wheelchairAccessibleEntrance": has_accessible_entrance
             })
         return json.dumps(venues, default=str)
     except Exception as e:
         return f"Error searching Google Places: {str(e)}"
 
-def calculate_travel_time(origin_geo: dict, dest_geo: dict) -> int:
+def calculate_travel_time(origin: Any, destination: Any) -> int:
     """Helper to calculate driving minutes between two points."""
     try:
-        origin = f"{origin_geo['latitude']},{origin_geo['longitude']}"
-        destination = f"{dest_geo['latitude']},{dest_geo['longitude']}"
-        matrix = gmaps_client.distance_matrix(origins=[origin], destinations=[destination], mode="driving", departure_time="now")
+        # Handle dict coordinates or raw address strings
+        orig = f"{origin['latitude']},{origin['longitude']}" if isinstance(origin, dict) else origin
+        dest = f"{destination['latitude']},{destination['longitude']}" if isinstance(destination, dict) else destination
+
+        matrix = gmaps_client.distance_matrix(origins=[orig], destinations=[dest], mode="driving", departure_time="now")
         if matrix['status'] == 'OK':
             element = matrix['rows'][0]['elements'][0]
             if element['status'] == 'OK':

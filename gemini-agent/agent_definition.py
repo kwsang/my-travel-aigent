@@ -12,7 +12,11 @@ from .tools import (
     record_user_profile, 
     search_destinations, 
     discover_new_destination, 
-    search_places
+    search_places,
+    query_user_profile,
+    save_itinerary,
+    google_maps_matrix,
+    google_places_details
 )
 
 def create_travel_agent():
@@ -20,29 +24,17 @@ def create_travel_agent():
     Defines and initializes the My-Travel-Aigent-Brain using the ADK.
     Orchestrates the transition between Concierge (Elicitation) and Architect (Planning).
     """
-
-    # 2. Define Tools (Superpowers)
-    # We map our validated OpenAPI specs from the mcp folder
-    specs_dir = os.path.join(os.path.dirname(__file__), "..", "mcp", "openapi-specs")
-
-    def load_spec(filename):
-        """Helper to load YAML and return as JSON string for OpenAPIToolset."""
-        path = os.path.join(specs_dir, filename)
-        with open(path, "r") as f:
-            return json.dumps(yaml.safe_load(f))
-
     # 2.1 Function-based Tools
     record_profile_tool = FunctionTool(func=record_user_profile)
     search_tool = FunctionTool(func=search_destinations)
     discovery_tool = FunctionTool(func=discover_new_destination)
     places_search_tool = FunctionTool(func=search_places)
-
-    # 2.2 OpenAPI-based Toolsets
-    # Each toolset can contain multiple tools if defined in the spec
-    maps_toolset = OpenAPIToolset(spec_str=load_spec("google_maps_matrix_openapi.yaml"), spec_str_type='json')
-    places_toolset = OpenAPIToolset(spec_str=load_spec("google_places_details_openapi.yaml"), spec_str_type='json')
-    profile_toolset = OpenAPIToolset(spec_str=load_spec("query_user_profile_openapi.yaml"), spec_str_type='json')
-    save_toolset = OpenAPIToolset(spec_str=load_spec("save_itinerary_openapi.yaml"), spec_str_type='json')
+    
+    # Local Python-based versions of the MCP/API tools to avoid Protocol errors
+    get_profile_tool = FunctionTool(func=query_user_profile)
+    persist_tool = FunctionTool(func=save_itinerary)
+    traffic_tool = FunctionTool(func=google_maps_matrix)
+    details_tool = FunctionTool(func=google_places_details)
 
     # 3. Load Instruction Prompts
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
@@ -79,10 +71,19 @@ def create_travel_agent():
     # 5. Initialize the Agent
     agent = Agent(
         name="my_travel_aigent_brain",
-        model="gemini-2.0-flash", # Aligned with ADK samples
+        model="gemini-2.5-flash", # Aligned with ADK samples
         static_instruction=system_instructions, # Optimized for context caching
         instruction=get_instructions,
-        tools=[search_tool, discovery_tool, places_search_tool, record_profile_tool, maps_toolset, places_toolset, profile_toolset, save_toolset],
+        tools=[
+            search_tool, 
+            discovery_tool, 
+            places_search_tool, 
+            record_profile_tool, 
+            get_profile_tool, 
+            persist_tool, 
+            traffic_tool, 
+            details_tool
+        ],
         output_key="final_itinerary",
         description="A high-fidelity travel planner and concierge."
     )
