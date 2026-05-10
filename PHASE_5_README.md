@@ -7,10 +7,10 @@ Phase 5 transforms "My Travel Aigent" into a high-fidelity web application. It m
 - **Framework:** Next.js (App Router) for high-performance itinerary rendering.
 - **Styling:** Tailwind CSS for a responsive, mobile-first design.
 - **Maps:** Google Maps JavaScript API (`@googlemaps/react-wrapper`) for route visualization.
-- **UI Components:** Shadcn/UI for timelines, budget progress bars, and interactive toggles.
+- **UI Components:** shadcn for timelines, budget progress bars, and interactive toggles.
 
 ## 1.1 Implementation Sequence
-1. **Scaffolding:** Initialize the Next.js project and configure the theme (Tailwind + Shadcn).
+1. **Scaffolding:** Initialize the Next.js project and configure the theme (Tailwind + shadcn).
 2. **Data Fetching Layer:** Create API routes to proxy requests between the UI and your MongoDB/Agent Builder tools.
 3. **The Timeline Builder:** Map the `itinerary.events` array to a chronological vertical list.
 4. **Map Orchestration:** Synchronize the Map markers with the Timeline selection.

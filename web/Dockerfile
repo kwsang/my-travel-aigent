@@ -1,4 +1,4 @@
-# Stage 1: Build the application
+# Stage 1: Build
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -6,25 +6,29 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Copy the rest of the source code (filtered by .dockerignore)
 COPY . .
-# Create public directory if it doesn't exist to prevent COPY failure in the runner stage
+
 RUN mkdir -p public
+
+ENV NEXT_TELEMETRY_DISABLED 1
+
 RUN npm run build
 
-# Stage 2: Production runner
+# Stage 2: Runner
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED 1
 
 # Copy necessary build artifacts and configurations
-COPY --from=builder /app/next.config.* ./
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 3000
 ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
 
-# Run the Next.js production server
-CMD ["npm", "start"]
+# Run the standalone server directly
+CMD ["node", "server.js"]
