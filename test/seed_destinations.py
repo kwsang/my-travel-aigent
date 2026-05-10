@@ -3,7 +3,9 @@ import sys
 import time
 import logging
 import voyageai
-import googlemaps
+import vertexai
+from vertexai.generative_models import GenerativeModel
+from google.maps import places_v1
 from pymongo import MongoClient, errors
 from dotenv import load_dotenv
 
@@ -28,8 +30,11 @@ if not maps_key:
 
 # Initialize Voyage AI Client
 vo = voyageai.Client(api_key=api_key)
-# Initialize Google Maps Client
-gmaps = googlemaps.Client(key=maps_key)
+# Initialize Google Places Client (New)
+places_client = places_v1.PlacesClient(client_options={"api_key": maps_key})
+
+# Initialize Vertex AI for city discovery
+vertexai.init(project=os.environ.get("GOOGLE_CLOUD_PROJECT"), location="us-central1")
 
 EMBEDDING_MODEL = "voyage-4"
 def get_embeddings(texts: list[str]) -> list[list[float]]:
@@ -47,71 +52,87 @@ def get_embeddings(texts: list[str]) -> list[list[float]]:
             logger.warning("Voyage AI rate limit hit. Consider increasing delay or reducing batch size.")
         raise
 
-def fetch_destinations_from_google(city_list: list[str]):
-    """Uses Google Maps API to find real cities and towns based on a fixed list."""
+def get_cities_from_vibe(vibe_phrase):
+    """Uses Gemini to find cities matching a specific vibe."""
+    logger.info(f"Asking Gemini for cities matching vibe: '{vibe_phrase}'")
+    model = GenerativeModel("gemini-2.5-flash-lite")
+    prompt = (
+        f"List 10 popular or major cities in the USA that match this travel vibe: '{vibe_phrase}'. "
+        "Return only a list of cities in the format 'City, State' separated by newlines. "
+        "Do not include any numbering or extra text."
+    )
+    try:
+        response = model.generate_content(prompt)
+        lines = response.text.strip().split('\n')
+        cities = [line.strip() for line in lines if ',' in line]
+        return cities
+    except Exception as e:
+        logger.error(f"Gemini city discovery failed: {e}")
+        return []
+
+def fetch_destinations_from_google(vibe_queries: list[str]):
+    """Uses Gemini to discover cities and Google Maps API to fetch their metadata."""
     results = []
+    # Stopwords to remove from queries when generating vibe_tags
+    STOPWORDS = {"cities", "towns", "villages", "spots", "destinations", "in", "with", "a", "and", "the", "usa", "us", "major", "top", "popular", "best", "near", "spot"}
+    # Field mask for the New Places API to specify required fields
+    mask = "places.displayName,places.location,places.formattedAddress,places.types"
 
-    for city_query in city_list:
-        logger.info(f"Fetching geographic data for: '{city_query}'")
-        try:
-            # Search for specific city/state to ensure domestic accuracy
-            response = gmaps.places(query=f"{city_query}, USA")
-            
-            if response.get('results'):
-                # Take the most relevant first result for the specific city name
-                place = response['results'][0]
-                types = place.get('types', [])
-                geographic_types = {'locality', 'sublocality', 'administrative_area_level_3', 'town'}
-                
-                if not any(t in geographic_types for t in types):
-                    logger.debug(f"Skipping non-city result for '{city_query}': {types}")
-                    continue
-
-                dest_doc = {
-                    "name": place.get('name'),
-                    "country": "USA",
-                    # Enforce city-specific description for better vector search
-                    "description": f"The city of {place.get('name')}, located at {place.get('formatted_address')}.",
-                    "location": {
-                        "type": "Point",
-                        # Map geometry returns lat/lng as discrete fields; GeoJSON standard is [longitude, latitude]
-                        "coordinates": [place['geometry']['location']['lng'], place['geometry']['location']['lat']]
-                    },
-                    # Tags derived from the city and state name for filtering
-                    "vibe_tags": [word.lower().strip(',') for word in city_query.split()],
-                    "rating": place.get('rating', 4.5)
+    for vibe_phrase in vibe_queries:
+        # Extract keywords for vibe_tags from the descriptive phrase
+        vibe_tags = [word.lower().strip(',') for word in vibe_phrase.split() if word.lower() not in STOPWORDS]
+        
+        # 1. Ask Gemini for cities that match this vibe
+        cities_to_fetch = get_cities_from_vibe(vibe_phrase)
+        
+        for city_query in cities_to_fetch:
+            logger.info(f"Fetching metadata for discovered city: '{city_query}'")
+            try:
+                # 2. Query Google Places for specific information about the discovered city
+                request = {
+                    "text_query": f"{city_query}, USA",
+                    "included_type": "locality",
+                    "strict_type_filtering": True,
+                    "max_result_count": 1
                 }
-                results.append(dest_doc)
-            
-            time.sleep(0.2) # Minor delay to respect quota
-        except Exception as e:
-            logger.error(f"Google API call failed for '{city_query}': {e}")
+                response = places_client.search_text(request=request, metadata=[("x-goog-fieldmask", mask)])
+                
+                for place in response.places:
+                    types = place.types
+                    geographic_types = {'locality', 'sublocality', 'administrative_area_level_3', 'town'}
+                    
+                    if not any(t in geographic_types for t in types):
+                        continue
+
+                    dest_doc = {
+                        "name": place.display_name.text,
+                        "country": "USA",
+                        # High-fidelity semantic description
+                        "description": (f"The city of {place.display_name.text}. A US destination found for its "
+                                       f"'{vibe_phrase}' characteristics, located in "
+                                       f"{place.formatted_address}."),
+                        "location": {
+                            "type": "Point",
+                            "coordinates": [place.location.longitude, place.location.latitude]
+                        },
+                        "vibe_tags": vibe_tags,
+                    }
+                    results.append(dest_doc)
+                
+                time.sleep(0.5) 
+            except Exception as e:
+                logger.error(f"Google fetch failed for '{city_query}': {e}")
             
     return results
 
-# 2. Top 100 US Major and Tourist Cities
-TOP_US_CITIES = [
-    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
-    "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
-    "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
-    "Indianapolis, IN", "San Francisco, CA", "Seattle, WA", "Denver, CO", "Oklahoma City, OK",
-    "Nashville, TN", "El Paso, TX", "Washington, DC", "Las Vegas, NV", "Boston, MA",
-    "Portland, OR", "Louisville, KY", "Memphis, TN", "Detroit, MI", "Baltimore, MD",
-    "Milwaukee, WI", "Albuquerque, NM", "Tucson, AZ", "Fresno, CA", "Sacramento, CA",
-    "Mesa, AZ", "Kansas City, MO", "Atlanta, GA", "Colorado Springs, CO", "Omaha, NE",
-    "Raleigh, NC", "Virginia Beach, VA", "Long Beach, CA", "Miami, FL", "Oakland, CA",
-    "Minneapolis, MN", "Tulsa, OK", "Bakersfield, CA", "Wichita, KS", "Arlington, TX",
-    "Aurora, CO", "Tampa, FL", "New Orleans, LA", "Cleveland, OH", "Honolulu, HI",
-    "Anaheim, CA", "Lexington, KY", "Stockton, CA", "Corpus Christi, TX", "Henderson, NV",
-    "Riverside, CA", "Newark, NJ", "Saint Paul, MN", "Santa Ana, CA", "Cincinnati, OH",
-    "Irvine, CA", "Orlando, FL", "Pittsburgh, PA", "St. Louis, MO", "Greensboro, NC",
-    "Jersey City, NJ", "Anchorage, AK", "Lincoln, NE", "Plano, TX", "Durham, NC",
-    "Buffalo, NY", "Chandler, AZ", "Chula Vista, CA", "Toledo, OH", "Madison, WI",
-    "Gilbert, AZ", "Reno, NV", "Fort Wayne, IN", "North Las Vegas, NV", "St. Petersburg, FL",
-    "Lubbock, TX", "Irving, TX", "Laredo, TX", "Winston-Salem, NC", "Chesapeake, VA",
-    "Glendale, AZ", "Scottsdale, AZ", "Garland, TX", "Norfolk, VA", "Boise, ID",
-    "Fremont, CA", "Richmond, VA", "Santa Clarita, CA", "Savannah, GA", "Duluth, GA",
-    "Asheville, NC", "Charleston, SC", "Sedona, AZ", "Key West, FL", "Aspen, CO"
+# 2. Vibe Discovery Queries
+VIBE_DISCOVERY_QUERIES = [
+    "Most popular affordable cities for travelers",
+    "Top-rated budget-friendly vacation spots",
+    "Most beautiful cities with mountain views",
+    "Popular coastal cities for summer",
+    "Best cities for nightlife and entertainment",
+    "Iconic bucket-list cities"
 ]
 
 # 3. Connect to Atlas
@@ -132,33 +153,55 @@ except errors.ConnectionFailure as e:
     sys.exit(1)
 
 def seed():
-    # 1. Identify cities already present in MongoDB to avoid redundant API calls
+    # 1. Identify cities already present in MongoDB to avoid redundant processing
     try:
         existing_names = set(collection.distinct("name"))
     except Exception as e:
         logger.error(f"Could not retrieve existing city names from MongoDB: {e}")
         existing_names = set()
 
-    # 2. Filter the list: only fetch cities whose name isn't already in the database
-    cities_to_fetch = [city for city in TOP_US_CITIES if city.split(',')[0].strip() not in existing_names]
-
-    if not cities_to_fetch:
-        logger.info("All targeted cities already exist in MongoDB. Skipping fetch.")
-        return
-
-    # 3. Fetch fresh data only for missing cities
-    raw_destinations = fetch_destinations_from_google(cities_to_fetch)
+    # 2. Fetch and Discover data from Google
+    raw_destinations = fetch_destinations_from_google(VIBE_DISCOVERY_QUERIES)
     
     if not raw_destinations:
         logger.warning("No destinations found via Google API. Aborting seed.")
         return
 
-    logger.info(f"Processing {len(raw_destinations)} city destinations for embeddings and Atlas upload...")
+    # 3. Process results: identify new cities for embeddings and update tags for existing ones
+    # We use a map to consolidate tags for new cities found across different queries in this run.
+    cities_to_process_map = {}
+    for d in raw_destinations:
+        name = d["name"]
+        if name in existing_names:
+            # City exists: update vibe tags using $addToSet to avoid duplicates
+            try:
+                collection.update_one(
+                    {"name": name},
+                    {"$addToSet": {"vibe_tags": {"$each": d["vibe_tags"]}}}
+                )
+                logger.info(f"Updated vibe tags for existing city: {name}")
+            except Exception as e:
+                logger.error(f"Failed to update tags for {name}: {e}")
+        elif name not in cities_to_process_map:
+            cities_to_process_map[name] = d
+        else:
+            # Consolidate tags for new cities found multiple times in this session
+            combined_tags = set(cities_to_process_map[name]["vibe_tags"])
+            combined_tags.update(d["vibe_tags"])
+            cities_to_process_map[name]["vibe_tags"] = list(combined_tags)
+
+    cities_to_process = list(cities_to_process_map.values())
+
+    if not cities_to_process:
+        logger.info("No new cities found. Database update complete.")
+        return
+
+    logger.info(f"Processing {len(cities_to_process)} new cities for embeddings and Atlas upload...")
     success_count = 0
     
     batch_size = 20 
-    for i in range(0, len(raw_destinations), batch_size):
-        batch = raw_destinations[i : i + batch_size]
+    for i in range(0, len(cities_to_process), batch_size):
+        batch = cities_to_process[i : i + batch_size]
         descriptions = [d["description"] for d in batch]
         
         try:
@@ -166,23 +209,16 @@ def seed():
             
             for idx, dest in enumerate(batch):
                 dest["description_embedding"] = embeddings[idx]
-                result = collection.update_one(
-                    {"name": dest["name"]},
-                    {"$set": dest},
-                    upsert=True
-                )
-                if result.upserted_id:
-                    logger.info(f"Inserted: {dest['name']}")
-                else:
-                    logger.info(f"Updated: {dest['name']}")
+                collection.insert_one(dest)
+                logger.info(f"Inserted: {dest['name']}")
                 success_count += 1
 
-            if i + batch_size < len(raw_destinations):
+            if i + batch_size < len(cities_to_process):
                 time.sleep(10)
         except Exception as e:
             logger.error(f"Failed to process batch starting at index {i}: {e}")
 
-    logger.info(f"Successfully processed {success_count}/{len(raw_destinations)} real-world city destinations.")
+    logger.info(f"Successfully processed {success_count} new real-world city destinations.")
 
 if __name__ == "__main__":
     seed()

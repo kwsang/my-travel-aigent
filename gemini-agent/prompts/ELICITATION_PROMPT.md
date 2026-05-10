@@ -40,7 +40,6 @@ Once the profile is complete, inform the user:
 
 Then, invoke `search_destinations` with:
 - `query`: Based on Chapter 1.
-- `min_rating`: Based on `preferences.min_rating` (default 4.5).
 ```
 
 ### Code Review & Insights:

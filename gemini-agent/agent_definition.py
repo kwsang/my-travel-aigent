@@ -5,7 +5,7 @@ import yaml
 import vertexai
 from google.genai import types as genai_types
 import voyageai
-from google.adk import Agent
+from google.adk.agents import Agent
 from google.adk.apps.app import App
 from google.adk.agents.context_cache_config import ContextCacheConfig
 from google.adk.agents.invocation_context import InvocationContext as Context
@@ -47,13 +47,12 @@ def record_user_profile(profile: dict, ctx: Context) -> str:
     ctx.state.update({"user_profile_data": profile})
     return "User profile recorded successfully. Transitioning to Architect mode."
 
-def search_destinations(query: str, min_rating: float = 4.0) -> str:
+def search_destinations(query: str) -> str:
     """
     Performs a semantic search for travel destinations (strictly cities and towns) using MongoDB Vector Search.
 
     Args:
         query: The semantic search query or 'vibe' for a city (e.g., 'historic coastal towns').
-        min_rating: The minimum rating threshold (default 4.0).
 
     Returns:
         A JSON string containing matching cities/towns and their geographic context.
@@ -70,8 +69,7 @@ def search_destinations(query: str, min_rating: float = 4.0) -> str:
                     "path": "description_embedding",
                     "queryVector": embedding,
                     "numCandidates": 100,
-                    "limit": 5,
-                    "filter": {"rating": {"$gte": min_rating}}
+                    "limit": 5
                 }
             },
             {"$project": {"_id": 0, "description_embedding": 0}}
@@ -85,13 +83,14 @@ def search_destinations(query: str, min_rating: float = 4.0) -> str:
     except Exception as e:
         return f"Error during semantic search: {str(e)}"
 
-def search_places(text_query: str, location_bias: str = None) -> str:
+def search_places(text_query: str, location_bias: str = None, location_type: str = None) -> str:
     """
     Searches for specific venues (hotels, restaurants, attractions) using the Google Places API.
 
     Args:
         text_query: The specific search (e.g., 'romantic hotels in Savannah').
         location_bias: Optional destination to focus the search.
+        location_type: Optional Google Place type to filter results (e.g., 'hotel', 'restaurant').
 
     Returns:
         A JSON string of venues including priceLevel, rating, and addresses.
@@ -101,6 +100,9 @@ def search_places(text_query: str, location_bias: str = None) -> str:
         query = f"{text_query} in {location_bias}" if location_bias else text_query
         
         request = {"text_query": query, "max_result_count": 8}
+        if location_type:
+            request["included_type"] = location_type
+            
         response = places_client.search_text(request=request, metadata=[("x-goog-fieldmask", mask)])
         
         venues = []
