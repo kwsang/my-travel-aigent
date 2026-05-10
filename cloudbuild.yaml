@@ -1,7 +1,7 @@
 steps:
   # 1. Build and push Backend
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/travel-agent-api', './gemini-agent']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/travel-agent-api', './gemini_agent']
   
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/travel-agent-api']

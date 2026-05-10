@@ -11,11 +11,14 @@ dependencies = [
     "uvicorn[standard]",
     "motor>=3.3.0",
     "pydantic>=2.0.0",
-    "python-dotenv"
+    "python-dotenv",
+    "google-adk",
+    "pymongo",
+    "adk-mongodb-session"
 ]
 
 [project.optional-dependencies]
-dev = ["google-adk"]
+dev = []
 
 [tool.setuptools.packages.find]
 include = ["gemini_agent*"]

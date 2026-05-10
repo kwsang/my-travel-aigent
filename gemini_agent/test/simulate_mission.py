@@ -48,7 +48,7 @@ async def simulate_adk_agent_run(user_input: str):
     """
     print("\n--- Starting ADK Agent Runner Simulation ---")
     # This assumes an 'architect' agent is defined in your package
-    runner = Runner(agents_dir="c:/Users/Kang/github/my-travel-aigent/gemini-agent")
+    runner = Runner(agents_dir="c:/Users/Kang/github/my-travel-aigent/gemini_agent")
     
     # Simulate the start of a session
     session_id = f"sim_{datetime.datetime.now().timestamp()}"

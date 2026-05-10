@@ -1,8 +1,8 @@
 services:
   api:
     build:
-      context: ./gemini-agent
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./gemini_agent/Dockerfile
     ports:
       - "8000:8000"
     environment:

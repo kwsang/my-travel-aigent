@@ -72,5 +72,5 @@ Generally use gemini-2.5-flash for moderate tasks.
 Use gemini-2.5-flash-lite for high throughput low intensity tasks.
 
 ## Package Structure
-The backend (agent) is in /gemini-agent
+The backend (agent) is in /gemini_agent
 The frontend is in /web

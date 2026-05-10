@@ -53,6 +53,10 @@ class ValidationResponse(BaseModel):
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
     itinerary_id: str
 
+class ChatResponse(BaseModel):
+    response: str = Field(..., description="The agent's text response.")
+    is_conflict: bool = Field(default=False, description="True if the current itinerary has validation errors.")
+
 class ChatRequest(BaseModel):
     message: str = Field(..., description="The user's chat input.")
     user_id: str

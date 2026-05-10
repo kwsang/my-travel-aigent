@@ -1,21 +1,34 @@
-# Use a slim Python image to keep the container lightweight
-FROM python:3.12-slim
+# Stage 1: Build stage
+FROM python:3.12-slim AS builder
 
-# Install system dependencies required for geospatial libraries like Shapely
 RUN apt-get update && apt-get install -y \
+    build-essential \
     libgeos-dev \
     && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /build
+
+# Copy dependency definitions from the build context (project root)
+COPY pyproject.toml .
+COPY gemini_agent ./gemini_agent
+
+# Generate wheels for all dependencies listed in pyproject.toml
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels .
+
+# Stage 2: Final runtime stage
+FROM python:3.12-slim
+
+# Install ONLY the runtime shared library for GEOS
+RUN apt-get update && apt-get install -y \
+    libgeos-c1v5 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
+COPY --from=builder /build/wheels /wheels
+# Install the generated wheels (this includes motor and google-adk)
+RUN pip install --no-cache-dir /wheels/*.whl
 
-# Copy requirements first to leverage Docker layer caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the agent source code
+# Copy the rest of the application code
 COPY . .
-
-# Cloud Run and Docker Compose both provide a PORT env var.
-# We use 'server:app' because server.py contains the FastAPI 'app' instance.
 EXPOSE 8000
-CMD uvicorn server:app --host 0.0.0.0 --port $PORT
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}"]
