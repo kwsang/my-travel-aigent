@@ -40,6 +40,14 @@ class MongoDBSessionService(BaseSessionService):
     async def delete_session(self, user_id: str, session_id: str, app_name: str):
         await self.collection.delete_one({"user_id": user_id, "session_id": session_id, "app_name": app_name})
 
+    async def list_sessions(self, user_id: str, app_name: str) -> list[str]:
+        """Retrieves a list of all session IDs for the given user and application."""
+        cursor = self.collection.find(
+            {"user_id": user_id, "app_name": app_name},
+            {"session_id": 1, "_id": 0}
+        )
+        return [doc["session_id"] async for doc in cursor]
+
 from gemini_agent.logic.validate_buffers import validate_itinerary_structure, validate_itinerary_budget
 from gemini_agent.logic.models import ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
 from gemini_agent import agent_definition

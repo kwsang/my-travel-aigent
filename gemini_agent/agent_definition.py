@@ -52,11 +52,6 @@ def create_travel_agent():
     traffic_tool = FunctionTool(func=google_maps_matrix)
     details_tool = FunctionTool(func=google_places_details)
 
-    # 2.2 Shared Model Configuration
-    # Note: Generation parameters like temperature are often handled via defaults 
-    # in the ADK to satisfy strict Pydantic V2 validation in the Agent constructor.
-    model_config = {}
-
     # 3. Load Instruction Prompts
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
 
@@ -76,7 +71,6 @@ def create_travel_agent():
         name="concierge",
         model="gemini-1.5-flash",
         static_instruction=system_instructions,
-        config=model_config,
         instruction=concierge_goal,
         tools=[
             record_profile_tool, 
@@ -105,7 +99,6 @@ def create_travel_agent():
         name="architect",
         model="gemini-1.5-flash",
         static_instruction=system_instructions,
-        config=model_config,
         instruction=get_architect_instructions,
         tools=[
             search_tool, 
@@ -155,7 +148,6 @@ def create_travel_agent():
     supervisor = Agent(
         name="travel_supervisor",
         model="gemini-1.5-flash",
-        config=model_config,
         instruction=supervisor_instructions,
         sub_agents=[concierge_agent, architect_agent],
         description="Orchestrates the travel planning process between the Concierge and the Architect."
