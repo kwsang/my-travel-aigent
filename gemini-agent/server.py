@@ -6,24 +6,25 @@ from pydantic import BaseModel
 from typing import List, Optional, Any
 from google.genai import types as genai_types
 from google.adk.runners import InMemoryRunner
-from .agent_definition import create_travel_agent
+import agent_definition
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="My Travel Aigent - Brain API")
 
-# Enable CORS for Next.js frontend development (localhost:3000)
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Shared app instance
-travel_agent_app = create_travel_agent()
+travel_agent_app = agent_definition.create_travel_agent()
 
 class ChatRequest(BaseModel):
     user_id: str
