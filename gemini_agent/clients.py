@@ -4,6 +4,7 @@ import voyageai
 import googlemaps
 import vertexai
 from vertexai.generative_models import GenerativeModel
+from google.cloud import secretmanager
 from pymongo import MongoClient
 from google.maps import places_v1
 from dotenv import load_dotenv
@@ -17,6 +18,29 @@ logger = logging.getLogger(__name__)
 # Project Config
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+def get_secret(secret_id: str, default: str = None) -> str:
+    """
+    Helper to fetch secrets from Google Cloud Secret Manager.
+    Falls back to environment variables for local development compatibility.
+    """
+    # If we don't have a project ID, we are likely local; skip API call.
+    if not PROJECT_ID:
+        return os.getenv(secret_id, default)
+
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        logger.warning(f"Could not fetch secret {secret_id} from Secret Manager: {e}")
+        return os.getenv(secret_id, default)
+
+# Resolve MONGODB_URI via Secret Manager or Environment
+MONGODB_URI = get_secret("MONGODB_URI")
+if not MONGODB_URI:
+    logger.error("MONGODB_URI could not be resolved from Secret Manager or Environment.")
 
 # Initialize Vertex AI context
 try:
@@ -34,7 +58,7 @@ except Exception:
     voyage_client = None
 
 try:
-    mongo_client = MongoClient(os.environ.get("MONGODB_URI"))
+    mongo_client = MongoClient(MONGODB_URI)
     db = mongo_client["my-travel-aigent"]
     destinations_collection = db["destinations"]
     # Verify MongoDB connection (MongoClient is lazy)

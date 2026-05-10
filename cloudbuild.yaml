@@ -1,44 +1,43 @@
 steps:
   # 1. Build and push Backend
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/travel-agent-api', './gemini_agent']
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:latest', '-f', 'gemini_agent/Dockerfile', '.']
   
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/travel-agent-api']
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:latest']
 
   # 2. Build and push Frontend
+  # Note: NEXT_PUBLIC_API_URL is passed as a build arg for Next.js bundle baking
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/travel-agent-web', './web']
-
+    args: 
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=$_API_URL'
+      - './web'
+  
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/travel-agent-web']
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest']
 
-  # 3. Deploy Backend
+  # 3. Deploy using YAML configurations (The "Source of Truth")
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args: 
       - 'run'
-      - 'deploy'
-      - 'travel-agent-api'
-      - '--image=gcr.io/$PROJECT_ID/travel-agent-api'
+      - 'services'
+      - 'replace'
+      - 'cloudrun-api.yml'
       - '--region=us-central1'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--set-env-vars=FRONTEND_URL=https://travel-agent-web-url-placeholder.a.run.app'
 
-  # 4. Deploy Frontend
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args: 
       - 'run'
-      - 'deploy'
-      - 'travel-agent-web'
-      - '--image=gcr.io/$PROJECT_ID/travel-agent-web'
+      - 'services'
+      - 'replace'
+      - 'cloudrun-web.yaml'
       - '--region=us-central1'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--set-env-vars=INTERNAL_API_URL=https://travel-agent-api-url-placeholder.a.run.app'
 
-images:
-  - 'gcr.io/$PROJECT_ID/travel-agent-api'
-  - 'gcr.io/$PROJECT_ID/travel-agent-web'
+substitutions:
+  _API_URL: "https://travel-aigent-api-your-id-uc.a.run.app"

@@ -1,0 +1,42 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: travel-aigent-api
+  labels:
+    cloudobjs.com/managed: "true"
+spec:
+  template:
+    spec:
+      # Use a service account with 'Vertex AI User' and 'Secret Manager Secret Accessor' roles
+      serviceAccountName: travel-aigent-runner@${PROJECT_ID}.iam.gserviceaccount.com
+      containers:
+        - image: us-central1-docker.pkg.dev/${PROJECT_ID}/travel-aigent/api:latest
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          env:
+            - name: GOOGLE_CLOUD_PROJECT
+              value: "${PROJECT_ID}"
+            - name: GOOGLE_CLOUD_LOCATION
+              value: "us-central1"
+            - name: VOYAGE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: VOYAGE_API_KEY
+                  key: latest
+            - name: GOOGLE_MAPS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: GOOGLE_MAPS_API_KEY
+                  key: latest
+            - name: FRONTEND_URL
+              value: "https://travel-aigent-web-xyz-uc.a.run.app"
+            # We map the secret directly to the env var for the code to consume
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: MONGODB_URI
+                  key: latest

@@ -9,6 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from google.adk.runners import Runner
+from gemini_agent.clients import MONGODB_URI
 from google.adk.sessions import BaseSessionService
 
 class MongoDBSessionService(BaseSessionService):
@@ -64,7 +65,7 @@ agent_app = agent_definition.create_travel_agent()
 
 # Initialize persistent MongoDB session storage for the Agent
 session_service = MongoDBSessionService(
-    uri=os.getenv("MONGODB_URI"),
+    uri=MONGODB_URI,
     db_name="my_travel_aigent_sessions",
     collection_name="sessions"
 )
@@ -74,11 +75,11 @@ runner = Runner(app=agent_app, session_service=session_service)
 async def lifespan(app: FastAPI):
     # Ensure TTL index on the session collection for automatic cleanup (30-day retention)
     try:
-        client = MongoClient(os.getenv("MONGODB_URI"))
-        session_db = client["my_travel_aigent_sessions"]
+        sync_client = MongoClient(MONGODB_URI)
+        session_db = sync_client["my_travel_aigent_sessions"]
         session_db["sessions"].create_index("updated_at", expireAfterSeconds=2592000)
         logger.info("MongoDB TTL index verified for session collection.")
-        client.close()
+        sync_client.close()
     except Exception as e:
         logger.warning(f"Could not verify MongoDB TTL index: {e}")
 
@@ -88,18 +89,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="My Travel Aigent API", version="1.0.0", lifespan=lifespan)
 
+# Resolve Frontend URL from environment, defaulting to local for dev
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 # 1. CORS Configuration
 # Essential for Phase 5 transition to Next.js
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js default port
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 security = HTTPBearer()
-
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
     """
     Security dependency to validate JWTs.
@@ -114,7 +117,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
     return "test_user_savannah"  # Placeholder return
 
 # MongoDB Setup
-MONGODB_URI = os.getenv("MONGODB_URI")
 client = AsyncIOMotorClient(MONGODB_URI)
 # Assumes the database name matches your implementation plan
 db = client["my-travel-aigent"]

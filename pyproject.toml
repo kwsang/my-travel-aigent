@@ -20,7 +20,8 @@ dependencies = [
     "google-maps-places",
     "PyYAML",
     "google-cloud-storage",
-    "shapely"
+    "shapely",
+    "google-cloud-secret-manager"
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,33 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: travel-aigent-web
+  labels:
+    cloudobjs.com/managed: "true"
+spec:
+  template:
+    spec:
+      # Using the same service account as the API for consistency
+      serviceAccountName: travel-aigent-runner@${PROJECT_ID}.iam.gserviceaccount.com
+      containers:
+        - image: us-central1-docker.pkg.dev/${PROJECT_ID}/travel-aigent/web:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          env:
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            # Point this to your actual deployed API URL
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://travel-aigent-api-xyz-uc.a.run.app"
+            # If you implement NextAuth, map the secret here
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: NEXTAUTH_SECRET
+                  key: latest
+            - name: NEXTAUTH_URL
+              value: "https://travel-aigent-web-xyz-uc.a.run.app"
