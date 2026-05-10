@@ -1,0 +1,28 @@
+services:
+  api:
+    build:
+      context: ./gemini-agent
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - FRONTEND_URL=http://localhost:3000
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - BIGQUERY_DATASET=${BIGQUERY_DATASET}
+      - MONGODB_URI=${MONGODB_URI}
+    env_file:
+      - .env
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - INTERNAL_API_URL=http://api:8000
+    depends_on:
+      - api

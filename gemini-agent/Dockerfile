@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the agent source code
 COPY . .
 
-# Cloud Run automatically assigns a port and provides it via the PORT env var.
+# Cloud Run and Docker Compose both provide a PORT env var.
 # We use 'server:app' because server.py contains the FastAPI 'app' instance.
 EXPOSE 8000
 CMD uvicorn server:app --host 0.0.0.0 --port $PORT
