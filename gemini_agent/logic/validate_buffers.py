@@ -88,7 +88,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     
     events = itinerary.get("events", [])
     if not events:
-        return True
+        return []
 
     # Establish the trip's start date to verify the 'day' property increments correctly
     start_date = min(datetime.datetime.fromisoformat(e["schedule"]["local_start_time"]).date() for e in events)
@@ -261,6 +261,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         for err in errors:
             print(f"  {err}")
         print("")
+    return errors
 
 def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     """
@@ -315,7 +316,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     if errors:
         for err in errors:
             print(f"  {err}")
-        return False
+        return False, errors
 
     final_val = total_cost / total_people if per_person_toggle else total_cost
     
@@ -324,13 +325,15 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     print(f"  Budget Limit:     {limit:.2f} {currency}")
 
     if final_val > limit:
-        print(f"  FAIL: Budget exceeded. {final_val:.2f} > {limit:.2f}\n")
-        return False
+        err_msg = f"FAIL: Budget exceeded. {final_val:.2f} > {limit:.2f}"
+        print(f"  {err_msg}\n")
+        errors.append(err_msg)
+        return False, errors
     elif final_val > (limit * 0.9):
         print(f"  WARNING: Budget threshold (90%) reached ({final_val:.2f} / {limit:.2f}).")
     
     print("  Result: PASS - Budget is within limits.\n")
-    return True
+    return True, errors
 
 def run_buffer_test_suite():
     """
