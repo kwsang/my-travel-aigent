@@ -33,7 +33,8 @@
     5. **Analytics (DONE):** BigQuery integration for full observability of agent behavior and tool usage.
     6. **Persistence (DONE):** Save finalized itineraries to MongoDB Atlas.
 
-### Phase 5: Visual Planning Dashboard (IN PROGRESS)
+### Phase 5: Visual Planning Dashboard (ACTIVE)
+- **DONE:** Backend REST API bridge (FastAPI) to expose ADK Agent to web clients.
 - **Frontend Stack:** Develop a responsive web application (e.g., Next.js/React).
 - **Visualization:**
     - **Interactive Timeline:** View segments chronologically with overlap warnings.

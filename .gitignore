@@ -228,3 +228,4 @@ __pycache__/
 .adk/
 .adk/*
 samples/*
+*/.env.*
