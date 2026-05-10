@@ -1,15 +1,16 @@
 import os
-import datetime
+from datetime import datetime, timezone
 from typing import Any
 from fastapi import FastAPI, HTTPException, Body
 from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
 
 from gemini_agent.logic.validate_buffers import validate_itinerary_structure, validate_itinerary_budget
+from gemini_agent.logic.models import ItineraryPatchRequest, ValidationResponse, ItineraryModel
+from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="My Travel Aigent API Bridge")
+app = FastAPI(title="My Travel Aigent API", version="1.0.0")
 
 # MongoDB Setup
 MONGODB_URI = os.getenv("MONGODB_URI")
@@ -17,7 +18,7 @@ client = AsyncIOMotorClient(MONGODB_URI)
 # Assumes the database name matches your implementation plan
 db = client["my-travel-aigent"]
 
-@app.get("/itinerary/{session_id}")
+@app.get("/itinerary/{session_id}", response_model=ItineraryModel)
 async def get_itinerary(session_id: str):
     """
     Endpoint for the Visual Dashboard to retrieve the structured itinerary JSON.
@@ -43,25 +44,26 @@ async def get_itinerary(session_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@app.patch("/itinerary/{session_id}")
-async def update_itinerary(session_id: str, updates: dict = Body(...)):
+@app.patch("/itinerary/{session_id}", response_model=ValidationResponse)
+async def update_itinerary(session_id: str, updates: ItineraryPatchRequest):
     """
     Direct manipulation endpoint. Re-validates the entire itinerary structure
     and budget buffers after a user modification (like drag-and-drop).
     """
     try:
         # 1. Fetch current itinerary and associated user profile
-        itinerary = await db.Itineraries.find_one({"session_id": session_id})
-        if not itinerary:
-            raise HTTPException(status_code=404, detail="Itinerary not found")
+        itinerary_doc = await db.Itineraries.find_one({"session_id": session_id})
+        if not itinerary_doc:
+            raise HTTPException(status_code=404, detail="Itinerary doc not found")
 
-        user_profile = await db.UserProfiles.find_one({"user_id": itinerary["user_id"]})
+        user_profile = await db.UserProfiles.find_one({"user_id": itinerary_doc["user_id"]})
         if not user_profile:
             raise HTTPException(status_code=404, detail="User profile not found")
 
-        # 2. Apply proposed updates (e.g., modified events list)
-        if "events" in updates:
-            itinerary["events"] = updates["events"]
+        # 2. Convert Pydantic models back to dict for the validation logic
+        # This allows us to use Phase 4 logic without refactoring it entirely yet
+        proposed_events = [event.model_dump() for event in updates.events]
+        itinerary = {**itinerary_doc, "events": proposed_events}
 
         # 3. Re-validate using Phase 4 logic
         risk = user_profile.get("risk_tolerance", "relaxed")
@@ -76,13 +78,13 @@ async def update_itinerary(session_id: str, updates: dict = Body(...)):
         # We still save even with warnings/errors but return them to the UI for display
         await db.Itineraries.update_one(
             {"session_id": session_id},
-            {"$set": {"events": itinerary["events"], "updated_at": datetime.datetime.utcnow()}}
+            {"$set": {"events": proposed_events, "updated_at": datetime.now(timezone.utc)}}
         )
 
         return {
             "status": "success" if not all_errors else "warning",
             "validation_errors": all_errors,
-            "itinerary_id": str(itinerary["_id"])
+            "itinerary_id": str(itinerary_doc["_id"])
         }
 
     except Exception as e:
