@@ -1,7 +1,7 @@
 import json
 import datetime
 from typing import Any, Optional
-from ..clients import destinations_collection
+from clients import destinations_collection
 from .models import Itinerary
 
 def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:

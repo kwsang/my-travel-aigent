@@ -1,5 +1,5 @@
 import json
-from ..clients import voyage_client, destinations_collection, places_client, discovery_model
+from clients import voyage_client, destinations_collection, places_client, discovery_model
 from .models import Destination
 
 def search_destinations(query: str) -> str:

@@ -1,6 +1,6 @@
 import json
 from typing import Any
-from ..clients import destinations_collection
+from clients import destinations_collection
 from .models import UserProfile
 
 def record_user_profile(profile: UserProfile, tool_context: Any) -> str:

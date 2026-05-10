@@ -1,5 +1,5 @@
 import json
-from ..clients import places_client, gmaps_client
+from clients import places_client, gmaps_client
 
 def google_maps_matrix(origins: list[str], destinations: list[str]) -> str:
     """
