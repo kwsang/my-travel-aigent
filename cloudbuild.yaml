@@ -19,22 +19,26 @@ steps:
         # Discover existing web URL or use a local placeholder for the first run
         WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)' 2>/dev/null || echo "http://localhost:3000")
         
-        # Use single $ for PROJECT_ID so Cloud Build injects the value.
-        # Use double $$ for WEB_URL so the shell resolves the local variable.
+        # Use $PROJECT_ID (GCB substitution) for the service account and image path
         sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-api.yml
+        # Use $$WEB_URL (shell variable) for the initial CORS setup
         sed -i "s|FRONTEND_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-api.yml
         
         gcloud run services replace cloudrun-api.yml --region=us-central1
+        
+        # Export the real API_URL to a file for the web build step
+        gcloud run services describe travel-aigent-api --region us-central1 --format='value(status.url)' > api_url.txt
 
-  # 3. Build and push Frontend (Now fetching the real API_URL dynamically)
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  # 3. Build and push Frontend image
+  # Using the docker builder instead of cloud-sdk to fix "docker: command not found"
+  - name: 'gcr.io/cloud-builders/docker'
     id: 'build-web'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Fetch the real backend URL established in the previous step
-        API_URL=$(gcloud run services describe travel-aigent-api --region us-central1 --format='value(status.url)')
+        # Read the API URL from the file created in the previous step
+        API_URL=$(cat api_url.txt)
         
         docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest \
           --build-arg NEXT_PUBLIC_API_URL=$$API_URL ./web
@@ -51,7 +55,9 @@ steps:
     args:
       - '-c'
       - |
+        # Fetch real URLs for the final link
         API_URL=$(gcloud run services describe travel-aigent-api --region us-central1 --format='value(status.url)')
+        WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)')
         
         # Update Web YAML and Deploy
         sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-web.yaml
@@ -60,7 +66,6 @@ steps:
         gcloud run services replace cloudrun-web.yaml --region=us-central1
         
         # Link Backend CORS to real Web URL
-        # Fetch final frontend URL to link CORS
-        WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)')
-        sed -i "s|FRONTEND_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-api.yml
+        # This sed command targets the 'value' line specifically following the 'FRONTEND_URL' name
+        sed -i "/name: FRONTEND_URL/{n;s|value:.*|value: \"$$WEB_URL\"|}" cloudrun-api.yml
         gcloud run services replace cloudrun-api.yml --region=us-central1

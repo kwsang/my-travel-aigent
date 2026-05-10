@@ -49,9 +49,7 @@ class MongoDBSessionService(BaseSessionService):
         )
         return [doc["session_id"] async for doc in cursor]
 
-from gemini_agent.logic.models import (
-    ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
-)
+from gemini_agent.logic.models import ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
 from gemini_agent import agent_definition
 
 # Setup logging
