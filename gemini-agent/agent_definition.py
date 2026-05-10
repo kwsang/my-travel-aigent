@@ -9,7 +9,6 @@ from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
 from plugins.logistics_monitor import LogisticsMonitorPlugin
-from google.adk.plugins.bigquery_agent_analytics_plugin import BigQueryAgentAnalyticsPlugin
 from tools.tools import (
     record_user_profile, 
     search_destinations, 
@@ -139,6 +138,8 @@ def create_travel_agent():
 
     # 6. Create the App with Context Caching (as seen in samples)
     # This stores the large SYSTEM_PROMPT in cache to reduce latency.
+    plugins = [LogisticsMonitorPlugin()]
+
     app = App(
         name="my_travel_aigent_app",
         root_agent=supervisor,
@@ -146,13 +147,7 @@ def create_travel_agent():
             min_tokens=2048,
             ttl_seconds=600,
         ),
-        plugins=[
-            LogisticsMonitorPlugin(),
-            BigQueryAgentAnalyticsPlugin(
-                project_id=os.getenv("GOOGLE_CLOUD_PROJECT"),
-                dataset_id=os.getenv("BIGQUERY_DATASET", "travel_agent_analytics")
-            )
-        ]
+        plugins=plugins
     )
     
     return app

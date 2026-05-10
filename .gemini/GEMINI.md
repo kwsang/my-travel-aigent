@@ -68,6 +68,9 @@ Simple Data Types: Favor primitive data types like str and int over custom class
 - Build for Parallel Execution: Improve function calling performance when multiple tools are run by building for asynchronous operation. For information on enabling parallel execution for tools, see Increase tool performance with parallel execution.
 
 ## Models
-
 Generally use gemini-2.5-flash for moderate tasks.
 Use gemini-2.5-flash-lite for high throughput low intensity tasks.
+
+## Package Structure
+The backend (agent) is in /gemini-agent
+The frontend is in /web

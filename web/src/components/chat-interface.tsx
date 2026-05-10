@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@/hooks/use-chat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,12 @@ import { Send, Bot } from 'lucide-react';
 export function ChatInterface() {
   const { messages, sendMessage, isLoading } = useChat();
   const [input, setInput] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Automatically scroll to the bottom anchor whenever content changes
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -58,6 +64,7 @@ export function ChatInterface() {
                 </div>
               </div>
             )}
+            <div ref={scrollRef} />
           </div>
         </ScrollArea>
       </CardContent>

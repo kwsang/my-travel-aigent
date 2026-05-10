@@ -6,7 +6,11 @@ from pydantic import BaseModel
 from typing import List, Optional, Any
 from google.genai import types as genai_types
 from google.adk.runners import InMemoryRunner
+from dotenv import load_dotenv
 import agent_definition
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -56,6 +60,13 @@ async def chat(request: ChatRequest):
 
     responses = []
     async with InMemoryRunner(app=travel_agent_app, app_name="my_travel_aigent") as runner:
+        # UPSERT LOGIC: Ensure the session exists in this runner instance before execution
+        await runner.session_service.create_session(
+            app_name="my_travel_aigent",
+            user_id=request.user_id,
+            session_id=request.session_id
+        )
+
         message = genai_types.Content(
             role="user", 
             parts=[genai_types.Part(text=request.message)]
