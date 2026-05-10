@@ -79,9 +79,9 @@ async def start_interactive_session():
                                 anchor_geo = top_venue["geo"]
                                 anchor_name = top_venue["name"]
                             elif anchor_geo:
-                                travel_mins = calculate_travel_time(anchor_geo, top_venue["geo"])
+                                travel_mins, travel_dist, travel_mode = calculate_travel_time(anchor_geo, top_venue["geo"])
                                 if travel_mins > 30:
-                                    msg = f"- '{top_venue['name']}' is {travel_mins} mins from {anchor_name}."
+                                    msg = f"- '{top_venue['name']}' is {travel_mins} mins {travel_mode} from {anchor_name} ({travel_dist:.1f} miles)."
                                     pending_violations.append(msg)
                                     print(f"\033[93m\n[PROXIMITY WARNING] {msg}\033[0m")
                         except Exception: continue

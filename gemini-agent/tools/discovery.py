@@ -1,13 +1,17 @@
 import json
-from ..clients import voyage_client, destinations_collection, places_client
+from ..clients import voyage_client, destinations_collection, places_client, discovery_model
 from .models import Destination
-from vertexai.generative_models import GenerativeModel
 
 def search_destinations(query: str) -> str:
     """
     Performs a semantic search for travel destinations (strictly cities and towns).
     """
     try:
+        if voyage_client is None:
+            return "Error: Voyage AI service is currently unavailable."
+        if destinations_collection is None:
+            return "Error: Destination database connection is currently unavailable."
+            
         embedding = voyage_client.embed([query], model="voyage-4", input_type="query").embeddings[0]
         pipeline = [
             {
@@ -35,7 +39,15 @@ def discover_new_destination(vibe_or_city: str) -> str:
     Autonomous Producer Tool: Discovers and seeds a new city destination into MongoDB.
     """
     try:
-        discovery_model = GenerativeModel("gemini-2.5-flash")
+        if discovery_model is None:
+            return "Error: Discovery model service is currently unavailable."
+        if destinations_collection is None:
+            return "Error: Destination database connection is currently unavailable."
+        if places_client is None:
+            return "Error: Google Places service is currently unavailable."
+        if voyage_client is None:
+            return "Error: Voyage AI service is currently unavailable."
+
         prompt = (
             f"Based on the input '{vibe_or_city}', identify the single most relevant major or popular "
             "city or town in the USA. Return only the name in 'City, State' format."

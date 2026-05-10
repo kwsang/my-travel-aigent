@@ -39,6 +39,9 @@ def query_user_profile(user_id: str, tool_context: Any) -> str:
     Retrieves a user's persistent travel profile and preferences from MongoDB.
     """
     try:
+        if destinations_collection is None:
+            return "Error: Database connection is currently unavailable."
+            
         db = destinations_collection.database
         profile = db["user_profiles"].find_one({"user_id": user_id})
         if not profile:
