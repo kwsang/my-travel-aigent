@@ -66,7 +66,8 @@ def create_travel_agent():
             return concierge_goal
 
         # 2. Architect Mode
-        prompt = f"{system_instructions}\n\n{concierge_goal}\n\n{architect_goal}"
+        # Remove concierge_goal to prevent redundant elicitation behavior during planning.
+        prompt = f"{system_instructions}\n\n{architect_goal}"
 
         # 3. Dynamic Injection: Check for Proximity Violations in State
         violations = ctx.state.get("proximity_violations")

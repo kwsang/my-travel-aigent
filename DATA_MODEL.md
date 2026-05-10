@@ -17,6 +17,7 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 - **Itinerary Duration:** The root itinerary must include `duration_days` representing the total length of the trip.
 - **ACCOMMODATION Metadata:** Must include `stay_duration_nights`, `property_type` (e.g., Hotel, House Rental), `beds` (count), `amenities` (list), and `policies` for early check-in/checkout.
 - **TRANSPORT Metadata:** Must include `vehicle_type`, `vehicle_count`, `is_rental`, and `provider`.
+- **VENUE Metadata:** For `DINING` and `EXPERIENCE`, include boolean flags for service options: `dineIn`, `servesVegetarianFood`, `servesBreakfast`, `servesLunch`, `servesDinner`, `goodForChildren`, and `wheelchairAccessibleEntrance`.
 
 #### Market Segments
 - `FLIGHT`: Commercial air travel.
@@ -55,7 +56,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
       - **Per-Person Toggle:** If `group_planning_per_person` is enabled, the budget limit comparison and final reporting must be calculated as `Total Cost / Total People`.
    - **Room Sharing:** When `room_sharing` is enabled, calculate the number of rooms needed (Total People / `people_per_room`, rounded up) and multiply by the per-room price before dividing by the total party size for the per-person estimate.
 9. **Quality vs. Value (Transparency Rule):**
-   - If a result is semantically relevant but its rating is below `min_rating`, it must be proposed as a **"Budget Alternative"**.
+   - This rule applies to individual venues discovered via `search_places`. If a result is semantically relevant but its rating is below `min_rating`, it must be proposed as a **"Budget Alternative"**.
    - The agent must explicitly flag these items with a "Review Alert" describing the rating discrepancy so the user can decide.
 10. **Risk Tolerance:**
    - **Relaxed:** Plan by "Days" rather than linear events. Cluster activities within a single geographic area per day to minimize travel. Include a mandatory "Retreat to Hotel" block after primary daily activities.
@@ -80,7 +81,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     "risk_tolerance": "relaxed", // Supported values: "relaxed", "strict"
     "activity_density": "medium", // Supported values: "low", "medium", "high"
     "transport_preference": "rideshare", // Supported values: "rental", "rideshare", "neutral"
-    "personal_transport_available": false,
+    "personal_transport_available": false, // If true, car rentals are prohibited.
     "group_planning_per_person": true,
     "room_sharing": true,
     "people_per_room": 2,
@@ -102,20 +103,20 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
 ---
 
 ### Destinations Collection
-*Purpose: Semantic discovery via Atlas Vector Search.*
+*Purpose: City/Town-level discovery via Atlas Vector Search. Does not contain specific venues.*
 ```json
 {
-  "name": "Ericeira",
-  "country": "Portugal",
-  "description": "A charming fishing village turned world surfing reserve. Known for consistent waves and cobblestone streets.",
+  "name": "Savannah",
+  "country": "USA",
+  "description": "The city of Savannah, GA. A historic US destination known for its romantic coastal vibe, Spanish moss-draped squares, and rich Southern culture.",
   "description_embedding": [0.12, -0.05, ...], 
   "location": {
     "type": "Point",
-    "coordinates": [-9.4185, 38.9633]
+    "coordinates": [-81.0912, 32.0761]
   },
-  "vibe_tags": ["surfing", "relaxed", "coastal", "authentic"],
-  "price_tier": "$$"
+  "vibe_tags": ["historic", "coastal", "romantic", "southern"]
 }
+
 ```
 
 ---
