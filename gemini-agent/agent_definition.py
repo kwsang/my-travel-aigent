@@ -8,6 +8,7 @@ from google.adk.agents.invocation_context import InvocationContext as Context
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
+from .plugins.logistics_monitor import LogisticsMonitorPlugin
 from .tools.tools import (
     record_user_profile, 
     search_destinations, 
@@ -96,7 +97,8 @@ def create_travel_agent():
         context_cache_config=ContextCacheConfig(
             min_tokens=2048,
             ttl_seconds=600,
-        )
+        ),
+        plugins=[LogisticsMonitorPlugin()]
     )
     
     return app

@@ -5,7 +5,6 @@ import logging
 from google.genai import types as genai_types
 from google.adk.runners import InMemoryRunner
 from .agent_definition import create_travel_agent
-from .tools.utils import calculate_travel_time
 
 # Suppress the noisy SDK warning about non-text parts in responses
 logging.getLogger('google_genai.types').setLevel(logging.ERROR)
@@ -19,9 +18,6 @@ async def start_interactive_session():
 
     my_app = create_travel_agent()
     user_id, session_id = "user_savannah_test", "session_001"
-    anchor_geo, anchor_name = None, None
-    home_address = None
-    pending_violations = []
 
     async with InMemoryRunner(app=my_app, app_name="my_travel_aigent") as runner:
         await runner.session_service.create_session(
@@ -44,19 +40,13 @@ async def start_interactive_session():
                 parts=[genai_types.Part(text=user_input)]
             )
             
-            # Pass gathered violations to Gemini via state_delta
-            # If violations exist, pass them. If not, explicitly clear the state key.
-            state_delta = {
-                "proximity_violations": "\n".join(pending_violations) if pending_violations else None
-            }
-            pending_violations = [] 
-
             print("Agent: ", end="", flush=True)
             async for event in runner.run_async(
                 user_id=user_id,
                 session_id=session_id,
                 new_message=message,
-                state_delta=state_delta
+                # The LogisticsMonitorPlugin now handles proximity_violations internally
+                state_delta={} 
             ):
                 if not event.content or not event.content.parts:
                     continue
@@ -65,26 +55,6 @@ async def start_interactive_session():
                     # 1. Handle Text Output (Filtering out model thoughts)
                     if part.text and not part.thought:
                         print(part.text, end="", flush=True)
-
-                    # 2. Logistical Monitor: Intercept tool results to track the anchor
-                    if part.tool_response and part.tool_response.name == "search_places":
-                        try:
-                            # Extract the returned value from the tool result dictionary
-                            raw_output = part.tool_response.response.get('result', '[]')
-                            venues = json.loads(raw_output)
-                            if not venues: continue
-                            
-                            top_venue = venues[0]
-                            if any(t in ["hotel", "lodging"] for t in top_venue.get("types", [])):
-                                anchor_geo = top_venue["geo"]
-                                anchor_name = top_venue["name"]
-                            elif anchor_geo:
-                                travel_mins, travel_dist, travel_mode = calculate_travel_time(anchor_geo, top_venue["geo"])
-                                if travel_mins > 30:
-                                    msg = f"- '{top_venue['name']}' is {travel_mins} mins {travel_mode} from {anchor_name} ({travel_dist:.1f} miles)."
-                                    pending_violations.append(msg)
-                                    print(f"\033[93m\n[PROXIMITY WARNING] {msg}\033[0m")
-                        except Exception: continue
             print("\n")
 
 if __name__ == "__main__":
