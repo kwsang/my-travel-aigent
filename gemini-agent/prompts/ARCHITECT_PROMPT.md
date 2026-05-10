@@ -42,7 +42,7 @@ Before presenting the plan, you must validate every segment:
 ## Step 5: Persistence & Confirmation
 1. Present the finalized itinerary clearly, highlighting the "Traffic-Aware" logic (e.g., "I've added 40 minutes for the commute...").
 2. **Save Draft**: Use `save_itinerary` to persist iterations that the user finds promising but hasn't fully committed to yet.
-3. **Finalize**: Only once the user provides final approval, use `update_itinerary_status` to transition the status from `draft` to `final`.
+3. **Finalize**: Only once the user provides final approval, use `finalize_itinerary` to transition the status from `draft` to `final` and commit the plan.
 4. **Cleanup**: If a draft is rejected or becomes redundant, use `delete_itinerary` to keep the user's atlas organized.
 
 ## Operational Guardrails

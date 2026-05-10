@@ -147,3 +147,50 @@ def list_trip_versions(user_id: str, source_trip_name: str, tool_context: Any = 
         return json.dumps(results, default=str)
     except Exception as e:
         return f"Error listing trip versions: {str(e)}"
+
+def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
+    """
+    Finalizes the trip by updating its status to 'final' and ensuring the latest 
+    state from the agent's memory is persisted to MongoDB.
+    """
+    try:
+        if destinations_collection is None:
+            return "Error: Database connection is currently unavailable."
+            
+        db = destinations_collection.database
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        
+        # 1. Get the current active itinerary from state if it matches the trip being finalized
+        active = tool_context.state.get("active_itinerary")
+        
+        if active and active.get("trip_name") == trip_name:
+            active["status"] = "final"
+            active.setdefault("metadata", {})["updated_at"] = now
+            
+            # Upsert into MongoDB to ensure latest edits are captured
+            db["itineraries"].update_one(
+                {"user_id": user_id, "trip_name": trip_name},
+                {"$set": active},
+                upsert=True
+            )
+            
+            # Sync back to state
+            tool_context.state.update({"active_itinerary": active})
+            return f"SUCCESS: Active itinerary '{trip_name}' has been finalized and persisted."
+        
+        # 2. Fallback: If not in state, just update status of the existing record in DB
+        result = db["itineraries"].update_one(
+            {"user_id": user_id, "trip_name": trip_name},
+            {"$set": {
+                "status": "final",
+                "metadata.updated_at": now
+            }}
+        )
+        
+        if result.matched_count == 0:
+            return f"Error: No itinerary found with name '{trip_name}' for user '{user_id}' to finalize."
+            
+        return f"SUCCESS: Itinerary '{trip_name}' status updated to 'final' in the atlas."
+        
+    except Exception as e:
+        return f"Error finalizing itinerary: {str(e)}"

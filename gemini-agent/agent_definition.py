@@ -22,6 +22,7 @@ from tools.tools import (
     update_itinerary_status,
     clone_itinerary,
     save_itinerary,
+    finalize_itinerary,
     google_maps_matrix,
     google_places_details,
     search_local_events
@@ -42,6 +43,7 @@ def create_travel_agent():
     list_versions_tool = FunctionTool(func=list_trip_versions)
     delete_itinerary_tool = FunctionTool(func=delete_itinerary)
     update_status_tool = FunctionTool(func=update_itinerary_status)
+    finalize_tool = FunctionTool(func=finalize_itinerary)
     clone_tool = FunctionTool(func=clone_itinerary)
     
     # Local Python-based versions of the MCP/API tools to avoid Protocol errors
@@ -87,6 +89,7 @@ def create_travel_agent():
             list_versions_tool,
             delete_itinerary_tool,
             update_status_tool,
+            finalize_tool,
             clone_tool
         ],
         description="Welcomes the user, gathers travel preferences, and proactively suggests local events to improve engagement."
@@ -118,6 +121,7 @@ def create_travel_agent():
             list_versions_tool,
             delete_itinerary_tool,
             update_status_tool,
+            finalize_tool,
             clone_tool
         ],
         output_key="final_itinerary",

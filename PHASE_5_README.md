@@ -11,7 +11,7 @@ Phase 5 transforms "My Travel Aigent" into a high-fidelity web application. It m
 
 ## 1.1 Implementation Sequence
 1. **Scaffolding:** Initialize the Next.js project and configure the theme (Tailwind + shadcn).
-2. **Data Fetching Layer:** Create API routes to proxy requests between the UI and your MongoDB/Agent Builder tools.
+2. **Data Fetching Layer:** Create API routes to proxy requests between the UI and your MongoDB/Programmatic ADK tools.
 3. **The Timeline Builder:** Map the `itinerary.events` array to a chronological vertical list.
 4. **Map Orchestration:** Synchronize the Map markers with the Timeline selection.
 5. **Validation Hook:** Integrate the `LogisticsMonitorPlugin` violations from the session state to show real-time "Conflict" warnings.
