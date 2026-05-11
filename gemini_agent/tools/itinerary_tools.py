@@ -6,18 +6,38 @@ from .models import Itinerary
 
 def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
     """
-    Persists a finalized, multi-day travel itinerary to MongoDB Atlas.
+    Persists a travel itinerary to MongoDB Atlas. 
+    Updates the existing draft for this session if it exists, otherwise creates it.
     """
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
-        # Add creation timestamp to metadata before saving
-        itinerary.metadata["created_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        # Capture context and timestamps for iterative updates
+        session_id = tool_context.session.id
+        user_id = tool_context.session.user_id
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        
+        # Prepare document data with session linkage for UI synchronization
+        itinerary_data = itinerary.model_dump()
+        itinerary_data["session_id"] = session_id
+        itinerary_data["user_id"] = user_id # Enforce consistency with session identity
+        itinerary_data["status"] = "draft" # Always save as a draft through this tool
+        itinerary_data["metadata"]["updated_at"] = now
+        if "created_at" not in itinerary_data["metadata"]:
+            itinerary_data["metadata"]["created_at"] = now
 
         db = destinations_collection.database
-        result = db["itineraries"].insert_one(itinerary.model_dump())
-        return f"SUCCESS: Itinerary saved with ID {result.inserted_id}."
+        # Use session_id as the primary anchor to ensure we update the same draft
+        result = db["itineraries"].update_one(
+            {"session_id": session_id, "user_id": user_id},
+            {"$set": itinerary_data},
+            upsert=True
+        )
+        
+        if result.upserted_id:
+            return f"SUCCESS: New draft itinerary created for session {session_id}."
+        return f"SUCCESS: Draft itinerary updated for session {session_id}."
     except Exception as e:
         return f"Error saving itinerary: {str(e)}"
 
@@ -159,6 +179,7 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
             
         db = destinations_collection.database
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        session_id = tool_context.session.id
         state = tool_context.state
         
         # 1. Search for the itinerary in agent memory
@@ -176,10 +197,13 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
             itinerary.metadata["updated_at"] = now
             itinerary.user_id = user_id # Ensure ownership
             
+            itinerary_data = itinerary.model_dump()
+            itinerary_data["session_id"] = session_id
+            
             # Upsert into MongoDB to ensure latest edits are captured
             db["itineraries"].update_one(
-                {"user_id": user_id, "trip_name": trip_name},
-                {"$set": itinerary.model_dump()},
+                {"session_id": session_id},
+                {"$set": itinerary_data},
                 upsert=True
             )
             
@@ -193,7 +217,7 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
         
         # 2. Fallback: If not in memory, just update the status of the existing record in DB
         result = db["itineraries"].update_one(
-            {"user_id": user_id, "trip_name": trip_name},
+            {"session_id": session_id},
             {"$set": {
                 "status": "final",
                 "metadata.finalized_at": now,

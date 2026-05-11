@@ -240,17 +240,18 @@ async def health_check():
 @app.get("/itinerary/{session_id}", response_model=ItineraryModel)
 async def get_itinerary(
     session_id: str,
+    user_id: str | None = None,
     auth_user_id: str | None = Depends(get_current_user)
 ):
     """
     Endpoint for the Visual Dashboard to retrieve the structured itinerary JSON.
     If unauthenticated, scopes access to the session_id itself.
     """
-    user_id = auth_user_id or f"anon_{session_id}"
+    identity = auth_user_id or user_id or f"anon_{session_id}"
     try:
         # Retrieve the latest draft for the given session
         itinerary_doc = await db.itineraries.find_one(
-            {"session_id": session_id, "user_id": user_id},
+            {"session_id": session_id, "user_id": identity},
             sort=[("_id", -1)] # Get the most recent update
         )
 
