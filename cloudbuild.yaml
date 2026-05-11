@@ -19,9 +19,9 @@ steps:
         # Discover existing web URL or use a local placeholder for the first run
         WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)' 2>/dev/null || echo "http://localhost:3000")
         
-        # Use $PROJECT_ID (GCB substitution) for the service account and image path
-        sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-api.yml
-        # Use $$WEB_URL (shell variable) for the initial CORS setup
+        # Replace placeholders. Using ${PROJECT_ID} ensures GCB handles the injection.
+        sed -i "s|PROJECT_ID_PLACEHOLDER|${PROJECT_ID}|g" cloudrun-api.yml
+        # Using $$WEB_URL escapes GCB to allow the shell variable to resolve.
         sed -i "s|FRONTEND_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-api.yml
         
         gcloud run services replace cloudrun-api.yml --region=us-central1
@@ -60,7 +60,7 @@ steps:
         WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)')
         
         # Update Web YAML and Deploy
-        sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-web.yaml
+        sed -i "s|PROJECT_ID_PLACEHOLDER|${PROJECT_ID}|g" cloudrun-web.yaml
         sed -i "s|API_URL_PLACEHOLDER|$$API_URL|g" cloudrun-web.yaml
         sed -i "s|WEB_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-web.yaml
         gcloud run services replace cloudrun-web.yaml --region=us-central1

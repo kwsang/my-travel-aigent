@@ -57,5 +57,29 @@ gcloud iam service-accounts add-iam-policy-binding $RUNNER_SA \
     --member="serviceAccount:$COMPUTE_SA" \
     --role="roles/iam.serviceAccountUser"
 
+# 5. Enable Public Access (Essential for Browser Access)
+echo "📌 Configuring Public Access (Allow Unauthenticated)..."
+gcloud run services add-iam-policy-binding travel-aigent-api \
+    --member="allUsers" --role="roles/run.invoker" --region=$REGION || true
+
+gcloud run services add-iam-policy-binding travel-aigent-web \
+    --member="allUsers" --role="roles/run.invoker" --region=$REGION || true
+
+# 5. Setup Required Secrets (Scenario 5 & Phase 5)
+echo "📌 Verifying required secrets..."
+REQUIRED_SECRETS=("NEXTAUTH_SECRET" "VOYAGE_API_KEY" "GOOGLE_MAPS_API_KEY" "MONGODB_URI")
+for secret in "${REQUIRED_SECRETS[@]}"; do
+    if ! gcloud secrets describe "$secret" &>/dev/null; then
+        echo "🔑 Creating $secret..."
+        gcloud secrets create "$secret" --replication-policy="automatic"
+        if [ "$secret" == "NEXTAUTH_SECRET" ]; then
+            VALUE=$(openssl rand -base64 32)
+        else
+            VALUE="REPLACE_ME_IN_CONSOLE"
+        fi
+        echo -n "$VALUE" | gcloud secrets versions add "$secret" --data-file=-
+    fi
+done
+
 echo "✅ Infrastructure Automation Complete!"
 echo "👉 Now run 'gcloud builds submit' to deploy."
