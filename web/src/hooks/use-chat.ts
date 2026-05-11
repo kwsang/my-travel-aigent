@@ -91,8 +91,10 @@ export function useChat() {
       const data = await response.json();
       const rawText = data.response || "";
       
-      // Split the response by double newlines to create separate message bubbles for each paragraph
-      const segments = rawText.split(/\n\n+/).filter((s: string) => s.trim());
+      // Split the response by double newlines OR look ahead for Markdown H3 headers (### Section)
+      // This makes splitting significantly more reliable when the agent is instructed to use headers.
+      const sectionDelimiter = /\n\n+|(?=\n?###\s)/;
+      const segments = rawText.split(sectionDelimiter).filter((s: string) => s.trim());
 
       if (segments.length > 0) {
         const modelMessages: ChatResponse[] = segments.map((segment: string, index: number) => ({

@@ -89,10 +89,18 @@ def create_travel_agent():
     # 4.2 Architect: Focused on logistics, search, and planning
     def get_architect_instructions(ctx: Context) -> str:
         prompt = architect_goal
+        
+        # Defensive state retrieval: Context > Session > Empty
+        state = getattr(ctx, "state", getattr(ctx.session, "state", {}))
+        
         # Dynamic Injection: Check for Proximity Violations in State
-        violations = ctx.state.get("proximity_violations")
+        violations = state.get("proximity_violations")
         if violations:
             prompt += f"\n\n[SYSTEM MONITOR ALERT]\nThe following logistical violations were detected:\n{violations}\nYou MUST address these by finding closer alternatives."
+        
+        # Add explicit formatting rules to ensure reliable UI splitting
+        prompt += "\n\nFORMATTING RULE: Use Markdown H3 headers ('### Section Name') for all major itinerary components (e.g., '### Accommodation', '### Transport', '### Dining', '### Day 1'). Do not use these headers for regular text."
+        
         return prompt
 
     architect_agent = Agent(
@@ -120,8 +128,11 @@ def create_travel_agent():
 
     # 4.3 Supervisor: The Root Agent that orchestrates handoffs
     def supervisor_instructions(ctx: Context) -> str:
+        # Defensive state retrieval
+        state = getattr(ctx, "state", getattr(ctx.session, "state", {}))
+
         # Decide which specialist should handle the turn based on the existence of profile data
-        if "user_profile_data" not in ctx.state:
+        if "user_profile_data" not in state:
             return (
                 "You are the Travel Supervisor. We do not have the user's travel preferences yet. "
                 "Transfer the user to the 'concierge' to begin the intake process."
@@ -129,14 +140,14 @@ def create_travel_agent():
         
         # Contextual Handoff: Mention if we are resuming a draft
         handoff_context = "The user's preferences are recorded."
-        if "active_itinerary" in ctx.state:
+        if "active_itinerary" in state:
             # Defensive parsing for state variables that might be strings
-            profile_data = ctx.state.get("user_profile_data", {})
+            profile_data = state.get("user_profile_data", {})
             if isinstance(profile_data, str):
                 try: profile_data = json.loads(profile_data)
                 except: profile_data = {}
                 
-            itinerary_data = ctx.state.get("active_itinerary", {})
+            itinerary_data = state.get("active_itinerary", {})
             if isinstance(itinerary_data, str):
                 try: itinerary_data = json.loads(itinerary_data)
                 except: itinerary_data = {}

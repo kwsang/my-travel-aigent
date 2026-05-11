@@ -64,7 +64,13 @@ class MongoDBSessionService(BaseSessionService):
             "data": {"state": state or {}},
             "updated_at": datetime.now(timezone.utc)
         })
-        return Session(id=session_id, user_id=user_id, app_name=app_name, state=state or {})
+        return Session(
+            id=session_id, 
+            user_id=user_id, 
+            app_name=app_name, 
+            state=state or {},
+            events=[] # Explicitly initialize events to avoid context mapping errors
+        )
 
     async def append_event(self, session: Session, event: Any) -> Any:
         """
