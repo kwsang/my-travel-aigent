@@ -5,9 +5,11 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 # New ADK Imports
+from google.genai import types
 from google.adk.runners import Runner
 from google.adk.agents.llm_agent import LlmAgent
 from gemini_agent import agent_definition
+from google.adk.sessions.in_memory_session_service import InMemorySessionService
 
 # Absolute package import to avoid "not defined" NameErrors
 from gemini_agent.logic.validate_buffers import calculate_buffer, validate_itinerary_structure, validate_itinerary_budget
@@ -49,19 +51,25 @@ async def simulate_adk_agent_run(user_input: str):
     """
     print("\n--- Starting ADK Agent Runner Simulation ---")
     # This assumes an 'architect' agent is defined in your package
-    runner = Runner(agents_dir="c:/Users/Kang/github/my-travel-aigent/gemini-agent")
+    my_app = agent_definition.create_travel_agent()
+    runner = Runner(app=my_app, session_service=InMemorySessionService())
     
     # Simulate the start of a session
     session_id = f"sim_{datetime.datetime.now().timestamp()}"
     
-    response = await runner.call_agent_async(
-        app_name="travel_aigent",
-        input_text=user_input,
-        session_id=session_id
-    )
+    full_text = ""
+    async for event in runner.run_async(
+        user_id="sim_user",
+        session_id=session_id,
+        new_message=types.Content(role="user", parts=[types.Part(text=user_input)])
+    ):
+        if event.content and event.content.parts:
+            for part in event.content.parts:
+                if part.text:
+                    full_text += part.text
     
-    print(f"Agent Response: {response.text}")
-    return response
+    print(f"Agent Response: {full_text}")
+    return full_text
 
 async def run_full_agent_test():
     """
@@ -73,7 +81,8 @@ async def run_full_agent_test():
 
     # 1. Setup the App and Runner
     my_app = agent_definition.create_travel_agent()
-    runner = Runner(app=my_app)
+    # Runner requires a session service
+    runner = Runner(app=my_app, session_service=InMemorySessionService())
     
     user_id = "test_user_savannah"
     session_id = f"test_session_{int(datetime.datetime.now().timestamp())}"
@@ -89,12 +98,16 @@ async def run_full_agent_test():
     
     # 3. Call Agent async
     async with runner:
-        response = await runner.call_agent_async(
-            app_name="my_travel_aigent",
-            input_text=user_input,
+        async for event in runner.run_async(
             user_id=user_id,
-            session_id=session_id
-        )
+            session_id=session_id,
+            new_message=types.Content(role="user", parts=[types.Part(text=user_input)])
+        ):
+            if event.content and event.content.parts:
+                for part in event.content.parts:
+                    if part.text:
+                        print(part.text, end="", flush=True)
+        print("\n")
         
         # Extract State for Validation
         state = await runner.session_service.get_session(user_id, session_id, "my_travel_aigent")

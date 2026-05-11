@@ -36,6 +36,8 @@ export function useChat() {
 
     // Helper function to perform the actual fetch call
     const performRequest = async (id: string) => {
+      // Ensure baseUrl is absolute and trailing-slash safe
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
       const payload: ChatRequest = {
         user_id: "user_savannah_test",
         session_id: id,
@@ -44,7 +46,7 @@ export function useChat() {
       if (process.env.NODE_ENV === 'development') {
         console.log("Sending message with session_id:", id);
       }
-      return fetch('/api/chat', {
+      return fetch(`${baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

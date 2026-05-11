@@ -30,7 +30,7 @@ export function ChatInterface() {
       <CardHeader className="border-b bg-white dark:bg-zinc-900">
         <CardTitle className="flex items-center gap-2 text-xl font-bold">
           <Bot className="w-6 h-6 text-primary" />
-          My Travel Aigent Brain
+          My Travel AIgent Brain
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-4 bg-zinc-50/50 dark:bg-zinc-950/50">

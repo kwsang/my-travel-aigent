@@ -8,9 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
+from google.genai import types
 from google.adk.runners import Runner
 from gemini_agent.clients import MONGODB_URI
 from google.adk.sessions import BaseSessionService
+from google.adk.sessions.session import Session
 
 class MongoDBSessionService(BaseSessionService):
     def __init__(self, uri, db_name, collection_name):
@@ -18,9 +20,12 @@ class MongoDBSessionService(BaseSessionService):
         self.client = AsyncIOMotorClient(uri)
         self.collection = self.client[db_name][collection_name]
 
-    async def get_session(self, user_id: str, session_id: str, app_name: str):
+    async def get_session(self, user_id: str, session_id: str, app_name: str, config: Any = None):
         doc = await self.collection.find_one({"user_id": user_id, "session_id": session_id, "app_name": app_name})
-        return doc["data"] if doc else None
+        if not doc:
+            return None
+        # Reconstruct the Session object from the persisted dictionary
+        return Session(user_id=user_id, session_id=session_id, state=doc["data"].get("state", {}))
 
     async def create_session(self, user_id: str, session_id: str, app_name: str):
         await self.collection.insert_one({
@@ -32,9 +37,19 @@ class MongoDBSessionService(BaseSessionService):
         })
 
     async def update_session(self, user_id: str, session_id: str, app_name: str, session):
+        # Extract state for persistence; handle both Session objects and raw dicts
+        if isinstance(session, Session):
+            data = {"state": session.state}
+        elif hasattr(session, "model_dump"):
+            data = session.model_dump()
+        elif isinstance(session, dict):
+            data = session
+        else:
+            data = {"state": {}}
+            
         await self.collection.update_one(
             {"user_id": user_id, "session_id": session_id, "app_name": app_name},
-            {"$set": {"data": session, "updated_at": datetime.now(timezone.utc)}},
+            {"$set": {"data": data, "updated_at": datetime.now(timezone.utc)}},
             upsert=True
         )
 
@@ -88,32 +103,40 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="My Travel Aigent API", version="1.0.0", lifespan=lifespan, redirect_slashes=True)
 
-# Resolve Frontend URL from environment, defaulting to local for dev
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+# Resolve Frontend URLs and normalize them for CORS to prevent 403 errors
+# Professional CORS: Handle multiple origins and trailing slashes
+FRONTEND_URLS_RAW = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URLS = [url.strip() for url in FRONTEND_URLS_RAW.split(",") if url.strip()]
+
+# Add both with and without trailing slash for robustness
+ALLOWED_ORIGINS = list(set([url.rstrip('/') for url in FRONTEND_URLS] + [f"{url.rstrip('/')}/" for url in FRONTEND_URLS]))
+
+# Allow any origin from this project's Cloud Run domain to handle dynamic project-number URLs
+ALLOWED_ORIGIN_REGEX = r"https://travel-aigent-web-.*\.run\.app"
+
 
 # 1. CORS Configuration
 # Essential for Phase 5 transition to Next.js
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-security = HTTPBearer()
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
+# Set auto_error=False to allow unauthenticated users to use session-based identity
+security = HTTPBearer(auto_error=False)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Security(security)):
     """
     Security dependency to validate JWTs.
-    In production, you would decode the token using a library like 'python-jose'
-    and verify it against your auth provider (e.g., Google or NextAuth secret).
+    Returns the raw token string if present, otherwise None.
     """
-    token = credentials.credentials
-    # Example logic:
-    # if not verify_token(token):
-    #     raise HTTPException(status_code=401, detail="Invalid token")
-    # return decoded_user_id
-    return "test_user_savannah"  # Placeholder return
+    if credentials:
+        return credentials.credentials
+    return None
 
 # MongoDB Setup
 client = AsyncIOMotorClient(MONGODB_URI)
@@ -151,15 +174,16 @@ async def health_check():
 @app.get("/itinerary/{session_id}", response_model=ItineraryModel)
 async def get_itinerary(
     session_id: str,
-    user_id: str = Depends(get_current_user)
+    auth_user_id: str | None = Depends(get_current_user)
 ):
     """
     Endpoint for the Visual Dashboard to retrieve the structured itinerary JSON.
-    Queries the 'Itineraries' collection, scoped to the current user.
+    If unauthenticated, scopes access to the session_id itself.
     """
+    user_id = auth_user_id or f"anon_{session_id}"
     try:
         # Retrieve the latest draft for the given session
-        itinerary_doc = await db.Itineraries.find_one(
+        itinerary_doc = await db.itineraries.find_one(
             {"session_id": session_id, "user_id": user_id},
             sort=[("_id", -1)] # Get the most recent update
         )
@@ -171,7 +195,7 @@ async def get_itinerary(
             )
 
         # Fetch user profile to provide context for re-validation (Rule 6 and Scenario 5)
-        user_profile = await db.UserProfiles.find_one({"user_id": itinerary_doc["user_id"]})
+        user_profile = await db.user_profiles.find_one({"user_id": itinerary_doc["user_id"]})
         
         is_conflict = False
         all_errors = []
@@ -201,20 +225,30 @@ async def get_itinerary(
 @app.post("/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    user_id: str = Depends(get_current_user)
+    auth_user_id: str | None = Depends(get_current_user)
 ):
     """
     Main entry point for the agent conversation.
     Orchestrates the ADK Runner to process user input and return the agent's response.
     """
+    # Derive identity: Auth Token > Request Body > Session Fallback
+    user_id = auth_user_id or request.user_id or f"anon_{request.session_id}"
+
     try:
         # 1. Call the global agent runner (initialized in lifespan)
-        response = await runner.call_agent_async(
-            app_name="my_travel_aigent",
-            input_text=request.message,
+        agent_text = ""
+        async for event in runner.run_async(
             user_id=user_id,
-            session_id=request.session_id
-        )
+            session_id=request.session_id,
+            new_message=types.Content(
+                role="user",
+                parts=[types.Part(text=request.message)]
+            )
+        ):
+            if event.content and event.content.parts:
+                for part in event.content.parts:
+                    if part.text:
+                        agent_text += part.text
 
         # 2. Retrieve the updated session state to check for logistics conflicts
         session = await runner.session_service.get_session(user_id, request.session_id, "my_travel_aigent")
@@ -239,24 +273,29 @@ async def chat(
                 if struct_errors or budget_errors:
                     is_conflict = True
 
-        return ChatResponse(response=response.text, is_conflict=is_conflict)
+        return ChatResponse(response=agent_text, is_conflict=is_conflict)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent execution error: {str(e)}")
 
 @app.patch("/itinerary/{session_id}", response_model=ItineraryModel)
-async def update_itinerary(session_id: str, updates: ItineraryPatchRequest):
+async def update_itinerary(
+    session_id: str, 
+    updates: ItineraryPatchRequest,
+    auth_user_id: str | None = Depends(get_current_user)
+):
     """
     Direct manipulation endpoint. Re-validates the entire itinerary structure
     and budget buffers after a user modification (like drag-and-drop).
     """
+    user_id = auth_user_id or f"anon_{session_id}"
     try:
         # 1. Fetch current itinerary and associated user profile
-        itinerary_doc = await db.Itineraries.find_one({"session_id": session_id})
+        itinerary_doc = await db.itineraries.find_one({"session_id": session_id, "user_id": user_id})
         if not itinerary_doc:
             raise HTTPException(status_code=404, detail="Itinerary doc not found")
 
-        user_profile = await db.UserProfiles.find_one({"user_id": itinerary_doc["user_id"]})
+        user_profile = await db.user_profiles.find_one({"user_id": user_id})
         if not user_profile:
             raise HTTPException(status_code=404, detail="User profile not found")
 
@@ -278,7 +317,7 @@ async def update_itinerary(session_id: str, updates: ItineraryPatchRequest):
 
         # 4. Persistence: Update MongoDB if there are no blocking errors
         # We still save even with warnings/errors but return them to the UI for display
-        await db.Itineraries.update_one(
+        await db.itineraries.update_one(
             {"session_id": session_id},
             {"$set": {"events": proposed_events, "updated_at": update_time}}
         )

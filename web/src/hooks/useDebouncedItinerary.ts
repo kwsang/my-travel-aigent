@@ -18,7 +18,8 @@ export function useDebouncedItinerary(initialData: ItineraryModel, delay: number
 
     setIsUpdating(true);
     try {
-      const response = await fetch(`http://localhost:8000/itinerary/${itinerary.session_id}`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/itinerary/${itinerary.session_id}`, {
         method: 'PATCH',
         signal: controller.signal,
         headers: {
