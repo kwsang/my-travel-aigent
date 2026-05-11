@@ -20,12 +20,15 @@ class LogisticsMonitorPlugin(BasePlugin):
         # Extract combined text from user parts
         text = " ".join([p.text for p in user_message.parts if p.text]).lower()
         
+        # Defensive state retrieval: Context > Session > Empty
+        state = getattr(invocation_context, "state", getattr(invocation_context.session, "state", {}))
+        
         # Common confirmation markers
         confirmation_markers = ["looks good", "perfect", "that works", "great", "confirmed", "satisfied"]
         
         if any(marker in text for marker in confirmation_markers):
-            if "proximity_violations" in invocation_context.state:
-                invocation_context.state["proximity_violations"] = None
+            if "proximity_violations" in state:
+                state["proximity_violations"] = None
                 logger.info("LogisticsMonitor: User confirmed plan; cleared proximity violations.")
 
     async def after_tool_callback(self, tool, tool_args, tool_context, result):
@@ -42,7 +45,8 @@ class LogisticsMonitorPlugin(BasePlugin):
                 return
 
             top_venue = venues[0]
-            state = tool_context.state
+            # Defensive state retrieval: Context > Session > Empty
+            state = getattr(tool_context, "state", getattr(tool_context.session, "state", {}))
             
             # Check if this is a hotel to set the anchor for the session
             is_lodging = any(t in ["hotel", "lodging"] for t in top_venue.get("types", []))
