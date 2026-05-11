@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
     async with runner:
         yield
 
-app = FastAPI(title="My Travel Aigent API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="My Travel Aigent API", version="1.0.0", lifespan=lifespan, redirect_slashes=True)
 
 # Resolve Frontend URL from environment, defaulting to local for dev
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -120,7 +120,11 @@ client = AsyncIOMotorClient(MONGODB_URI)
 # Assumes the database name matches your implementation plan
 db = client["my-travel-aigent"]
 
-@app.get("/health")
+@app.get("/", tags=["system"])
+async def root():
+    return {"message": "My Travel Aigent API is running.", "docs": "/docs", "health": "/health"}
+
+@app.get("/health", tags=["system"])
 async def health_check():
     """
     Active health check endpoint.

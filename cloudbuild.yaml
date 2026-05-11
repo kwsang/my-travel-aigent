@@ -2,12 +2,12 @@ steps:
   # 1. Build and push Backend image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-api'
-    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:latest', '-f', 'gemini_agent/Dockerfile', '.']
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:$BUILD_ID', '-f', 'gemini_agent/Dockerfile', '.']
     env: ['DOCKER_BUILDKIT=1']
   
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-api'
-    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:latest']
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/api:$BUILD_ID']
 
   # 2. Initial API Deployment (Sets up the service to get a URL)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -23,10 +23,16 @@ steps:
         sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-api.yml
         sed -i "s|FRONTEND_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-api.yml
         sed -i "s|BUILD_ID_PLACEHOLDER|$BUILD_ID|g" cloudrun-api.yml
+        sed -i "s|IMAGE_TAG_PLACEHOLDER|$BUILD_ID|g" cloudrun-api.yml
         
         echo "🚀 Deploying API service..."
         gcloud run services replace cloudrun-api.yml --region=us-central1
         
+        # Ensure public access (Allow Unauthenticated)
+        gcloud run services add-iam-policy-binding travel-aigent-api \
+          --member="allUsers" --role="roles/run.invoker" \
+          --region=us-central1 --quiet
+
         # Export the real API_URL to a file for the web build step
         gcloud run services describe travel-aigent-api --region us-central1 --format='value(status.url)' > api_url.txt
 
@@ -41,13 +47,13 @@ steps:
         # Read the API URL from the file created in the previous step
         API_URL=$(cat api_url.txt)
         
-        docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest \
+        docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:$BUILD_ID \
           --build-arg NEXT_PUBLIC_API_URL=$$API_URL ./web
     env: ['DOCKER_BUILDKIT=1']
 
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-web'
-    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:latest']
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:$BUILD_ID']
 
   # 4. Final Deployment (Linking Frontend to Backend URLs)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -67,10 +73,16 @@ steps:
         sed -i "s|API_URL_PLACEHOLDER|$$API_URL|g" cloudrun-web.yaml
         sed -i "s|WEB_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-web.yaml
         sed -i "s|BUILD_ID_PLACEHOLDER|$BUILD_ID|g" cloudrun-web.yaml
+        sed -i "s|IMAGE_TAG_PLACEHOLDER|$BUILD_ID|g" cloudrun-web.yaml
         
         echo "🚀 Deploying Web service..."
         gcloud run services replace cloudrun-web.yaml --region=us-central1
         
+        # Ensure public access (Allow Unauthenticated)
+        gcloud run services add-iam-policy-binding travel-aigent-web \
+          --member="allUsers" --role="roles/run.invoker" \
+          --region=us-central1 --quiet
+
         # 3. Link Backend CORS to the now-guaranteed real Web URL
         FINAL_WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)')
         echo "🔗 Linking API CORS to: $$FINAL_WEB_URL"

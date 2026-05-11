@@ -11,9 +11,9 @@ spec:
       # Placeholders to be replaced by sed in cloudbuild.yaml
       serviceAccountName: travel-aigent-runner@PROJECT_ID_PLACEHOLDER.iam.gserviceaccount.com
       containers:
-        - image: us-central1-docker.pkg.dev/PROJECT_ID_PLACEHOLDER/travel-aigent/api:latest
+        - image: us-central1-docker.pkg.dev/PROJECT_ID_PLACEHOLDER/travel-aigent/api:IMAGE_TAG_PLACEHOLDER
           ports:
-            - containerPort: 8000
+            - containerPort: 8080
           resources:
             limits:
               cpu: 1000m
