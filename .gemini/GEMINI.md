@@ -70,6 +70,7 @@ Simple Data Types: Favor primitive data types like str and int over custom class
 ## Models
 Generally use gemini-2.5-flash for moderate tasks.
 Use gemini-2.5-flash-lite for high throughput low intensity tasks.
+DO NOT USE gemini-1.5-flash, that is a hallucination (it does not exist)
 
 ## Package Structure
 The backend (agent) is in /gemini_agent

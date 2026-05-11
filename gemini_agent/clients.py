@@ -82,8 +82,8 @@ except Exception:
     places_client = gmaps_client = None
 
 try:
-    discovery_model = GenerativeModel("gemini-1.5-flash")
-    logger.info("Discovery model (gemini-1.5-flash) initialized.")
+    discovery_model = GenerativeModel("gemini-2.5-flash")
+    logger.info("Discovery model (gemini-2.5-flash) initialized.")
 except Exception:
-    logger.exception("Failed to initialize discovery model (gemini-1.5-flash)")
+    logger.exception("Failed to initialize discovery model (gemini-2.5-flash)")
     discovery_model = None

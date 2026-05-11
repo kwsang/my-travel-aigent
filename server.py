@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
@@ -13,6 +14,7 @@ from google.adk.runners import Runner
 from gemini_agent.clients import MONGODB_URI
 from google.adk.sessions import BaseSessionService
 from google.adk.sessions.session import Session
+from google.adk.sessions.base_session_service import ListSessionsResponse
 
 class MongoDBSessionService(BaseSessionService):
     def __init__(self, uri, db_name, collection_name):
@@ -20,51 +22,96 @@ class MongoDBSessionService(BaseSessionService):
         self.client = AsyncIOMotorClient(uri)
         self.collection = self.client[db_name][collection_name]
 
-    async def get_session(self, user_id: str, session_id: str, app_name: str, config: Any = None):
+    async def get_session(self, *, app_name: str, user_id: str, session_id: str, config: Any = None):
+        logger.info(f"Fetching session: user={user_id}, session={session_id}")
         doc = await self.collection.find_one({"user_id": user_id, "session_id": session_id, "app_name": app_name})
         if not doc:
+            logger.info(f"No session found for {session_id}")
             return None
-        # Reconstruct the Session object from the persisted dictionary
-        return Session(user_id=user_id, session_id=session_id, state=doc["data"].get("state", {}))
+        
+        # Ensure state is a dictionary even if persisted as a JSON string
+        state = doc["data"].get("state", {})
+        if isinstance(state, str):
+            try:
+                state = json.loads(state)
+            except Exception as e:
+                logger.warning(f"Failed to parse stringified state: {e}")
+                state = {}
 
-    async def create_session(self, user_id: str, session_id: str, app_name: str):
+        # Reconstruct the Session object from the persisted dictionary
+        logger.info(f"Session state keys found: {list(state.keys())}")
+        return Session(
+            id=session_id,
+            app_name=app_name,
+            user_id=user_id,
+            state=state
+        )
+
+    async def create_session(self, *, app_name: str, user_id: str, state: dict[str, Any] | None = None, session_id: str | None = None) -> Session:
+        session_id = session_id or f"sess_{datetime.now().timestamp()}"
         await self.collection.insert_one({
             "user_id": user_id,
             "session_id": session_id,
             "app_name": app_name,
-            "data": {},
+            "data": {"state": state or {}},
             "updated_at": datetime.now(timezone.utc)
         })
+        return Session(id=session_id, user_id=user_id, app_name=app_name, state=state or {})
 
-    async def update_session(self, user_id: str, session_id: str, app_name: str, session):
-        # Extract state for persistence; handle both Session objects and raw dicts
-        if isinstance(session, Session):
-            data = {"state": session.state}
-        elif hasattr(session, "model_dump"):
-            data = session.model_dump()
-        elif isinstance(session, dict):
-            data = session
-        else:
-            data = {"state": {}}
-            
+    async def append_event(self, session: Session, event: Any) -> Any:
+        """
+        Standard ADK persistence hook. 
+        Saves the updated session state to MongoDB whenever an event occurs.
+        """
+        if event.partial:
+            return event
+
+        # 1. Update the in-memory session object using ADK logic
+        await super().append_event(session, event)
+        
+        # 2. Persist the current state to MongoDB
         await self.collection.update_one(
-            {"user_id": user_id, "session_id": session_id, "app_name": app_name},
-            {"$set": {"data": data, "updated_at": datetime.now(timezone.utc)}},
+            {"user_id": session.user_id, "session_id": session.id, "app_name": session.app_name},
+            {"$set": {
+                "data": {"state": session.state},
+                "updated_at": datetime.now(timezone.utc)
+            }},
             upsert=True
         )
+        return event
 
-    async def delete_session(self, user_id: str, session_id: str, app_name: str):
+    async def delete_session(self, *, app_name: str, user_id: str, session_id: str):
         await self.collection.delete_one({"user_id": user_id, "session_id": session_id, "app_name": app_name})
 
-    async def list_sessions(self, user_id: str, app_name: str) -> list[str]:
+    async def list_sessions(self, *, app_name: str, user_id: str | None = None) -> ListSessionsResponse:
         """Retrieves a list of all session IDs for the given user and application."""
-        cursor = self.collection.find(
-            {"user_id": user_id, "app_name": app_name},
-            {"session_id": 1, "_id": 0}
-        )
-        return [doc["session_id"] async for doc in cursor]
+        query = {"app_name": app_name}
+        if user_id:
+            query["user_id"] = user_id
+            
+        cursor = self.collection.find(query, {"session_id": 1, "user_id": 1, "data": 1, "_id": 0})
+        sessions = []
+        async for doc in cursor:
+            state = doc["data"].get("state", {})
+            if isinstance(state, str):
+                try: state = json.loads(state)
+                except: state = {}
 
-from gemini_agent.logic.models import ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
+            sessions.append(Session(
+                id=doc["session_id"],
+                user_id=doc["user_id"],
+                app_name=app_name,
+                state=state
+            ))
+        return ListSessionsResponse(sessions=sessions)
+
+from gemini_agent.logic.models import (
+    ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
+)
+from gemini_agent.logic.validate_buffers import (
+    validate_itinerary_structure, 
+    validate_itinerary_budget
+)
 from gemini_agent import agent_definition
 from dotenv import load_dotenv
 
@@ -83,7 +130,11 @@ session_service = MongoDBSessionService(
     db_name="my_travel_aigent_sessions",
     collection_name="sessions"
 )
-runner = Runner(app=agent_app, session_service=session_service)
+runner = Runner(
+    app=agent_app, 
+    session_service=session_service,
+    auto_create_session=True  # Fixes the "Session not found" crash
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -109,7 +160,7 @@ FRONTEND_URLS_RAW = os.getenv("FRONTEND_URL", "http://localhost:3000")
 FRONTEND_URLS = [url.strip() for url in FRONTEND_URLS_RAW.split(",") if url.strip()]
 
 # Add both with and without trailing slash for robustness
-ALLOWED_ORIGINS = list(set([url.rstrip('/') for url in FRONTEND_URLS] + [f"{url.rstrip('/')}/" for url in FRONTEND_URLS]))
+ALLOWED_ORIGINS = list(set([url.rstrip('/') for url in FRONTEND_URLS] + [f"{url.rstrip('/')}/" for url in FRONTEND_URLS] + ["http://localhost:3000", "http://127.0.0.1:3000"]))
 
 # Allow any origin from this project's Cloud Run domain to handle dynamic project-number URLs
 ALLOWED_ORIGIN_REGEX = r"https://travel-aigent-web-.*\.run\.app"
@@ -233,6 +284,8 @@ async def chat(
     """
     # Derive identity: Auth Token > Request Body > Session Fallback
     user_id = auth_user_id or request.user_id or f"anon_{request.session_id}"
+    logger.info(f"--- Chat Request Start ---")
+    logger.info(f"User: {user_id} | Session: {request.session_id} | Message: {request.message[:50]}...")
 
     try:
         # 1. Call the global agent runner (initialized in lifespan)
@@ -247,22 +300,49 @@ async def chat(
         ):
             if event.content and event.content.parts:
                 for part in event.content.parts:
-                    if part.text:
+                    # Filter out model internal reasoning (thoughts) to provide clean text to the UI
+                    if part.text and not getattr(part, "thought", False):
                         agent_text += part.text
+        logger.info(f"Agent generated {len(agent_text)} characters.")
 
         # 2. Retrieve the updated session state to check for logistics conflicts
-        session = await runner.session_service.get_session(user_id, request.session_id, "my_travel_aigent")
+        session = await runner.session_service.get_session(
+            app_name="my_travel_aigent",
+            user_id=user_id, 
+            session_id=request.session_id
+        )
         
         is_conflict = False
         if session:
-            # The session stores agent variables in the 'state' attribute/key
-            state = session.state if hasattr(session, "state") else session.get("state", {})
+            # The session stores agent variables in the 'state' attribute
+            state = getattr(session, "state", {})
             itinerary = state.get("final_itinerary")
             user_profile = state.get("user_profile_data")
             
-            if itinerary and user_profile:
+            # Trace data types to identify 'str' vs 'dict' corruption
+            logger.info(f"State Validation - itinerary type: {type(itinerary)}")
+            logger.info(f"State Validation - profile type: {type(user_profile)}")
+
+            # Defensively handle cases where data might be stored as JSON strings
+            if isinstance(itinerary, str):
+                try:
+                    itinerary = json.loads(itinerary)
+                except:
+                    pass
+            if isinstance(user_profile, str):
+                try:
+                    user_profile = json.loads(user_profile)
+                except:
+                    pass
+
+            if isinstance(itinerary, dict) and isinstance(user_profile, dict):
                 # Extract user constraints from the profile data structure
                 prefs = user_profile.get("preferences", {})
+                # Deep defensive check for nested stringified fields
+                if isinstance(prefs, str):
+                    try: prefs = json.loads(prefs)
+                    except: prefs = {}
+
                 risk = prefs.get("risk_tolerance", "relaxed")
                 vibe = prefs.get("circadian_preference", "night_owl")
                 
@@ -271,11 +351,14 @@ async def chat(
                 _, budget_errors = validate_itinerary_budget(itinerary, user_profile)
                 
                 if struct_errors or budget_errors:
+                    logger.warning(f"Conflicts detected: {len(struct_errors)} structural, {len(budget_errors)} budget")
                     is_conflict = True
 
+        logger.info(f"--- Chat Request Success ---")
         return ChatResponse(response=agent_text, is_conflict=is_conflict)
 
     except Exception as e:
+        logger.exception("CRITICAL: Error in /chat endpoint")
         raise HTTPException(status_code=500, detail=f"Agent execution error: {str(e)}")
 
 @app.patch("/itinerary/{session_id}", response_model=ItineraryModel)

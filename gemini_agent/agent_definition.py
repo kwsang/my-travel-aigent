@@ -69,7 +69,7 @@ def create_travel_agent():
     # 4.1 Concierge: Focused on user profiling and data gathering
     concierge_agent = Agent(
         name="concierge",
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash", # gemini-1.5-flash is a hallucination
         static_instruction=system_instructions,
         instruction=concierge_goal,
         tools=[
@@ -97,7 +97,7 @@ def create_travel_agent():
 
     architect_agent = Agent(
         name="architect",
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash", # gemini-1.5-flash is a hallucination
         static_instruction=system_instructions,
         instruction=get_architect_instructions,
         tools=[
@@ -130,9 +130,20 @@ def create_travel_agent():
         # Contextual Handoff: Mention if we are resuming a draft
         handoff_context = "The user's preferences are recorded."
         if "active_itinerary" in ctx.state:
+            # Defensive parsing for state variables that might be strings
+            profile_data = ctx.state.get("user_profile_data", {})
+            if isinstance(profile_data, str):
+                try: profile_data = json.loads(profile_data)
+                except: profile_data = {}
+                
+            itinerary_data = ctx.state.get("active_itinerary", {})
+            if isinstance(itinerary_data, str):
+                try: itinerary_data = json.loads(itinerary_data)
+                except: itinerary_data = {}
+
             # Conflict Detection: Check for Starting Location mismatch
-            profile_start = ctx.state.get("user_profile_data", {}).get("preferences", {}).get("starting_location")
-            itinerary_start = ctx.state.get("active_itinerary", {}).get("metadata", {}).get("starting_location")
+            profile_start = profile_data.get("preferences", {}).get("starting_location")
+            itinerary_start = itinerary_data.get("metadata", {}).get("starting_location")
             
             if profile_start and itinerary_start and profile_start != itinerary_start:
                 handoff_context += f" [CONFLICT ALERT] The user profile starting location is '{profile_start}', but this draft itinerary starts from '{itinerary_start}'."
@@ -147,7 +158,7 @@ def create_travel_agent():
 
     supervisor = Agent(
         name="travel_supervisor",
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash", # gemini-1.5-flash is a hallucination
         instruction=supervisor_instructions,
         sub_agents=[concierge_agent, architect_agent],
         description="Orchestrates the travel planning process between the Concierge and the Architect."
