@@ -10,6 +10,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
 from google.genai import types
+from google.adk.events.event import Event
 from google.adk.runners import Runner
 from gemini_agent.clients import MONGODB_URI
 from google.adk.sessions import BaseSessionService
@@ -37,14 +38,21 @@ class MongoDBSessionService(BaseSessionService):
             except Exception as e:
                 logger.warning(f"Failed to parse stringified state: {e}")
                 state = {}
+        
+        # Reconstruct Event objects for conversation history
+        raw_history = doc["data"].get("history", [])
+        history = []
+        for e_dict in raw_history:
+            history.append(Event.model_validate(e_dict))
 
         # Reconstruct the Session object from the persisted dictionary
-        logger.info(f"Session state keys found: {list(state.keys())}")
+        logger.debug(f"Session state keys found: {list(state.keys())}")
         return Session(
             id=session_id,
             app_name=app_name,
             user_id=user_id,
-            state=state
+            state=state,
+            events=history
         )
 
     async def create_session(self, *, app_name: str, user_id: str, state: dict[str, Any] | None = None, session_id: str | None = None) -> Session:
@@ -70,10 +78,11 @@ class MongoDBSessionService(BaseSessionService):
         await super().append_event(session, event)
         
         # 2. Persist the current state to MongoDB
+        history_json = [e.model_dump(mode='json') for e in session.events]
         await self.collection.update_one(
             {"user_id": session.user_id, "session_id": session.id, "app_name": session.app_name},
             {"$set": {
-                "data": {"state": session.state},
+                "data": {"state": session.state, "history": history_json},
                 "updated_at": datetime.now(timezone.utc)
             }},
             upsert=True
@@ -284,7 +293,7 @@ async def chat(
     """
     # Derive identity: Auth Token > Request Body > Session Fallback
     user_id = auth_user_id or request.user_id or f"anon_{request.session_id}"
-    logger.info(f"--- Chat Request Start ---")
+    logger.debug(f"--- Chat Request Start ---")
     logger.info(f"User: {user_id} | Session: {request.session_id} | Message: {request.message[:50]}...")
 
     try:
@@ -320,8 +329,8 @@ async def chat(
             user_profile = state.get("user_profile_data")
             
             # Trace data types to identify 'str' vs 'dict' corruption
-            logger.info(f"State Validation - itinerary type: {type(itinerary)}")
-            logger.info(f"State Validation - profile type: {type(user_profile)}")
+            logger.debug(f"State Validation - itinerary type: {type(itinerary)}")
+            logger.debug(f"State Validation - profile type: {type(user_profile)}")
 
             # Defensively handle cases where data might be stored as JSON strings
             if isinstance(itinerary, str):
@@ -354,7 +363,7 @@ async def chat(
                     logger.warning(f"Conflicts detected: {len(struct_errors)} structural, {len(budget_errors)} budget")
                     is_conflict = True
 
-        logger.info(f"--- Chat Request Success ---")
+        logger.debug(f"--- Chat Request Success ---")
         return ChatResponse(response=agent_text, is_conflict=is_conflict)
 
     except Exception as e:

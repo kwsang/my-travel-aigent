@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChatRequest, ChatResponse } from '@/types';
 import { v4 as uuidv4 } from 'uuid'; // You'll need to install this package: npm install uuid @types/uuid
 
@@ -25,6 +25,17 @@ export function useChat() {
 
   const [messages, setMessages] = useState<ChatResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Function to scroll to the bottom of the chat window
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Automatically trigger scroll whenever the messages array updates
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || !sessionId) return; // Ensure sessionId is available
@@ -78,16 +89,27 @@ export function useChat() {
       }
       
       const data = await response.json();
+      const rawText = data.response || "";
       
-      // Map backend 'response' to frontend 'text' and ensure role is 'model'
-      const modelMsg: ChatResponse = {
-        role: 'model',
-        text: data.response,
-        is_conflict: data.is_conflict
-      };
+      // Split the response by double newlines to create separate message bubbles for each paragraph
+      const segments = rawText.split(/\n\n+/).filter((s: string) => s.trim());
 
-      setMessages((prev) => [...prev, modelMsg]);
-
+      if (segments.length > 0) {
+        const modelMessages: ChatResponse[] = segments.map((segment: string, index: number) => ({
+          role: 'model',
+          text: segment.trim(),
+          // Apply the conflict flag only to the last segment to avoid duplicate UI warnings
+          is_conflict: index === segments.length - 1 ? data.is_conflict : false
+        }));
+        setMessages((prev) => [...prev, ...modelMessages]);
+      } else {
+        // Fallback for empty responses that might still contain conflict state updates
+        setMessages((prev) => [...prev, { 
+          role: 'model', 
+          text: '', 
+          is_conflict: data.is_conflict 
+        }]);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Could not connect to the agent brain.";
       console.error("Failed to send message for session_id:", sessionId, error);
@@ -100,5 +122,5 @@ export function useChat() {
     }
   };
 
-  return { messages, sendMessage, isLoading, sessionId }; // Export sessionId if needed elsewhere
+  return { messages, sendMessage, isLoading, sessionId, messagesEndRef }; // Export sessionId if needed elsewhere
 }
