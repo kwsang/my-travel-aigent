@@ -49,9 +49,6 @@ class MongoDBSessionService(BaseSessionService):
         )
         return [doc["session_id"] async for doc in cursor]
 
-# Import validation logic from the logic package
-from gemini_agent.logic.validate_buffers import validate_itinerary_structure, validate_itinerary_budget
-
 from gemini_agent.logic.models import ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
 from gemini_agent import agent_definition
 from dotenv import load_dotenv
@@ -104,17 +101,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Set auto_error=False to allow validation without a Bearer token
-security = HTTPBearer(auto_error=False)
-
-async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Security(security)):
+security = HTTPBearer()
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)):
     """
     Security dependency to validate JWTs.
-    Validation Mode: Returns a default test user if no credentials are provided.
+    In production, you would decode the token using a library like 'python-jose'
+    and verify it against your auth provider (e.g., Google or NextAuth secret).
     """
-    if credentials:
-        token = credentials.credentials
-        # Logic for production: verify_token(token)
+    token = credentials.credentials
+    # Example logic:
+    # if not verify_token(token):
+    #     raise HTTPException(status_code=401, detail="Invalid token")
+    # return decoded_user_id
     return "test_user_savannah"  # Placeholder return
 
 # MongoDB Setup

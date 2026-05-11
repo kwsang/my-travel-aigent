@@ -4,6 +4,9 @@ metadata:
   name: travel-aigent-api
 spec:
   template:
+    metadata:
+      annotations:
+        build-id: "BUILD_ID_PLACEHOLDER"
     spec:
       # Placeholders to be replaced by sed in cloudbuild.yaml
       serviceAccountName: travel-aigent-runner@PROJECT_ID_PLACEHOLDER.iam.gserviceaccount.com

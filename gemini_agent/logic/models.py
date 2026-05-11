@@ -61,5 +61,5 @@ class ChatResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="The user's chat input.")
-    user_id: str
+    user_id: Optional[str] = Field(None, description="The user's ID, optional for anonymous sessions.")
     session_id: str

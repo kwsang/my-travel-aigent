@@ -19,11 +19,12 @@ steps:
         # Discover existing web URL or use a local placeholder for the first run
         WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)' 2>/dev/null || echo "http://localhost:3000")
         
-        # Replace placeholders. Using ${PROJECT_ID} ensures GCB handles the injection.
-        sed -i "s|PROJECT_ID_PLACEHOLDER|${PROJECT_ID}|g" cloudrun-api.yml
-        # Using $$WEB_URL escapes GCB to allow the shell variable to resolve.
+        # Replace placeholders. Using $PROJECT_ID (GCB) and $$WEB_URL (Shell).
+        sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-api.yml
         sed -i "s|FRONTEND_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-api.yml
+        sed -i "s|BUILD_ID_PLACEHOLDER|$BUILD_ID|g" cloudrun-api.yml
         
+        echo "🚀 Deploying API service..."
         gcloud run services replace cloudrun-api.yml --region=us-central1
         
         # Export the real API_URL to a file for the web build step
@@ -55,17 +56,23 @@ steps:
     args:
       - '-c'
       - |
-        # Fetch real URLs for the final link
+        # 1. Fetch real API URL
         API_URL=$(gcloud run services describe travel-aigent-api --region us-central1 --format='value(status.url)')
-        WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)')
+        
+        # 2. Discover existing web URL or use placeholder for the very first 'replace'
+        WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)' 2>/dev/null || echo "https://pending-deployment")
         
         # Update Web YAML and Deploy
-        sed -i "s|PROJECT_ID_PLACEHOLDER|${PROJECT_ID}|g" cloudrun-web.yaml
+        sed -i "s|PROJECT_ID_PLACEHOLDER|$PROJECT_ID|g" cloudrun-web.yaml
         sed -i "s|API_URL_PLACEHOLDER|$$API_URL|g" cloudrun-web.yaml
         sed -i "s|WEB_URL_PLACEHOLDER|$$WEB_URL|g" cloudrun-web.yaml
+        sed -i "s|BUILD_ID_PLACEHOLDER|$BUILD_ID|g" cloudrun-web.yaml
+        
+        echo "🚀 Deploying Web service..."
         gcloud run services replace cloudrun-web.yaml --region=us-central1
         
-        # Link Backend CORS to real Web URL
-        # This sed command targets the 'value' line specifically following the 'FRONTEND_URL' name
-        sed -i "/name: FRONTEND_URL/{n;s|value:.*|value: \"$$WEB_URL\"|}" cloudrun-api.yml
+        # 3. Link Backend CORS to the now-guaranteed real Web URL
+        FINAL_WEB_URL=$(gcloud run services describe travel-aigent-web --region us-central1 --format='value(status.url)')
+        echo "🔗 Linking API CORS to: $$FINAL_WEB_URL"
+        sed -i "/name: FRONTEND_URL/{n;s|value:.*|value: \"$$FINAL_WEB_URL\"|}" cloudrun-api.yml
         gcloud run services replace cloudrun-api.yml --region=us-central1
