@@ -126,6 +126,11 @@ On the final day of the itinerary (Target Duration Day):
 2. **Restrictions:** Water-based activities (pools, beaches) or high-intensity sports are permitted ONLY if completed before `ACCOMMODATION` checkout. Otherwise, avoid them as luggage is stored in the vehicle and changing is difficult.
 3. **Buffer Priority:** Prioritize the buffer for the return journey above all other daytime segments.
 
+## 14. Interest-Based Personalization
+1. **Semantic Weighting**: The agent MUST assign higher priority to `EXPERIENCE` and `DINING` segments that align with keywords found in `user_profile_data.interests`.
+2. **Acknowledge Choices**: When proposing an activity that matches a user interest, explicitly state the reasoning. Example: "Since you expressed an interest in [Interest], I've included [Venue] in your plan."
+3. **Balance Logics**: Interests should drive the *selection* of activities, but must not override logistical safety rules (Transit Buffers, Peak Hour Adjustments, or Temporal Sanity Checks).
+
 ## Conflict Resolution
 If a conflict occurs due to operating hours or a **Buffer Overrun**:
 1. Attempt to shift the schedule to accommodate the venue.
