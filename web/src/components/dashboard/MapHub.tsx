@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Map as MapIcon, MapPin, Navigation } from 'lucide-react';
+import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { GoogleMap, useJsApiLoader, useGoogleMap, Polyline, InfoWindow } from '@react-google-maps/api';
 
@@ -70,6 +70,8 @@ export default function MapHub() {
   const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex } = useItineraryData();
   const selectedSegment = activeSegmentIndex !== null ? (segments[activeSegmentIndex] as any) : null;
 
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
+
   // Extract destination from the events
   const cities = Array.from(new Set(segments.map((s) => s.details?.city).filter(Boolean)));
   const primaryDestination = cities.length > 0 ? cities[0] : 'Destination TBD';
@@ -78,9 +80,9 @@ export default function MapHub() {
   const startingLocation = (profile?.preferences as any)?.starting_location;
 
   // Load the Google Maps script
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: apiKey,
     libraries: MAPS_LIBRARIES
   });
 
@@ -216,7 +218,7 @@ export default function MapHub() {
       </div>
 
       {/* Loading State / Fallback UI */}
-      {!isLoaded && (
+      {!isLoaded && !loadError && apiKey && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-3 text-muted-foreground">
             <div className="rounded-full bg-card p-4 shadow-xl border border-border">
@@ -224,6 +226,19 @@ export default function MapHub() {
             </div>
             <div className="text-center">
               <h3 className="font-bold text-foreground/60 uppercase tracking-widest text-xs">Loading Workspace...</h3>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error / Missing API Key State */}
+      {(!apiKey || loadError) && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 text-destructive p-6 rounded-2xl bg-card border border-destructive/10 shadow-xl">
+            <AlertTriangle className="w-8 h-8 text-destructive/80" />
+            <div className="text-center">
+              <h3 className="font-bold uppercase tracking-widest text-xs mb-1">Map Unavailable</h3>
+              <p className="text-xs font-medium opacity-80">{!apiKey ? "Google Maps API key is missing." : "Failed to load Google Maps."}</p>
             </div>
           </div>
         </div>

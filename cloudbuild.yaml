@@ -48,7 +48,8 @@ steps:
         API_URL=$(cat api_url.txt)
         
         docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/web:$BUILD_ID \
-          --build-arg NEXT_PUBLIC_API_URL=$$API_URL ./web
+          --build-arg NEXT_PUBLIC_API_URL=$$API_URL \
+          --build-arg GOOGLE_MAPS_API_KEY=$_GOOGLE_MAPS_API_KEY ./web
     env: ['DOCKER_BUILDKIT=1']
 
   - name: 'gcr.io/cloud-builders/docker'
