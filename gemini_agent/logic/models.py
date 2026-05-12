@@ -41,7 +41,7 @@ class UserProfileBudget(BaseModel):
 
 class UserProfile(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    user_id: str
+    user_id: str = ""
     party_size: int = Field(default=1)
     budget: UserProfileBudget
     preferences: UserProfilePreferences
@@ -68,14 +68,14 @@ class Event(BaseModel):
 
 class Itinerary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    user_id: str
-    session_id: str
+    user_id: str = ""
+    session_id: str = ""
     trip_name: str
     duration_days: int
     party_size_total: int
     status: Literal["draft", "final"] = Field(default="draft")
     events: List[Event]
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
     user_profile_data: Optional[UserProfile] = None

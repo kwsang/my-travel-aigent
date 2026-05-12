@@ -15,23 +15,26 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ userId, initialData, onClose, onSave }: ProfileModalProps) {
   const [page, setPage] = useState(1);
-  const [formData, setFormData] = useState<ProfileFormData>({
-    party_size: initialData?.party_size || 1,
-    room_sharing: initialData?.room_sharing || false,
-    people_per_room: initialData?.people_per_room || 2,
+
+  const parseProfileData = (data: any): ProfileFormData => ({
+    party_size: data?.party_size || 1,
+    room_sharing: data?.room_sharing || false,
+    people_per_room: data?.people_per_room || 2,
     budget: {
-      total_limit: initialData?.budget?.total_limit || 0,
+      total_limit: data?.budget?.total_limit || 0,
       currency: 'USD'
     },
     preferences: {
-      risk_tolerance: initialData?.preferences?.risk_tolerance || 'relaxed',
-      circadian_preference: initialData?.preferences?.circadian_preference || 'night_owl',
-      group_planning_per_person: initialData?.preferences?.group_planning_per_person || false,
-      transport_preference: initialData?.preferences?.transport_preference || 'public',
-      personal_transport_available: initialData?.preferences?.personal_transport_available || false
+      risk_tolerance: data?.preferences?.risk_tolerance || 'relaxed',
+      circadian_preference: data?.preferences?.circadian_preference || 'night_owl',
+      group_planning_per_person: data?.preferences?.group_planning_per_person || false,
+      transport_preference: data?.preferences?.transport_preference || 'public',
+      personal_transport_available: data?.preferences?.personal_transport_available || false
     },
-    interests: initialData?.interests || []
+    interests: data?.interests || []
   });
+
+  const [formData, setFormData] = useState<ProfileFormData>(parseProfileData(initialData));
   const [isFetching, setIsFetching] = useState(!initialData);
   const [isSaving, setIsLoading] = useState(false);
 
@@ -43,20 +46,7 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
         const response = await fetch(`${API_CONFIG.BASE_URL}/profile/${userId}`);
         if (response.ok) {
           const data = await response.json();
-          setFormData({
-            party_size: data.party_size || 1,
-            room_sharing: data.room_sharing || false,
-            people_per_room: data.people_per_room || 2,
-            budget: { total_limit: data.budget?.total_limit || 0, currency: 'USD' },
-            preferences: data.preferences || { 
-              risk_tolerance: 'relaxed', 
-              circadian_preference: 'night_owl',
-              group_planning_per_person: false,
-              transport_preference: 'public',
-              personal_transport_available: false
-            },
-            interests: data.interests || []
-          });
+          setFormData(parseProfileData(data));
         }
       } catch (e) {
         console.error("ProfileModal: Error loading data", e);

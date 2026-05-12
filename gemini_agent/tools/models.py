@@ -28,7 +28,7 @@ class UserPreferences(BaseModel):
     party_size: PartySize
 
 class UserProfile(BaseModel):
-    user_id: str
+    user_id: str = ""
     preferences: UserPreferences
     home_airport: Optional[str] = None
     loyalty_programs: Dict[str, str] = Field(default_factory=dict)
@@ -46,7 +46,7 @@ class Destination(BaseModel):
     vibe_tags: List[str]
 
 class Itinerary(BaseModel):
-    user_id: str
+    user_id: str = ""  # Default prevents the AI from needing to hallucinate this
     trip_name: str
     duration_days: int
     status: Literal["draft", "final"] = "draft"

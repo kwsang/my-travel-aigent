@@ -1,13 +1,19 @@
 import json
 import datetime
+import logging
 from typing import Any, Optional
 from gemini_agent.clients import destinations_collection
 from gemini_agent.logic.models import Itinerary
+
+logger = logging.getLogger(__name__)
 
 def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
     """
     Persists a travel itinerary to MongoDB Atlas. 
     Updates the existing draft for this session if it exists, otherwise creates it.
+
+    Args:
+        itinerary: The itinerary data to save.
     """
     try:
         if destinations_collection is None:
@@ -21,6 +27,7 @@ def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
         itinerary_data = itinerary.model_dump()
         itinerary_data["session_id"] = session_id
         itinerary_data["user_id"] = user_id # Enforce consistency with session identity
+        itinerary_data["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         db = destinations_collection.database
         # Use session_id as the primary anchor to ensure we update the same draft
@@ -36,15 +43,17 @@ def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
     except Exception as e:
         return f"Error saving itinerary: {str(e)}"
 
-def get_itinerary(user_id: str, trip_name: Optional[str] = None, tool_context: Any = None) -> str:
+def get_itinerary(trip_name: Optional[str] = None, tool_context: Any = None) -> str:
     """
     Retrieves saved itineraries for a given user from MongoDB Atlas.
     If trip_name is provided, it filters for that specific trip.
     """
+    logger.info(f"Tool invoked: get_itinerary for trip_name '{trip_name}'")
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         query = {"user_id": user_id}
         if trip_name:
@@ -61,14 +70,16 @@ def get_itinerary(user_id: str, trip_name: Optional[str] = None, tool_context: A
     except Exception as e:
         return f"Error retrieving itinerary: {str(e)}"
 
-def delete_itinerary(user_id: str, trip_name: str, tool_context: Any = None) -> str:
+def delete_itinerary(trip_name: str, tool_context: Any = None) -> str:
     """
     Deletes a specific itinerary for a given user from MongoDB Atlas by trip name.
     """
+    logger.info(f"Tool invoked: delete_itinerary for trip_name '{trip_name}'")
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         result = db["itineraries"].delete_one({"user_id": user_id, "trip_name": trip_name})
         
@@ -79,14 +90,16 @@ def delete_itinerary(user_id: str, trip_name: str, tool_context: Any = None) -> 
     except Exception as e:
         return f"Error deleting itinerary: {str(e)}"
 
-def update_itinerary_status(user_id: str, trip_name: str, status: str, tool_context: Any = None) -> str:
+def update_itinerary_status(trip_name: str, status: str, tool_context: Any = None) -> str:
     """
     Updates the status of a specific itinerary (e.g., from 'draft' to 'final').
     """
+    logger.info(f"Tool invoked: update_itinerary_status to '{status}' for trip_name '{trip_name}'")
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
+        user_id = tool_context.session.user_id
         if status not in ["draft", "final"]:
             return f"Error: Invalid status '{status}'. Must be 'draft' or 'final'."
 
@@ -95,7 +108,7 @@ def update_itinerary_status(user_id: str, trip_name: str, status: str, tool_cont
             {"user_id": user_id, "trip_name": trip_name},
             {"$set": {
                 "status": status, 
-                "updated_at": datetime.datetime.now(datetime.timezone.utc)
+                "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
             }}
         )
         
@@ -106,15 +119,17 @@ def update_itinerary_status(user_id: str, trip_name: str, status: str, tool_cont
     except Exception as e:
         return f"Error updating itinerary status: {str(e)}"
 
-def clone_itinerary(user_id: str, source_trip_name: str, new_trip_name: str, tool_context: Any = None) -> str:
+def clone_itinerary(source_trip_name: str, new_trip_name: str, tool_context: Any = None) -> str:
     """
     Creates a new draft itinerary by cloning an existing one.
     Useful for exploring variations of a trip while keeping the original plan intact.
     """
+    logger.info(f"Tool invoked: clone_itinerary from '{source_trip_name}' to '{new_trip_name}'")
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         source_doc = db["itineraries"].find_one({"user_id": user_id, "trip_name": source_trip_name})
         
@@ -139,14 +154,16 @@ def clone_itinerary(user_id: str, source_trip_name: str, new_trip_name: str, too
     except Exception as e:
         return f"Error cloning itinerary: {str(e)}"
 
-def list_trip_versions(user_id: str, source_trip_name: str, tool_context: Any = None) -> str:
+def list_trip_versions(source_trip_name: str, tool_context: Any = None) -> str:
     """
     Retrieves all draft versions cloned from a specific itinerary.
     """
+    logger.info(f"Tool invoked: list_trip_versions for source_trip_name '{source_trip_name}'")
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         query = {
             "user_id": user_id,
@@ -162,11 +179,12 @@ def list_trip_versions(user_id: str, source_trip_name: str, tool_context: Any = 
     except Exception as e:
         return f"Error listing trip versions: {str(e)}"
 
-def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
+def finalize_itinerary(trip_name: str, tool_context: Any) -> str:
     """
     Finalizes the trip by updating its status to 'final' and ensuring the latest 
     state from the agent's memory is persisted to MongoDB.
     """
+    logger.info(f"Tool invoked: finalize_itinerary for trip_name '{trip_name}'")
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
@@ -174,6 +192,7 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
         db = destinations_collection.database
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         session_id = tool_context.session.id
+        user_id = tool_context.session.user_id
         state = tool_context.state
         
         # 1. Search for the itinerary in agent memory
@@ -210,7 +229,7 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
             {"session_id": session_id},
             {"$set": {
                 "status": "final",
-                "updated_at": datetime.datetime.now(datetime.timezone.utc)
+                "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
             }}
         )
         

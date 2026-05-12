@@ -21,3 +21,21 @@ export function useItinerary() {
   }
   return context;
 }
+
+// Extended hook to automatically extract and fall back deeply nested values
+export function useItineraryData() {
+  const context = useItinerary();
+  const { itinerary } = context;
+
+  const segments = itinerary.events || [];
+  const profile = itinerary.user_profile_data;
+  const partySize = profile?.party_size || 1;
+  const budget = profile?.budget;
+  const riskTolerance = profile?.preferences?.risk_tolerance;
+  const isRelaxed = riskTolerance === 'relaxed';
+
+  return {
+    ...context,
+    segments, profile, partySize, budget, riskTolerance, isRelaxed
+  };
+}

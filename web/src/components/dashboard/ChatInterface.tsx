@@ -22,7 +22,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { 
       role: 'agent', 
-      content: "Hello! I'm your Travel AIgent. I can help you refine this itinerary or suggest new experiences. What's on your mind?" 
+      content: "Hello! I'm your Travel AIgent. Let's build your itinerary from scratch! Where would you like to go, and what kind of experiences are you looking for?" 
     }
   ]);
   const [input, setInput] = useState('');
@@ -43,7 +43,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
             // Default greeting for new sessions
             setMessages([{ 
               role: 'agent', 
-              content: "Hello! I'm your Travel AIgent. I can help you refine this itinerary or suggest new experiences. What's on your mind?" 
+              content: "Hello! I'm your Travel AIgent. Let's build your itinerary from scratch! Where would you like to go, and what kind of experiences are you looking for?" 
             }]);
           }
         }

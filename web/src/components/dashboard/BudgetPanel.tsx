@@ -3,14 +3,10 @@
 import React from 'react';
 import { AlertCircle, ArrowLeftRight, Banknote } from 'lucide-react';
 import { BUDGET_CONFIG } from '@/config/constants';
-import { useItinerary } from '@/context/ItineraryContext';
+import { useItineraryData } from '@/context/ItineraryContext';
 
 export default function BudgetPanel() {
-  const { itinerary, viewMode, setViewMode } = useItinerary();
-
-  const segments = itinerary.events || [];
-  const budget = itinerary.user_profile_data?.budget;
-  const partySize = itinerary.user_profile_data?.party_size || BUDGET_CONFIG.MIN_PARTY_SIZE;
+  const { viewMode, setViewMode, segments, budget, partySize } = useItineraryData();
 
   const onToggleMode = () => {
     setViewMode((v) => (v === 'total' ? 'per_person' : 'total'));
@@ -40,7 +36,7 @@ export default function BudgetPanel() {
         <div className="text-right">
           <div className="flex items-center justify-end gap-1 font-mono text-lg font-bold">
             <Banknote className={`w-5 h-5 mr-1 ${isOverThreshold ? 'text-amber-600' : 'text-slate-400'}`} />
-            <span className={`${isOverThreshold ? 'text-amber-600' : 'text-slate-900'} text-white-outline`}>
+            <span className={`${isOverThreshold ? 'text-amber-600' : 'text-white'} text-stroke-1`}>
               {currency} {displayTotal.toLocaleString()}
             </span>
             {limit > 0 && (

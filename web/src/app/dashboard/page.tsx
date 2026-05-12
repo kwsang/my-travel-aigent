@@ -171,8 +171,20 @@ export default function DashboardPage() {
     setItinerary({ events: [], is_conflict: false, validation_errors: [] });
   };
 
+  // Memoize the context value to prevent unnecessary re-renders of all consumer components
+  const contextValue = useMemo(() => ({
+    itinerary,
+    setItinerary,
+    viewMode,
+    setViewMode,
+    refreshDashboard,
+    sessionId: currentSessionId,
+    userId: visitorId,
+    isLoading: isLoadingItinerary
+  }), [itinerary, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoadingItinerary]);
+
   return (
-    <ItineraryContext.Provider value={{ itinerary, setItinerary, viewMode, setViewMode, refreshDashboard, sessionId: currentSessionId, userId: visitorId, isLoading: isLoadingItinerary }}>
+    <ItineraryContext.Provider value={contextValue}>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <Navbar 
         onEditProfile={() => setShowProfileModal(true)} 

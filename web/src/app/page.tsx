@@ -23,7 +23,7 @@ export default function LandingPage() {
               Next-Gen Travel Planning
             </div>
             <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              Meet <span className="text-indigo-600 underline decoration-indigo-200">Travel AIgent</span>, your personal travel architect.
+              Meet <span className="text-indigo-600 underline decoration-indigo-200">Travel AIgent</span>, your personal travel concierge.
             </h1>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
               Design hyper-optimized itineraries with Gemini. Handle logistics, budgets, and maps in real-time, all in one place.

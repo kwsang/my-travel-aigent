@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useItinerary } from '@/context/ItineraryContext';
+import { useItineraryData } from '@/context/ItineraryContext';
 import { API_CONFIG } from '@/config/constants';
 
 // Map segment types to Lucide icons
@@ -25,14 +25,10 @@ const DefaultIcon = Sparkles; // Fallback icon
  * Supports Phase 4 logic for risk tolerance buffers.
  */
 export default function TimelineView() {
-  const { itinerary, viewMode, setItinerary, sessionId, userId } = useItinerary();
+  const { viewMode, setItinerary, sessionId, userId, segments, partySize, riskTolerance } = useItineraryData();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
-  const segments = itinerary.events || [];
-  const partySize = itinerary.user_profile_data?.party_size || 1;
-  const riskTolerance = itinerary.user_profile_data?.preferences?.risk_tolerance;
-
   // Extract unique days and sort them
   const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
 

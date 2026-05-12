@@ -2,17 +2,14 @@
 
 import React from 'react';
 import { Map as MapIcon } from 'lucide-react';
-import { useItinerary } from '@/context/ItineraryContext';
+import { useItineraryData } from '@/context/ItineraryContext';
 
 /**
  * MapHub Component
  * Visualizes itinerary segments on a geographic workspace.
  */
 export default function MapHub() {
-  const { itinerary } = useItinerary();
-  
-  const segments = itinerary.events || [];
-  const isRelaxed = itinerary.user_profile_data?.preferences?.risk_tolerance === 'relaxed';
+  const { segments, isRelaxed } = useItineraryData();
 
   return (
     <div className="relative h-full w-full bg-background overflow-hidden">

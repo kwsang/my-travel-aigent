@@ -1,10 +1,14 @@
 import json
+import logging
 from gemini_agent.clients import places_client, gmaps_client
+
+logger = logging.getLogger(__name__)
 
 def google_maps_matrix(origins: list[str], destinations: list[str]) -> str:
     """
     Calculates real-time driving time and distance between locations.
     """
+    logger.info(f"Tool invoked: google_maps_matrix with origins {origins} and destinations {destinations}")
     try:
         if gmaps_client is None:
             return "Error: Google Maps service is currently unavailable."
@@ -23,6 +27,7 @@ def google_places_details(name: str) -> str:
     """
     Retrieves detailed information (rating, business status, opening hours) for a specific place.
     """
+    logger.info(f"Tool invoked: google_places_details for name '{name}'")
     try:
         if places_client is None:
             return "Error: Google Places service is currently unavailable."
@@ -48,6 +53,7 @@ def search_places(text_query: str, location_bias: str = None, **kwargs) -> str:
     """
     Searches for venues using the Google Places API.
     """
+    logger.info(f"Tool invoked: search_places with query '{text_query}', location_bias '{location_bias}'")
     try:
         if places_client is None:
             return "Error: Google Places service is currently unavailable."
@@ -84,5 +90,6 @@ def search_local_events(location: str, query: str = "festivals and events") -> s
     Searches for current local events, festivals, and happenings in a specific city.
     Useful for providing real-time value and engagement during the user intake process.
     """
+    logger.info(f"Tool invoked: search_local_events in '{location}' with query '{query}'")
     # Leverages the robust search_places logic with a specialized event-centric query
     return search_places(text_query=f"{query} in {location}")
