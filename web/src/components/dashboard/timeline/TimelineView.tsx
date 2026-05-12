@@ -4,20 +4,8 @@ import React, { useState } from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { API_CONFIG } from '@/config/constants';
 
-// Map segment types to Lucide icons
-import { Car, Utensils, Sparkles, Hotel, ClipboardList, Plane, LucideIcon, GripVertical, Loader2 } from 'lucide-react';
-
-const SegmentIcons: Record<string, LucideIcon> = {
-  TRANSPORT: Car,
-  DINING: Utensils,
-  EXPERIENCE: Sparkles,
-  ACCOMMODATION: Hotel,
-  LOGISTICS: ClipboardList,
-  FLIGHT: Plane,
-  // Add more mappings as needed
-};
-
-const DefaultIcon = Sparkles; // Fallback icon
+import { Loader2, AlertTriangle } from 'lucide-react';
+import TimelineItem from './TimelineItem';
 
 /**
  * TimelineView Component
@@ -25,7 +13,7 @@ const DefaultIcon = Sparkles; // Fallback icon
  * Supports Phase 4 logic for risk tolerance buffers.
  */
 export default function TimelineView() {
-  const { viewMode, setItinerary, sessionId, userId, segments, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex } = useItineraryData();
+  const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex } = useItineraryData();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
@@ -115,6 +103,22 @@ export default function TimelineView() {
           </div>
         </div>
       )}
+      
+      {/* Validation Errors / Overlap Warnings Banner */}
+      {itinerary.is_conflict && itinerary.validation_errors && itinerary.validation_errors.length > 0 && (
+        <div className="flex flex-col gap-2 bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-4 -mt-4 mb-2">
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <AlertTriangle className="w-4 h-4" />
+            <span>Schedule Conflicts Detected</span>
+          </div>
+          <ul className="list-disc pl-5 space-y-1 text-xs font-medium opacity-90">
+            {itinerary.validation_errors.map((error: string, idx: number) => (
+              <li key={idx}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {days.map((day) => (
         <div key={day} className="flex flex-col gap-4">
           <div className="sticky top-0 z-10 -mx-6 bg-card/80 px-6 py-2 backdrop-blur-md border-y border-border/20">
@@ -130,56 +134,17 @@ export default function TimelineView() {
               .map((event, absoluteIndex) => ({ event, absoluteIndex }))
               .filter(({ event }) => event.day === day)
               .map(({ event, absoluteIndex }) => (
-                <div
-                  id={`timeline-item-${absoluteIndex}`}
+                <TimelineItem
                   key={`${day}-${absoluteIndex}`}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, absoluteIndex)}
+                  event={event}
+                  absoluteIndex={absoluteIndex}
+                  day={day}
+                  draggedIndex={draggedIndex}
+                  isSyncing={isSyncing}
+                  onDragStart={handleDragStart}
                   onDragOver={handleDragOver}
-                  onDrop={(e) => {
-                    e.stopPropagation(); // Prevent fallback drop zone from firing
-                    handleDrop(e, absoluteIndex, day);
-                  }}
-                  onClick={() => setActiveSegmentIndex(absoluteIndex)}
-                  className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card cursor-pointer group ${
-                    draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
-                  } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''} ${isSyncing ? 'cursor-wait' : 'active:cursor-grabbing'}`}
-                >
-                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
-                    <GripVertical size={14} />
-                  </div>
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-col gap-1">
-                      <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        {React.createElement(SegmentIcons[event.segment] || DefaultIcon, {
-                          className: 'w-3 h-3',
-                        })}
-                        {event.segment.replace('_', ' ')}
-                      </span>
-                      <h4 className="font-semibold text-foreground">{event.details.name}</h4>
-                      <p className="text-sm text-muted-foreground">{event.details.category} • {event.details.city}</p>
-                    </div>
-                    <div className="text-right">
-                      <time className="text-sm font-semibold text-foreground/80">
-                        {event.schedule.local_start_time}
-                      </time>
-                      {event.details.price && (
-                        <p className="text-sm font-bold text-emerald-600">
-                          {event.details.price.currency}{' '}
-                          {viewMode === 'total'
-                            ? event.details.price.amount.toLocaleString()
-                            : (event.details.price.amount / Math.max(1, partySize)).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {/* Indication for the Retreat Rule (from ARCHITECT_PROMPT logic) */}
-                  {riskTolerance === 'relaxed' && event.details.name.toLowerCase().includes('retreat') && (
-                    <div className="mt-3 rounded-md bg-amber-50 px-2 py-1 text-xs font-bold uppercase text-amber-600 border border-amber-100">
-                      Mandatory Retreat Block (16:00 - 18:30)
-                    </div>
-                  )}
-                </div>
+                  onDrop={handleDrop}
+                />
               ))}
           </div>
         </div>

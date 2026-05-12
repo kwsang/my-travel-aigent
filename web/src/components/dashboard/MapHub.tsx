@@ -3,7 +3,9 @@
 import React from 'react';
 import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { GoogleMap, useJsApiLoader, useGoogleMap, Polyline, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Polyline, InfoWindow } from '@react-google-maps/api';
+import AdvancedSegmentMarker from './map/AdvancedSegmentMarker';
+import { darkMapStyle } from './map/mapStyles';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
@@ -14,70 +16,25 @@ const PolylineComponent = Polyline as any;
 const InfoWindowComponent = InfoWindow as any;
 
 /**
- * Custom Advanced Marker Component
- * Leverages google.maps.marker.AdvancedMarkerElement and PinElement
- */
-function AdvancedSegmentMarker({ position, title, segmentType, isActive, onClick }: { position: google.maps.LatLngLiteral, title: string, segmentType: string, isActive: boolean, onClick: () => void }) {
-  const map = useGoogleMap();
-
-  React.useEffect(() => {
-    if (!map || !window.google) return;
-
-    let bgColor = '#6366f1'; // Default primary
-    let glyph = '📍';
-    
-    switch(segmentType) {
-      case 'ACCOMMODATION': bgColor = '#8b5cf6'; glyph = '🏨'; break; // Violet
-      case 'DINING': bgColor = '#f43f5e'; glyph = '🍽️'; break; // Rose
-      case 'EXPERIENCE': bgColor = '#f59e0b'; glyph = '✨'; break; // Amber
-      case 'FLIGHT': bgColor = '#0ea5e9'; glyph = '✈️'; break; // Sky
-      case 'TRANSPORT': bgColor = '#0ea5e9'; glyph = '🚗'; break; // Sky
-      case 'LOGISTICS': bgColor = '#64748b'; glyph = '📋'; break; // Slate
-    }
-
-    const pin = new google.maps.marker.PinElement({
-      background: bgColor,
-      borderColor: isActive ? '#020617' : '#ffffff', // High contrast dark border when active
-      glyph: glyph,
-      scale: isActive ? 1.4 : 1.1, // Scale up when active
-    });
-
-    const marker = new google.maps.marker.AdvancedMarkerElement({
-      map,
-      position,
-      title,
-      content: pin.element,
-      zIndex: isActive ? 100 : undefined, // Bring to front
-    });
-
-    // AdvancedMarkerElements use 'gmp-click' instead of standard 'click'
-    const listener = marker.addListener('gmp-click', onClick);
-
-    return () => {
-      listener.remove();
-      marker.map = null;
-    };
-  }, [map, position, title, segmentType, isActive, onClick]);
-
-  return null;
-}
-
-/**
  * MapHub Component
  * Visualizes itinerary segments on a geographic workspace.
  */
 export default function MapHub() {
-  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex } = useItineraryData();
+  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary } = useItineraryData();
   const selectedSegment = activeSegmentIndex !== null ? (segments[activeSegmentIndex] as any) : null;
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
 
-  // Extract destination from the events
-  const cities = Array.from(new Set(segments.map((s) => s.details?.city).filter(Boolean)));
-  const primaryDestination = cities.length > 0 ? cities[0] : 'Destination TBD';
-  
   // Extract starting location from profile preferences (populated by the Concierge agent)
   const startingLocation = (profile?.preferences as any)?.starting_location;
+
+  // Extract destination from the events (prioritizing non-transit segments to avoid origin airports)
+  const nonTransitSegments = segments.filter((s: any) => !['FLIGHT', 'TRANSPORT'].includes(s.segment));
+  const targetSegments = nonTransitSegments.length > 0 ? nonTransitSegments : segments;
+  const cities = Array.from(new Set(targetSegments.map((s: any) => s.details?.city).filter(Boolean)));
+  const destinationCities = cities.filter(city => city !== startingLocation);
+  const tripName = itinerary?.trip_name && itinerary.trip_name !== 'New Trip' ? itinerary.trip_name : null;
+  const primaryDestination = destinationCities.length > 0 ? destinationCities[0] : (cities.length > 0 ? cities[0] : (tripName || 'Destination TBD'));
 
   // Load the Google Maps script
   const { isLoaded, loadError } = useJsApiLoader({
@@ -115,6 +72,18 @@ export default function MapHub() {
     }
   }, [mapInstance, routePath]);
 
+  // Formats raw ISO strings into a clean "09:00 AM" format
+  const formatTime = (timeStr?: string) => {
+    if (!timeStr) return '';
+    try {
+      const d = new Date(timeStr);
+      if (isNaN(d.getTime())) return timeStr;
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return timeStr;
+    }
+  };
+
   return (
     <div className="relative h-full w-full bg-background overflow-hidden">
       {/* Google Map */}
@@ -127,6 +96,7 @@ export default function MapHub() {
             disableDefaultUI: true, // Hides standard controls for a cleaner, modern look
             zoomControl: true,
             mapId: 'DEMO_MAP_ID', // Required for AdvancedMarkerElements
+            styles: darkMapStyle,
           }}
           onLoad={setMapInstance}
           onUnmount={() => setMapInstance(null)}
@@ -164,7 +134,7 @@ export default function MapHub() {
                   <p className="text-xs text-slate-600 mb-1">{selectedSegment.details?.category}</p>
                   {selectedSegment.schedule?.local_start_time && (
                     <p className="text-[11px] font-semibold text-indigo-600">
-                      {selectedSegment.schedule.local_start_time}
+                      {formatTime(selectedSegment.schedule.local_start_time)}
                     </p>
                   )}
                 </div>

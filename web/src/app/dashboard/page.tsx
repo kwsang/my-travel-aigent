@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import TimelineView from '@/components/dashboard/TimelineView';
+import TimelineView from '@/components/dashboard/timeline/TimelineView';
 import MapHub from '@/components/dashboard/MapHub';
 import BudgetPanel from '@/components/dashboard/BudgetPanel';
 import ChatInterface from '@/components/dashboard/ChatInterface';
@@ -15,7 +15,7 @@ import { Plus, Clock, Search, Trash2 } from 'lucide-react';
 import { ItineraryContext } from '@/context/ItineraryContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
-import TimelineSkeleton from '@/components/dashboard/TimelineSkeleton';
+import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/BudgetSkeleton';
 
 /**
@@ -85,6 +85,7 @@ export default function DashboardPage() {
   const fetchItinerary = useCallback(async () => {
     if (!currentSessionId || !visitorId) return;
     setIsLoadingItinerary(true);
+    setActiveSegmentIndex(null); // Reset active map highlight when switching trips
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`);
       if (response.ok) {
@@ -199,24 +200,31 @@ export default function DashboardPage() {
           <div className="py-8 border-b border-border/50 mb-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                {isEditingName ? (
-                  <input
-                    autoFocus
-                    className="text-2xl font-bold text-foreground tracking-tight bg-transparent border-b-2 border-primary outline-none w-full"
-                    value={editedName}
-                    onChange={(e) => setEditedName(e.target.value)}
-                    onBlur={handleRename}
-                    onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                  />
-                ) : (
-                  <h1 
-                    className="text-2xl font-bold text-foreground tracking-tight cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => setIsEditingName(true)}
-                  >
-                    {itinerary.trip_name || 'New Trip'}
-                  </h1>
-                )}
-                <p className="text-sm text-muted-foreground">Collaborating with Travel AIgent</p>
+                <div className="flex items-center gap-3">
+                  {isEditingName ? (
+                    <input
+                      autoFocus
+                      className="text-2xl font-bold text-foreground tracking-tight bg-transparent border-b-2 border-primary outline-none w-full"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      onBlur={handleRename}
+                      onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                    />
+                  ) : (
+                    <h1 
+                      className="text-2xl font-bold text-foreground tracking-tight cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => setIsEditingName(true)}
+                    >
+                      {itinerary.trip_name || 'New Trip'}
+                    </h1>
+                  )}
+                  {!isEditingName && (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${itinerary.status === 'final' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                      {itinerary.status || 'draft'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">Collaborating with Travel AIgent</p>
               </div>
               <button 
                 onClick={handleNewTrip}
