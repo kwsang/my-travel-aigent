@@ -43,6 +43,8 @@ class UserProfileModel(BaseModel):
     party_size: int = Field(default=1)
     budget: UserProfileBudgetModel
     preferences: UserProfilePreferencesModel
+    room_sharing: bool = Field(default=False)
+    people_per_room: int = Field(default=2)
 
 class EventModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2 } from 'lucide-react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel } from 'lucide-react';
 import { API_CONFIG } from '@/config/constants';
 
 interface ProfileModalProps {
@@ -14,6 +14,8 @@ interface ProfileModalProps {
 export default function ProfileModal({ userId, initialData, onClose, onSave }: ProfileModalProps) {
   const [formData, setFormData] = useState({
     party_size: initialData?.party_size || 1,
+    room_sharing: initialData?.room_sharing || false,
+    people_per_room: initialData?.people_per_room || 2,
     budget: {
       total_limit: initialData?.budget?.total_limit || 0,
       currency: initialData?.budget?.currency || 'USD'
@@ -36,6 +38,8 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
           const data = await response.json();
           setFormData({
             party_size: data.party_size || 1,
+            room_sharing: data.room_sharing || false,
+            people_per_room: data.people_per_room || 2,
             budget: data.budget || { total_limit: 0, currency: 'USD' },
             preferences: data.preferences || { risk_tolerance: 'relaxed', circadian_preference: 'night_owl' }
           });
@@ -91,18 +95,46 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {/* Party Size */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-              <Users size={14} /> Party Size
-            </label>
+          {/* Party & Accommodation */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                <Users size={14} /> Party Size
+              </label>
+              <input 
+                type="number"
+                value={formData.party_size}
+                onChange={(e) => setFormData({...formData, party_size: parseInt(e.target.value) || 0})}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                placeholder="Total travelers"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                <Hotel size={14} /> Per Room
+              </label>
+              <input 
+                type="number"
+                disabled={!formData.room_sharing}
+                value={formData.people_per_room}
+                onChange={(e) => setFormData({...formData, people_per_room: parseInt(e.target.value) || 0})}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-30"
+                placeholder="2"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
             <input 
-              type="number"
-              value={formData.party_size}
-              onChange={(e) => setFormData({...formData, party_size: parseInt(e.target.value) || 0})}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-              placeholder="Number of travelers"
+              type="checkbox"
+              id="room_sharing"
+              checked={formData.room_sharing}
+              onChange={(e) => setFormData({...formData, room_sharing: e.target.checked})}
+              className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
             />
+            <label htmlFor="room_sharing" className="text-sm font-medium text-white cursor-pointer select-none">
+              Group members share rooms?
+            </label>
           </div>
 
           {/* Budget */}
@@ -115,17 +147,17 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
                 type="number"
                 value={formData.budget.total_limit}
                 onChange={(e) => setFormData({...formData, budget: {...formData.budget, total_limit: parseInt(e.target.value) || 0}})}
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                 placeholder="Limit"
               />
               <select 
                 value={formData.budget.currency}
                 onChange={(e) => setFormData({...formData, budget: {...formData.budget, currency: e.target.value}})}
-                className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <option value="USD" className="bg-card text-white">USD</option>
+                <option value="EUR" className="bg-card text-white">EUR</option>
+                <option value="GBP" className="bg-card text-white">GBP</option>
               </select>
             </div>
           </div>
@@ -139,10 +171,10 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
               <select 
                 value={formData.preferences.risk_tolerance}
                 onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, risk_tolerance: e.target.value as any}})}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               >
-                <option value="relaxed">Relaxed</option>
-                <option value="strict">Strict</option>
+                <option value="relaxed" className="bg-card text-white">Relaxed</option>
+                <option value="strict" className="bg-card text-white">Strict</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -152,10 +184,10 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
               <select 
                 value={formData.preferences.circadian_preference}
                 onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: e.target.value as any}})}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               >
-                <option value="night_owl">Night Owl</option>
-                <option value="morning_person">Early Bird</option>
+                <option value="night_owl" className="bg-card text-white">Night Owl</option>
+                <option value="morning_person" className="bg-card text-white">Early Bird</option>
               </select>
             </div>
           </div>

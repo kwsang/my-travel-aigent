@@ -20,7 +20,9 @@ async def get_user_profile(user_id: str, db: AsyncIOMotorDatabase = Depends(get_
             "preferences": {
                 "risk_tolerance": "relaxed",
                 "circadian_preference": "night_owl"
-            }
+            },
+            "room_sharing": False,
+            "people_per_room": 2
         }
     
     profile["_id"] = str(profile["_id"])

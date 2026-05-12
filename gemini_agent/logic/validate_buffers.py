@@ -267,14 +267,24 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     """
     Validates budget adherence based on group size, per-person toggle, and room sharing.
     """
-    print(f"Validating Budget (Group Size: {user_prefs['party_size']['adults']}, Per-Person: {user_prefs['group_planning_per_person']})...")
-    
-    adults = user_prefs['party_size']['adults']
-    children = user_prefs['party_size']['children']
+    # Extract party size: support both new flat int and legacy dict structure
+    party_raw = user_prefs.get('party_size', 1)
+    if isinstance(party_raw, dict):
+        adults = party_raw.get('adults', 1)
+        children = party_raw.get('children', 0)
+    else:
+        adults = party_raw
+        children = 0
+
     total_people = adults + children
+    
+    # Extract per-person toggle from nested preferences
+    prefs = user_prefs.get('preferences', {})
+    per_person_toggle = prefs.get('group_planning_per_person', user_prefs.get('group_planning_per_person', False))
+
+    print(f"Validating Budget (Group Size: {total_people}, Per-Person: {per_person_toggle})...")
     total_cost = 0.0
     limit = user_prefs['budget']['total_limit']
-    per_person_toggle = user_prefs.get('group_planning_per_person', False)
     room_sharing = user_prefs.get('room_sharing', False)
     people_per_room = user_prefs.get('people_per_room', 2)
 

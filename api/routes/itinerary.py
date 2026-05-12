@@ -129,7 +129,12 @@ async def update_itinerary(
 
         user_profile = await db.user_profiles.find_one({"user_id": identity})
         # Fallback profile for validation if the user hasn't chatted yet
-        profile_for_val = user_profile or {"preferences": {}, "party_size": 1}
+        profile_for_val = user_profile or {
+            "preferences": {}, 
+            "party_size": 1, 
+            "room_sharing": False, 
+            "people_per_room": 2
+        }
 
         # Extract updates from the request body
         update_data = updates.model_dump(exclude_unset=True)
@@ -140,7 +145,7 @@ async def update_itinerary(
         # Prepare the full itinerary object for validation
         itinerary = {**itinerary_doc, **update_data}
 
-        prefs = profile_for_val.get("preferences", {})
+        prefs = agent_prefs.get("preferences", {})
         risk = prefs.get("risk_tolerance", "relaxed")
         vibe = prefs.get("circadian_preference", "night_owl")
 
