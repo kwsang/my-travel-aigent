@@ -11,12 +11,17 @@ interface Message {
   content: string;
 }
 
+interface ChatInterfaceProps {
+  sessionId: string;
+  onMessageReceived?: () => void;
+}
+
 /**
  * ChatInterface Component
  * Replaces the ArchitectOverlay to provide direct conversation with the Gemini agent.
- * Maintains a unique session ID for the duration of the component's lifecycle.
+ * Receives a session ID from the parent dashboard to sync data.
  */
-export default function ChatInterface() {
+export default function ChatInterface({ sessionId, onMessageReceived }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: 'agent', 
@@ -25,7 +30,6 @@ export default function ChatInterface() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId] = useState(() => uuidv4());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages or loading state change
@@ -57,6 +61,11 @@ export default function ChatInterface() {
 
       const data = await response.json();
       setMessages(prev => [...prev, { role: 'agent', content: data.response }]);
+
+      // Trigger refresh of the itinerary in the parent dashboard
+      if (onMessageReceived) {
+        onMessageReceived();
+      }
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, { role: 'agent', content: "Sorry, I lost my connection to the server. Please check if the API is running." }]);

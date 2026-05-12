@@ -88,8 +88,8 @@ app.include_router(chat.router)
 app.include_router(itinerary.router)
 
 @app.get("/", tags=["system"])
-async def root():
-    return {"message": "My Travel Aigent API is running.", "docs": "/docs", "health": "/health"}
+async def root(): #
+    return {"message": "Travel AIgent API is running.", "docs": "/docs", "health": "/health"}
 
 @app.get("/health", tags=["system"])
 async def health_check():

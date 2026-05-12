@@ -2,7 +2,7 @@ import os
 from gemini_agent.clients import MONGODB_URI
 
 # App Metadata
-APP_TITLE = "My Travel Aigent API"
+APP_TITLE = "Travel AIgent API"
 APP_VERSION = "1.0.0"
 
 # Database Settings
