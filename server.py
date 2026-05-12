@@ -283,6 +283,7 @@ async def get_itinerary(
         itinerary_doc["_id"] = str(itinerary_doc["_id"])
         itinerary_doc["is_conflict"] = is_conflict
         itinerary_doc["validation_errors"] = all_errors
+        itinerary_doc["user_profile_data"] = user_profile
         
         return itinerary_doc
 
