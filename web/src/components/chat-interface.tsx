@@ -37,7 +37,7 @@ export function ChatInterface() {
       <CardContent className="flex-1 overflow-hidden p-4 bg-zinc-50/50 dark:bg-zinc-950/50">
         <ScrollArea className="h-full pr-4">
           <div className="space-y-4">
-            {(messages as any[]).map((m: ChatMessage, i) => (
+            {messages.map((m, i) => (
               <div
                 key={i}
                 className={`flex gap-3 ${
@@ -74,7 +74,7 @@ export function ChatInterface() {
             {isLoading && (
               <div className="flex gap-3">
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 rounded-2xl rounded-tl-none animate-pulse text-base">
-                  Architect is thinking...
+                  Concierge is thinking...
                 </div>
               </div>
             )}

@@ -2,9 +2,9 @@ import json
 import datetime
 from typing import Any, Optional
 from gemini_agent.clients import destinations_collection
-from gemini_agent.logic.models import ItineraryModel
+from gemini_agent.logic.models import Itinerary
 
-def save_itinerary(itinerary: ItineraryModel, tool_context: Any) -> str:
+def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
     """
     Persists a travel itinerary to MongoDB Atlas. 
     Updates the existing draft for this session if it exists, otherwise creates it.
@@ -127,7 +127,7 @@ def clone_itinerary(user_id: str, source_trip_name: str, new_trip_name: str, too
 
         # Strip the MongoDB ID and validate into the model
         source_doc.pop("_id", None)
-        itinerary = ItineraryModel.model_validate(source_doc)
+        itinerary = Itinerary.model_validate(source_doc)
         
         # Update identifying details
         itinerary.trip_name = new_trip_name
@@ -183,7 +183,7 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
         # If the data in memory matches the requested trip_name, use it for persistence
         if isinstance(raw_itinerary, dict) and raw_itinerary.get("trip_name") == trip_name:
             # Validate/Hydrate into the Pydantic model for schema consistency
-            itinerary = ItineraryModel.model_validate(raw_itinerary)
+            itinerary = Itinerary.model_validate(raw_itinerary)
             
             itinerary.user_id = user_id # Ensure ownership
             

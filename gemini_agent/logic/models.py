@@ -2,13 +2,13 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timezone
 
-class PriceModel(BaseModel):
+class Price(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     amount: float = Field(..., description="The numeric cost of the segment.")
     currency: str = Field(default="USD", description="3-letter ISO currency code.")
     is_estimated: bool = Field(default=True, description="Whether the price is a placeholder or confirmed.")
 
-class ScheduleModel(BaseModel):
+class Schedule(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     local_start_time: str = Field(..., description="ISO 8601 string for local start time.")
     local_end_time: Optional[str] = Field(None, description="ISO 8601 string for local end time.")
@@ -24,27 +24,27 @@ class EventDetails(BaseModel):
     category: str = Field(..., description="Broad category (e.g., Museum, Fine Dining).")
     city: Optional[str] = Field(None, description="Primary city for clustering logic.")
     travel_zone: Optional[str] = Field(None, description="Micro-location zone within a city.")
-    price: Optional[PriceModel] = None
+    price: Optional[Price] = None
     is_rental: bool = Field(default=False, description="True if this is a rental car segment.")
     vehicle_count: int = Field(default=1, description="Number of vehicles for large groups.")
 
-class UserProfilePreferencesModel(BaseModel):
+class UserProfilePreferences(BaseModel):
     risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')
     circadian_preference: Literal['early_bird', 'night_owl', 'morning_person'] = Field(default='night_owl')
     group_planning_per_person: bool = Field(default=False)
     transport_preference: Literal['public', 'rideshare', 'rental'] = Field(default='public')
     personal_transport_available: bool = Field(default=False)
 
-class UserProfileBudgetModel(BaseModel):
+class UserProfileBudget(BaseModel):
     total_limit: float
     currency: str = Field(default="USD")
 
-class UserProfileModel(BaseModel):
+class UserProfile(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     user_id: str
     party_size: int = Field(default=1)
-    budget: UserProfileBudgetModel
-    preferences: UserProfilePreferencesModel
+    budget: UserProfileBudget
+    preferences: UserProfilePreferences
     room_sharing: bool = Field(default=False)
     people_per_room: int = Field(default=2)
     interests: List[str] = Field(default_factory=list)
@@ -52,21 +52,21 @@ class UserProfileModel(BaseModel):
 class ProfileUpdateRequest(BaseModel):
     """Schema for updating a user profile from the UI."""
     party_size: Optional[int] = None
-    budget: Optional[UserProfileBudgetModel] = None
-    preferences: Optional[UserProfilePreferencesModel] = None
+    budget: Optional[UserProfileBudget] = None
+    preferences: Optional[UserProfilePreferences] = None
     room_sharing: Optional[bool] = None
     people_per_room: Optional[int] = None
     group_planning_per_person: Optional[bool] = None
     interests: Optional[List[str]] = None
 
-class EventModel(BaseModel):
+class Event(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     day: int = Field(..., description="The sequential day of the trip (1-indexed).")
     segment: Literal["TRANSPORT", "DINING", "EXPERIENCE", "ACCOMMODATION", "LOGISTICS", "FLIGHT"] = Field(..., description="The logistical segment type.")
-    schedule: ScheduleModel
+    schedule: Schedule
     details: EventDetails
 
-class ItineraryModel(BaseModel):
+class Itinerary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     user_id: str
     session_id: str
@@ -74,14 +74,14 @@ class ItineraryModel(BaseModel):
     duration_days: int
     party_size_total: int
     status: Literal["draft", "final"] = Field(default="draft")
-    events: List[EventModel]
+    events: List[Event]
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
-    user_profile_data: Optional[UserProfileModel] = None
+    user_profile_data: Optional[UserProfile] = None
 
 class ItineraryPatchRequest(BaseModel):
-    events: Optional[List[EventModel]] = Field(None, description="Updated events from the UI.")
+    events: Optional[List[Event]] = Field(None, description="Updated events from the UI.")
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
     status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
 

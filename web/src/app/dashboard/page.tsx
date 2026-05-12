@@ -8,7 +8,7 @@ import ChatInterface from '@/components/dashboard/ChatInterface';
 import ProfileModal from '@/components/dashboard/ProfileModal';
 import Toast from '@/components/dashboard/Toast';
 import Navbar from '@/components/layout/Navbar';
-import { Itinerary } from '@/types/models';
+import { Itinerary } from '@/types';
 import { API_CONFIG } from '@/config/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Clock, Search, Trash2 } from 'lucide-react';

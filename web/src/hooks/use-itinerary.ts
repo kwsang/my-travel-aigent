@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ItineraryModel } from '@/types';
+import { Itinerary } from '@/types';
 
 export function useItinerary(sessionId: string | null) {
-  const [itinerary, setItinerary] = useState<ItineraryModel | null>(null);
+  const [itinerary, setItinerary] = useState<Itinerary | null>(null);
 
   useEffect(() => {
     // Don't poll if we don't have a session ID yet

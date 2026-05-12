@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChatRequest, ChatResponse } from '@/types';
+import { ChatRequest, ChatResponse, ChatMessage } from '@/types';
 import { v4 as uuidv4 } from 'uuid'; // You'll need to install this package: npm install uuid @types/uuid
 
 export function useChat() {
@@ -23,7 +23,7 @@ export function useChat() {
     return storedSessionId;
   });
 
-  const [messages, setMessages] = useState<ChatResponse[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -41,7 +41,7 @@ export function useChat() {
     if (!text.trim() || !sessionId) return; // Ensure sessionId is available
 
     // Add user message to UI immediately
-    const userMsg: ChatResponse = { role: 'user', text };
+    const userMsg: ChatMessage = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
@@ -88,7 +88,7 @@ export function useChat() {
         }
       }
       
-      const data = await response.json();
+      const data: ChatResponse = await response.json();
       const rawText = data.response || "";
       
       // Split the response by double newlines OR look ahead for Markdown H3 headers (### Section)
@@ -97,9 +97,9 @@ export function useChat() {
       const segments = rawText.split(sectionDelimiter).filter((s: string) => s.trim());
 
       if (segments.length > 0) {
-        const modelMessages: ChatResponse[] = segments.map((segment: string, index: number) => ({
-          role: 'model',
-          text: segment.trim(),
+        const modelMessages: ChatMessage[] = segments.map((segment: string, index: number) => ({
+          role: 'agent',
+          content: segment.trim(),
           // Apply the conflict flag only to the last segment to avoid duplicate UI warnings
           is_conflict: index === segments.length - 1 ? data.is_conflict : false
         }));
@@ -107,8 +107,8 @@ export function useChat() {
       } else {
         // Fallback for empty responses that might still contain conflict state updates
         setMessages((prev) => [...prev, { 
-          role: 'model', 
-          text: '', 
+          role: 'agent', 
+          content: '', 
           is_conflict: data.is_conflict 
         }]);
       }
@@ -117,7 +117,7 @@ export function useChat() {
       console.error("Failed to send message for session_id:", sessionId, error);
       setMessages((prev) => [
         ...prev, 
-        { role: 'system', text: `Error: ${errorMessage}` }
+        { role: 'agent', content: `Error: ${errorMessage}` }
       ]);
     } finally {
       setIsLoading(false);

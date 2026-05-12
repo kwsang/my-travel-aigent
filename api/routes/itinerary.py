@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from api.dependencies import get_current_user, get_db, get_session_db
-from gemini_agent.logic.models import ItineraryModel, ItineraryPatchRequest
+from gemini_agent.logic.models import Itinerary, ItineraryPatchRequest
 from gemini_agent.logic.validate_buffers import (
     validate_itinerary_structure, 
     validate_itinerary_budget
@@ -13,7 +13,7 @@ from gemini_agent.logic.validate_buffers import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/itinerary", tags=["itinerary"])
 
-@router.get("/", response_model=list[ItineraryModel])
+@router.get("/", response_model=list[Itinerary])
 async def list_itineraries(
     user_id: str | None = None,
     auth_user_id: str | None = Depends(get_current_user),
@@ -37,7 +37,7 @@ async def list_itineraries(
         doc.setdefault("validation_errors", [])
     return docs
 
-@router.get("/{session_id}", response_model=ItineraryModel)
+@router.get("/{session_id}", response_model=Itinerary)
 async def get_itinerary(
     session_id: str,
     user_id: str | None = None,
@@ -103,7 +103,7 @@ async def get_itinerary(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.patch("/{session_id}", response_model=ItineraryModel)
+@router.patch("/{session_id}", response_model=Itinerary)
 async def update_itinerary(
     session_id: str, 
     updates: ItineraryPatchRequest,
@@ -172,7 +172,7 @@ async def update_itinerary(
 
         itinerary_doc.update(update_data)
 
-        # Explicit assignment to ensure these fields exist and are valid for ItineraryModel
+        # Explicit assignment to ensure these fields exist and are valid for Itinerary
         itinerary_doc["duration_days"] = itinerary_doc.get("duration_days") or 0
         itinerary_doc["party_size_total"] = itinerary_doc.get("party_size_total") or profile_for_val.get("party_size", 1)
         itinerary_doc["status"] = itinerary_doc.get("status", "draft")

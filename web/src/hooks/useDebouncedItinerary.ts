@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ItineraryModel, EventModel } from '../types';
+import { Itinerary, Event } from '../types';
 
 /**
  * Custom hook to handle debounced updates to the travel itinerary.
  * Provides on-the-fly validation and auto-saving to the FastAPI backend.
  */
-export function useDebouncedItinerary(initialData: ItineraryModel, delay: number = 800) {
-  const [itinerary, setItinerary] = useState<ItineraryModel>(initialData);
+export function useDebouncedItinerary(initialData: Itinerary, delay: number = 800) {
+  const [itinerary, setItinerary] = useState<Itinerary>(initialData);
   const [isUpdating, setIsUpdating] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Function to perform the actual API call
-  const persistUpdate = useCallback(async (updatedEvents: EventModel[]) => {
+  const persistUpdate = useCallback(async (updatedEvents: Event[]) => {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -32,7 +32,7 @@ export function useDebouncedItinerary(initialData: ItineraryModel, delay: number
 
       if (!response.ok) throw new Error('Failed to update itinerary');
 
-      const serverResult: ItineraryModel = await response.json();
+      const serverResult: Itinerary = await response.json();
       
       // Update local state with server-side validation results (is_conflict, errors)
       setItinerary(serverResult);
@@ -69,7 +69,7 @@ export function useDebouncedItinerary(initialData: ItineraryModel, delay: number
    * Use this function in your UI components (Gantt/Timeline) to 
    * update specific event details or positions.
    */
-  const updateEvents = (newEvents: EventModel[]) => {
+  const updateEvents = (newEvents: Event[]) => {
     setItinerary(prev => ({
       ...prev,
       events: newEvents

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Event, UserProfile } from '@/types/models';
+import { Event, UserProfile } from '@/types';
 import { AlertCircle, ArrowLeftRight, Banknote } from 'lucide-react';
 import { BUDGET_CONFIG } from '@/config/constants';
 
