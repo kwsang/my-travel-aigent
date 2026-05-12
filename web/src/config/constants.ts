@@ -19,7 +19,6 @@ export const PROFILE_OPTIONS = {
   CIRCADIAN_PREFERENCES: [
     { value: 'night_owl', label: 'Night Owl' },
     { value: 'early_bird', label: 'Early Bird' },
-    { value: 'morning_person', label: 'Morning Person' },
   ],
   TRANSPORT_OPTIONS: [
     { value: 'public', label: 'Public Transit' },
