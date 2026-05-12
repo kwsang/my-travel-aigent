@@ -1,132 +1,15 @@
 import os
 import logging
-import json
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from typing import Any
-from fastapi import FastAPI, HTTPException, Body, Depends, Security
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
-from google.genai import types
-from google.adk.events.event import Event
 from google.adk.runners import Runner
 from gemini_agent.clients import MONGODB_URI
-from google.adk.sessions import BaseSessionService
-from google.adk.sessions.session import Session
-from google.adk.sessions.base_session_service import ListSessionsResponse
+from api.services.session_service import MongoDBSessionService
+from api.routes import chat, itinerary
 
-class MongoDBSessionService(BaseSessionService):
-    def __init__(self, uri, db_name, collection_name):
-        super().__init__()
-        self.client = AsyncIOMotorClient(uri)
-        self.collection = self.client[db_name][collection_name]
-
-    async def get_session(self, *, app_name: str, user_id: str, session_id: str, config: Any = None):
-        logger.info(f"Fetching session: user={user_id}, session={session_id}")
-        doc = await self.collection.find_one({"user_id": user_id, "session_id": session_id, "app_name": app_name})
-        if not doc:
-            logger.info(f"No session found for {session_id}")
-            return None
-        
-        # Ensure state is a dictionary even if persisted as a JSON string
-        state = doc["data"].get("state", {})
-        if isinstance(state, str):
-            try:
-                state = json.loads(state)
-            except Exception as e:
-                logger.warning(f"Failed to parse stringified state: {e}")
-                state = {}
-        
-        # Reconstruct Event objects for conversation history
-        raw_history = doc["data"].get("history", [])
-        history = []
-        for e_dict in raw_history:
-            history.append(Event.model_validate(e_dict))
-
-        # Reconstruct the Session object from the persisted dictionary
-        logger.debug(f"Session state keys found: {list(state.keys())}")
-        return Session(
-            id=session_id,
-            app_name=app_name,
-            user_id=user_id,
-            state=state,
-            events=history
-        )
-
-    async def create_session(self, *, app_name: str, user_id: str, state: dict[str, Any] | None = None, session_id: str | None = None) -> Session:
-        session_id = session_id or f"sess_{datetime.now().timestamp()}"
-        await self.collection.insert_one({
-            "user_id": user_id,
-            "session_id": session_id,
-            "app_name": app_name,
-            "data": {"state": state or {}},
-            "updated_at": datetime.now(timezone.utc)
-        })
-        return Session(
-            id=session_id, 
-            user_id=user_id, 
-            app_name=app_name, 
-            state=state or {},
-            events=[] # Explicitly initialize events to avoid context mapping errors
-        )
-
-    async def append_event(self, session: Session, event: Any) -> Any:
-        """
-        Standard ADK persistence hook. 
-        Saves the updated session state to MongoDB whenever an event occurs.
-        """
-        if event.partial:
-            return event
-
-        # 1. Update the in-memory session object using ADK logic
-        await super().append_event(session, event)
-        
-        # 2. Persist the current state to MongoDB
-        history_json = [e.model_dump(mode='json') for e in session.events]
-        await self.collection.update_one(
-            {"user_id": session.user_id, "session_id": session.id, "app_name": session.app_name},
-            {"$set": {
-                "data": {"state": session.state, "history": history_json},
-                "updated_at": datetime.now(timezone.utc)
-            }},
-            upsert=True
-        )
-        return event
-
-    async def delete_session(self, *, app_name: str, user_id: str, session_id: str):
-        await self.collection.delete_one({"user_id": user_id, "session_id": session_id, "app_name": app_name})
-
-    async def list_sessions(self, *, app_name: str, user_id: str | None = None) -> ListSessionsResponse:
-        """Retrieves a list of all session IDs for the given user and application."""
-        query = {"app_name": app_name}
-        if user_id:
-            query["user_id"] = user_id
-            
-        cursor = self.collection.find(query, {"session_id": 1, "user_id": 1, "data": 1, "_id": 0})
-        sessions = []
-        async for doc in cursor:
-            state = doc["data"].get("state", {})
-            if isinstance(state, str):
-                try: state = json.loads(state)
-                except: state = {}
-
-            sessions.append(Session(
-                id=doc["session_id"],
-                user_id=doc["user_id"],
-                app_name=app_name,
-                state=state
-            ))
-        return ListSessionsResponse(sessions=sessions)
-
-from gemini_agent.logic.models import (
-    ItineraryPatchRequest, ItineraryModel, ChatRequest, ChatResponse
-)
-from gemini_agent.logic.validate_buffers import (
-    validate_itinerary_structure, 
-    validate_itinerary_budget
-)
 from gemini_agent import agent_definition
 from dotenv import load_dotenv
 
@@ -153,6 +36,12 @@ runner = Runner(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize shared MongoDB database
+    client = AsyncIOMotorClient(MONGODB_URI)
+    app.state.db = client["my-travel-aigent"]
+    # Initialize global runner
+    app.state.runner = runner
+
     # Ensure TTL index on the session collection for automatic cleanup (30-day retention)
     try:
         sync_client = MongoClient(MONGODB_URI)
@@ -192,22 +81,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Set auto_error=False to allow unauthenticated users to use session-based identity
-security = HTTPBearer(auto_error=False)
-
-async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Security(security)):
-    """
-    Security dependency to validate JWTs.
-    Returns the raw token string if present, otherwise None.
-    """
-    if credentials:
-        return credentials.credentials
-    return None
-
-# MongoDB Setup
-client = AsyncIOMotorClient(MONGODB_URI)
-# Assumes the database name matches your implementation plan
-db = client["my-travel-aigent"]
+# Include split routes
+app.include_router(chat.router)
+app.include_router(itinerary.router)
 
 @app.get("/", tags=["system"])
 async def root():
@@ -221,9 +97,10 @@ async def health_check():
     Returns 503 if critical services are unreachable.
     """
     health_report = {"mongodb": "offline", "agent_app": "offline"}
+    db_client = getattr(app.state, "db", None)
     try:
-        # Perform a low-latency ping to the MongoDB cluster
-        await client.admin.command('ping')
+        if db_client:
+            await db_client.client.admin.command('ping')
         health_report["mongodb"] = "online"
     except Exception as e:
         logger.error(f"Health Check: MongoDB connection error: {e}")
