@@ -26,7 +26,8 @@ async def get_user_profile(user_id: str, db: AsyncIOMotorDatabase = Depends(get_
                 "personal_transport_available": False
             },
             "room_sharing": False,
-            "people_per_room": 2
+            "people_per_room": 2,
+            "interests": []
         }
     
     profile["_id"] = str(profile["_id"])

@@ -26,7 +26,9 @@ export const PROFILE_OPTIONS = {
     { value: 'rideshare', label: 'Rideshare' },
     { value: 'rental', label: 'Rental Car' },
   ],
-  SUPPORTED_CURRENCIES: ['USD', 'EUR', 'GBP', 'JPY', 'CAD'],
+  TRAVEL_INTERESTS: [
+    'Nature', 'Culture', 'Food', 'Adventure', 'Relaxation', 'Shopping', 'History', 'Art', 'Nightlife', 'Sports'
+  ],
 };
 
 export const API_CONFIG = {

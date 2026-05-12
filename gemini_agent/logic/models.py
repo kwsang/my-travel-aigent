@@ -47,6 +47,7 @@ class UserProfileModel(BaseModel):
     preferences: UserProfilePreferencesModel
     room_sharing: bool = Field(default=False)
     people_per_room: int = Field(default=2)
+    interests: List[str] = Field(default_factory=list)
 
 class ProfileUpdateRequest(BaseModel):
     """Schema for updating a user profile from the UI."""
@@ -56,6 +57,7 @@ class ProfileUpdateRequest(BaseModel):
     room_sharing: Optional[bool] = None
     people_per_room: Optional[int] = None
     group_planning_per_person: Optional[bool] = None
+    interests: Optional[List[str]] = None
 
 class EventModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

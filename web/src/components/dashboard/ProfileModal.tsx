@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel, Bus, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel, Bus, Zap, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 
@@ -20,7 +20,7 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
     people_per_room: initialData?.people_per_room || 2,
     budget: {
       total_limit: initialData?.budget?.total_limit || 0,
-      currency: initialData?.budget?.currency || 'USD'
+      currency: 'USD'
     },
     preferences: {
       risk_tolerance: initialData?.preferences?.risk_tolerance || 'relaxed',
@@ -28,7 +28,8 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
       group_planning_per_person: initialData?.preferences?.group_planning_per_person || false,
       transport_preference: initialData?.preferences?.transport_preference || 'public',
       personal_transport_available: initialData?.preferences?.personal_transport_available || false
-    }
+    },
+    interests: initialData?.interests || []
   });
   const [isFetching, setIsFetching] = useState(!initialData);
   const [isSaving, setIsLoading] = useState(false);
@@ -45,14 +46,15 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
             party_size: data.party_size || 1,
             room_sharing: data.room_sharing || false,
             people_per_room: data.people_per_room || 2,
-            budget: data.budget || { total_limit: 0, currency: 'USD' },
+            budget: { total_limit: data.budget?.total_limit || 0, currency: 'USD' },
             preferences: data.preferences || { 
               risk_tolerance: 'relaxed', 
               circadian_preference: 'night_owl',
               group_planning_per_person: false,
               transport_preference: 'public',
               personal_transport_available: false
-            }
+            },
+            interests: data.interests || []
           });
         }
       } catch (e) {
@@ -63,6 +65,15 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
     };
     fetchProfile();
   }, [userId, initialData]);
+
+  const toggleInterest = (interest: string) => {
+    setFormData(prev => ({
+      ...prev,
+      interests: prev.interests.includes(interest)
+        ? prev.interests.filter(i => i !== interest)
+        : [...prev.interests, interest]
+    }));
+  };
 
   const handleSave = async () => {
     setIsLoading(true);
@@ -95,14 +106,42 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
         </button>
 
         <div className="mb-8">
-          <div className="flex justify-between items-end">
+          <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-white text-white-outline tracking-tight">Traveler Profile</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {page === 1 ? "Step 1: Group & Budget" : "Step 2: Style & Transit"}
               </p>
             </div>
-            <span className="text-xs font-bold text-primary mb-1">PAGE {page}/2</span>
+            {/* Progress Ring */}
+            <div className="relative w-12 h-12">
+              <svg className="w-full h-full" viewBox="0 0 100 100">
+                {/* Background circle */}
+                <circle
+                  className="text-white/10 stroke-current"
+                  strokeWidth="8"
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="transparent"
+                ></circle>
+                {/* Progress circle */}
+                <circle
+                  className="text-primary progress-ring-circle stroke-current"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="transparent"
+                  strokeDasharray={`${page === 1 ? 50 * 2.51 : 100 * 2.51}, 251.2`} /* 2 * PI * R = 251.2 */
+                  strokeDashoffset="0"
+                ></circle>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-sm font-bold text-primary">{page * 50}%</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -144,6 +183,27 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
             </div>
           </div>
 
+          <div className="space-y-3">
+            <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Sparkles size={14} /> Interests
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {PROFILE_OPTIONS.TRAVEL_INTERESTS.map(interest => (
+                <button
+                  key={interest}
+                  onClick={() => toggleInterest(interest)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    formData.interests.includes(interest)
+                      ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20'
+                      : 'border-white/10 bg-white/5 text-muted-foreground hover:border-primary/50'
+                  }`}
+                >
+                  {interest}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
             <input 
               type="checkbox"
@@ -162,19 +222,28 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
               {/* Style & Preferences */}
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-              <Wallet size={14} /> Total Budget
+              <Wallet size={14} /> Total Budget (USD)
             </label>
-            <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+            <div className="space-y-4">
               <input 
-                type="checkbox"
-                id="group_planning"
-                checked={formData.preferences.group_planning_per_person}
-                onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, group_planning_per_person: e.target.checked}})}
-                className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
+                type="number"
+                value={formData.budget.total_limit}
+                onChange={(e) => setFormData({...formData, budget: {...formData.budget, total_limit: parseInt(e.target.value) || 0}})}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                placeholder="e.g. 5000"
               />
-              <label htmlFor="group_planning" className="text-sm font-medium text-white cursor-pointer select-none">
-                Plan budget on a per-person basis?
-              </label>
+              <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                <input 
+                  type="checkbox"
+                  id="group_planning"
+                  checked={formData.preferences.group_planning_per_person}
+                  onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, group_planning_per_person: e.target.checked}})}
+                  className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
+                />
+                <label htmlFor="group_planning" className="text-sm font-medium text-white cursor-pointer select-none">
+                  Plan budget on a per-person basis?
+                </label>
+              </div>
             </div>
           </div>
 
