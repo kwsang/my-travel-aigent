@@ -121,7 +121,7 @@ export default function ChatInterface({ sessionId, onMessageReceived }: ChatInte
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Adjust itinerary..."
-          className="flex-1 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+          className="flex-1 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-white-outline placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
           disabled={isLoading}
         />
         <button type="submit" disabled={isLoading || !input.trim()} className="bg-primary text-primary-foreground p-2 rounded-xl hover:brightness-110 disabled:opacity-30 transition-all active:scale-95 shadow-lg shadow-primary/20">

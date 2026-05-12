@@ -1,10 +1,12 @@
 import json
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from google.genai import types
 from google.adk.runners import Runner
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from api.dependencies import get_current_user, get_runner
+from api.dependencies import get_current_user, get_runner, get_db
 from gemini_agent.logic.models import ChatRequest, ChatResponse
 from gemini_agent.logic.validate_buffers import (
     validate_itinerary_structure, 
@@ -18,7 +20,8 @@ router = APIRouter(tags=["chat"])
 async def chat(
     request: ChatRequest,
     auth_user_id: str | None = Depends(get_current_user),
-    runner: Runner = Depends(get_runner)
+    runner: Runner = Depends(get_runner),
+    db: AsyncIOMotorDatabase = Depends(get_db)
 ):
     """
     Main entry point for the agent conversation.
@@ -63,6 +66,37 @@ async def chat(
             if isinstance(user_profile, str):
                 try: user_profile = json.loads(user_profile)
                 except: pass
+             # Sync the extracted state to the materialized collections
+            # This ensures the visual dashboard can find the latest plans
+            if isinstance(itinerary, dict):
+                # Extract party size: try itinerary first, then profile, then default 1
+                party_size = itinerary.get("party_size_total")
+                if party_size is None and isinstance(user_profile, dict):
+                    party_size = user_profile.get("party_size")
+
+                await db.itineraries.update_one(
+                    {"session_id": request.session_id, "user_id": user_id},
+                    {"$set": {
+                        "session_id": request.session_id,
+                        "user_id": user_id,
+                        "events": itinerary.get("events", []),
+                        "trip_name": itinerary.get("trip_name", "Your Trip"),
+                        "duration_days": itinerary.get("duration_days", 0),
+                        "party_size_total": party_size or 1,
+                        "updated_at": datetime.now(timezone.utc)
+                    }},
+                    upsert=True
+                )
+
+            if isinstance(user_profile, dict):
+                await db.user_profiles.update_one(
+                    {"user_id": user_id},
+                    {"$set": {
+                        **user_profile, 
+                        "updated_at": datetime.now(timezone.utc)
+                    }},
+                    upsert=True
+                )
 
             if isinstance(itinerary, dict) and isinstance(user_profile, dict):
                 prefs = user_profile.get("preferences", {})

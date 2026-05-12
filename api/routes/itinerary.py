@@ -29,10 +29,20 @@ async def get_itinerary(
         )
 
         if not itinerary_doc:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Itinerary for session '{session_id}' not found."
-            )
+            # Resilience: If no materialized doc exists, return an empty skeleton.
+            # This prevents 404s on the frontend before the agent has created a plan.
+            return {
+                "session_id": session_id,
+                "user_id": identity,
+                "events": [],
+                "trip_name": "New Trip",
+                "duration_days": 0,
+                "party_size_total": 1,
+                "is_conflict": False,
+                "validation_errors": [],
+                "user_profile_data": None,
+                "updated_at": datetime.now(timezone.utc)
+            }
 
         user_profile = await db.user_profiles.find_one({"user_id": itinerary_doc["user_id"]})
         
@@ -50,6 +60,8 @@ async def get_itinerary(
             all_errors = struct_errors + budget_errors
             is_conflict = len(all_errors) > 0
 
+        itinerary_doc.setdefault("duration_days", 0)
+        itinerary_doc.setdefault("party_size_total", user_profile.get("party_size", 1) if user_profile else 1)
         itinerary_doc["_id"] = str(itinerary_doc["_id"])
         itinerary_doc["is_conflict"] = is_conflict
         itinerary_doc["validation_errors"] = all_errors
@@ -99,6 +111,8 @@ async def update_itinerary(
             {"$set": {"events": proposed_events, "updated_at": update_time}}
         )
 
+        itinerary_doc.setdefault("duration_days", 0)
+        itinerary_doc.setdefault("party_size_total", user_profile.get("party_size", 1) if user_profile else 1)
         itinerary_doc["events"] = proposed_events
         itinerary_doc["is_conflict"] = is_conflict
         itinerary_doc["validation_errors"] = all_errors

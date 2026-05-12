@@ -138,3 +138,12 @@
 .markdown-content ol {
   @apply list-decimal ml-4 mb-2;
 }
+
+/* Accessibility: Black outline for white text */
+.text-white-outline {
+  text-shadow: 
+    -1px -1px 0 #000,  
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
+}
