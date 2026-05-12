@@ -1,0 +1,77 @@
+'use client';
+
+import React from 'react';
+import { Event, UserProfile } from '@/types/models';
+import { AlertCircle, ArrowLeftRight, Banknote } from 'lucide-react';
+
+interface BudgetPanelProps {
+  segments: Event[];
+  budget?: UserProfile['budget'];
+  viewMode: 'total' | 'per_person';
+  partySize: number;
+  onToggleMode: () => void;
+}
+
+export default function BudgetPanel({
+  segments,
+  budget,
+  viewMode,
+  partySize,
+  onToggleMode,
+}: BudgetPanelProps) {
+  const totalCost = segments.reduce((acc, s) => acc + (s.details.price?.amount || 0), 0);
+  const limit = budget?.amount || 0;
+  const currency = budget?.currency || 'USD';
+
+  const percentage = limit > 0 ? (totalCost / limit) * 100 : 0;
+  const isOverThreshold = percentage >= 90;
+
+  const displayTotal = viewMode === 'total' ? totalCost : totalCost / Math.max(1, partySize);
+  const displayLimit = viewMode === 'total' ? limit : limit / Math.max(1, partySize);
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onToggleMode}
+          className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-tight text-slate-600 transition-colors hover:bg-slate-200"
+        >
+          <ArrowLeftRight className="w-3 h-3" />
+          {viewMode === 'total' ? 'Show Per Person' : 'Show Total Trip'}
+        </button>
+        
+        <div className="text-right">
+          <div className="flex items-center justify-end gap-1 font-mono text-lg font-bold">
+            <Banknote className={`w-5 h-5 mr-1 ${isOverThreshold ? 'text-amber-600' : 'text-slate-400'}`} />
+            <span className={isOverThreshold ? 'text-amber-600' : 'text-slate-900'}>
+              {currency} {displayTotal.toLocaleString()}
+            </span>
+            {limit > 0 && (
+              <span className="text-slate-400 font-medium mx-1">/</span>
+            )}
+            {limit > 0 && (
+              <span className="text-slate-500 text-sm">
+                {currency} {displayLimit.toLocaleString()}
+              </span>
+            )}
+          </div>
+          {limit > 0 && (
+            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                style={{ width: `${Math.min(100, percentage)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isOverThreshold && (
+        <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-amber-700 border border-amber-100">
+          <AlertCircle className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-semibold italic">90% Budget Warning: Limit Approaching</span>
+        </div>
+      )}
+    </div>
+  );
+}

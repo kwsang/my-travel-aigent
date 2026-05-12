@@ -28,6 +28,22 @@ class EventDetails(BaseModel):
     is_rental: bool = Field(default=False, description="True if this is a rental car segment.")
     vehicle_count: int = Field(default=1, description="Number of vehicles for large groups.")
 
+class UserProfilePreferencesModel(BaseModel):
+    risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')
+    circadian_preference: Literal['early_bird', 'night_owl'] = Field(default='night_owl')
+    group_planning_per_person: bool = Field(default=False)
+
+class UserProfileBudgetModel(BaseModel):
+    total_limit: float
+    currency: str = Field(default="USD")
+
+class UserProfileModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    user_id: str
+    party_size: int = Field(default=1)
+    budget: UserProfileBudgetModel
+    preferences: UserProfilePreferencesModel
+
 class EventModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     day: int = Field(..., description="The sequential day of the trip (1-indexed).")
@@ -46,6 +62,7 @@ class ItineraryModel(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
+    user_profile_data: Optional[UserProfileModel] = None
 
 class ItineraryPatchRequest(BaseModel):
     events: List[EventModel] = Field(..., description="The complete set of updated events from the UI.")

@@ -405,8 +405,9 @@ async def update_itinerary(
         itinerary = {**itinerary_doc, "events": proposed_events}
 
         # 3. Re-validate using Phase 4 logic
-        risk = user_profile.get("risk_tolerance", "relaxed")
-        vibe = user_profile.get("circadian_preference", "night_owl")
+        prefs = user_profile.get("preferences", {})
+        risk = prefs.get("risk_tolerance", "relaxed")
+        vibe = prefs.get("circadian_preference", "night_owl")
 
         struct_errors = validate_itinerary_structure(itinerary, risk, vibe, user_profile)
         budget_ok, budget_errors = validate_itinerary_budget(itinerary, user_profile)
@@ -427,6 +428,7 @@ async def update_itinerary(
         itinerary_doc["is_conflict"] = is_conflict
         itinerary_doc["validation_errors"] = all_errors
         itinerary_doc["updated_at"] = update_time
+        itinerary_doc["user_profile_data"] = user_profile
         itinerary_doc["_id"] = str(itinerary_doc["_id"])
 
         return itinerary_doc
