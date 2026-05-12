@@ -11,7 +11,7 @@ import Navbar from '@/components/layout/Navbar';
 import { Itinerary } from '@/types/models';
 import { API_CONFIG } from '@/config/constants';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Clock, Search } from 'lucide-react';
+import { Plus, Clock, Search, Trash2 } from 'lucide-react';
 
 /**
  * The Visual Planning Dashboard
@@ -125,6 +125,26 @@ export default function DashboardPage() {
     setIsEditingName(false);
   };
 
+  const handleDeleteTrip = async (e: React.MouseEvent, sessId: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this trip and its history?")) return;
+    
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessId}?user_id=${visitorId}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        fetchList();
+        if (currentSessionId === sessId) {
+          handleNewTrip();
+        }
+        triggerToast('Trip deleted successfully.');
+      }
+    } catch (e) {
+      console.error("Dashboard: Delete failed", e);
+    }
+  };
+
   const triggerToast = (message: string) => {
     setToast({ show: true, message });
   };
@@ -198,17 +218,23 @@ export default function DashboardPage() {
                 </label>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                   {filteredItineraries.map((item) => (
-                    <button
+                    <div
                       key={item.session_id}
                       onClick={() => setCurrentSessionId(item.session_id)}
-                      className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                      className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all cursor-pointer flex items-center gap-2 group/item ${
                         currentSessionId === item.session_id
                           ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20'
                           : 'border-border bg-white/5 text-muted-foreground hover:border-primary/50'
                       }`}
                     >
                       {item.trip_name || 'Unnamed Trip'}
-                    </button>
+                      <button 
+                        onClick={(e) => handleDeleteTrip(e, item.session_id)}
+                        className="opacity-0 group-hover/item:opacity-100 hover:text-red-400 transition-all p-0.5"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

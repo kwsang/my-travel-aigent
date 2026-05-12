@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel, Bus, Zap, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
+import { ProfileFormData } from '@/types/profile';
 
 interface ProfileModalProps {
   userId: string;
@@ -14,7 +15,7 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ userId, initialData, onClose, onSave }: ProfileModalProps) {
   const [page, setPage] = useState(1);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProfileFormData>({
     party_size: initialData?.party_size || 1,
     room_sharing: initialData?.room_sharing || false,
     people_per_room: initialData?.people_per_room || 2,

@@ -17,6 +17,12 @@ def get_db(request: Request) -> AsyncIOMotorDatabase:
         raise HTTPException(status_code=500, detail="Database not initialized")
     return request.app.state.db
 
+def get_session_db(request: Request) -> AsyncIOMotorDatabase:
+    """Retrieves the Session MongoDB database instance from app state."""
+    if not hasattr(request.app.state, "session_db"):
+        raise HTTPException(status_code=500, detail="Session Database not initialized")
+    return request.app.state.session_db
+
 def get_runner(request: Request) -> Runner:
     """Retrieves the ADK Runner instance from app state."""
     if not hasattr(request.app.state, "runner"):

@@ -22,6 +22,7 @@ async def lifespan(app: FastAPI):
     # Initialize Database
     client = AsyncIOMotorClient(config.MONGODB_URL)
     app.state.db = client[config.DATABASE_NAME]
+    app.state.session_db = client[config.SESSION_DATABASE_NAME]
     app.state.runner = runner
 
     # Ensure TTL index for automatic cleanup

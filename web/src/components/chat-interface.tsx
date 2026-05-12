@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import ReactMarkdown from 'react-markdown';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, AlertTriangle } from 'lucide-react';
+import { ChatMessage } from '@/types';
 
 export function ChatInterface() {
   const { messages, sendMessage, isLoading } = useChat();
@@ -36,7 +37,7 @@ export function ChatInterface() {
       <CardContent className="flex-1 overflow-hidden p-4 bg-zinc-50/50 dark:bg-zinc-950/50">
         <ScrollArea className="h-full pr-4">
           <div className="space-y-4">
-            {messages.map((m, i) => (
+            {(messages as any[]).map((m: ChatMessage, i) => (
               <div
                 key={i}
                 className={`flex gap-3 ${
@@ -58,7 +59,7 @@ export function ChatInterface() {
                   )}
                   <div className="text-base leading-relaxed prose dark:prose-invert max-w-none prose-p:leading-relaxed prose-sm md:prose-base">
                     <ReactMarkdown>
-                      {m.text || ''}
+                      {m.content}
                     </ReactMarkdown>
                   </div>
                   {m.thought && (

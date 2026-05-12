@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from api.dependencies import get_current_user, get_db
+from api.dependencies import get_current_user, get_db, get_session_db
 from gemini_agent.logic.models import ItineraryModel, ItineraryPatchRequest
 from gemini_agent.logic.validate_buffers import (
     validate_itinerary_structure, 
@@ -189,3 +189,23 @@ async def update_itinerary(
     except Exception as e:
         logger.exception(f"CRITICAL: Unhandled exception in PATCH /itinerary/{session_id}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.delete("/{session_id}")
+async def delete_itinerary_route(
+    session_id: str,
+    user_id: str | None = None,
+    auth_user_id: str | None = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    session_db: AsyncIOMotorDatabase = Depends(get_session_db)
+):
+    """Delete a specific itinerary and its associated agent chat history."""
+    identity = auth_user_id or user_id or session_id
+    try:
+        # Clear materialized data
+        await db.itineraries.delete_one({"session_id": session_id, "user_id": identity})
+        # Clear agent memory
+        await session_db.sessions.delete_one({"session_id": session_id, "user_id": identity})
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error deleting itinerary {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during deletion.")

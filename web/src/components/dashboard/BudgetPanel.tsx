@@ -57,7 +57,7 @@ export default function BudgetPanel({
             )}
           </div>
           {limit > 0 && (
-            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden">
+            <div className="w-full bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
               <div 
                 className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-amber-500' : 'bg-emerald-500'}`}
                 style={{ width: `${Math.min(100, percentage)}%` }}

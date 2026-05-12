@@ -5,11 +5,7 @@ import { Send, User, Bot, Loader2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import { API_CONFIG } from '@/config/constants';
-
-interface Message {
-  role: 'user' | 'agent';
-  content: string;
-}
+import { ChatMessage } from '@/types'; // Import ChatMessage from shared types
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -23,7 +19,7 @@ interface ChatInterfaceProps {
  * Receives a session ID from the parent dashboard to sync data.
  */
 export default function ChatInterface({ sessionId, userId, onMessageReceived }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { 
       role: 'agent', 
       content: "Hello! I'm your Travel AIgent. I can help you refine this itinerary or suggest new experiences. What's on your mind?" 
@@ -114,24 +110,24 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
 
       {/* Messages Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth">
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+        {messages.map((m: ChatMessage, i) => (
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex gap-3 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
               <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                msg.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-white/10 text-foreground'
+                m.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-white/10 text-foreground'
               }`}>
-                {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
+                {m.role === 'user' ? <User size={14} /> : <Bot size={14} />}
               </div>
               <div className={`p-3 rounded-2xl text-sm shadow-sm leading-relaxed ${
-                msg.role === 'user' 
+                m.role === 'user' 
                   ? 'bg-primary text-primary-foreground rounded-tr-none font-medium' 
                   : 'bg-white/5 border border-white/10 text-foreground rounded-tl-none backdrop-blur-sm'
               }`}>
-                {msg.role === 'agent' ? (
+                {m.role === 'agent' ? (
                   <div className="markdown-content">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown>{m.content}</ReactMarkdown>
                   </div>
-                ) : msg.content}
+                ) : m.content}
               </div>
             </div>
           </div>
