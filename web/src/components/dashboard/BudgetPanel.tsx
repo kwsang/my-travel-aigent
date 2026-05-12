@@ -35,7 +35,7 @@ export default function BudgetPanel({
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleMode}
-          className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-tight text-slate-600 transition-colors hover:bg-slate-200"
+          className="flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold uppercase tracking-tight text-muted-foreground transition-colors hover:bg-white/10"
         >
           <ArrowLeftRight className="w-3 h-3" />
           {viewMode === 'total' ? 'Show Per Person' : 'Show Total Trip'}
@@ -70,7 +70,7 @@ export default function BudgetPanel({
       {isOverThreshold && (
         <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-amber-700 border border-amber-100">
           <AlertCircle className="w-3.5 h-3.5" />
-          <span className="text-[11px] font-semibold italic">{BUDGET_CONFIG.WARNING_THRESHOLD}% Budget Warning: Limit Approaching</span>
+          <span className="text-xs font-semibold italic">{BUDGET_CONFIG.WARNING_THRESHOLD}% Budget Warning: Limit Approaching</span>
         </div>
       )}
     </div>

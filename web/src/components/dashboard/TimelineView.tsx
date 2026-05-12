@@ -66,21 +66,21 @@ export default function TimelineView({
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex flex-col gap-1">
-                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         {React.createElement(SegmentIcons[event.segment] || DefaultIcon, {
                           className: 'w-3 h-3',
                         })}
                         {event.segment.replace('_', ' ')}
                       </span>
                       <h4 className="font-semibold text-foreground">{event.details.name}</h4>
-                      <p className="text-xs text-muted-foreground">{event.details.category} • {event.details.city}</p>
+                      <p className="text-sm text-muted-foreground">{event.details.category} • {event.details.city}</p>
                     </div>
                     <div className="text-right">
                       <time className="text-sm font-semibold text-foreground/80">
                         {event.schedule.local_start_time}
                       </time>
                       {event.details.price && (
-                        <p className="text-xs font-bold text-emerald-600">
+                        <p className="text-sm font-bold text-emerald-600">
                           {event.details.price.currency}{' '}
                           {viewMode === 'total'
                             ? event.details.price.amount.toLocaleString()
@@ -91,7 +91,7 @@ export default function TimelineView({
                   </div>
                   {/* Indication for the Retreat Rule (from ARCHITECT_PROMPT logic) */}
                   {riskTolerance === 'relaxed' && event.details.name.toLowerCase().includes('retreat') && (
-                    <div className="mt-3 rounded-md bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase text-amber-600 border border-amber-100">
+                    <div className="mt-3 rounded-md bg-amber-50 px-2 py-1 text-xs font-bold uppercase text-amber-600 border border-amber-100">
                       Mandatory Retreat Block (16:00 - 18:30)
                     </div>
                   )}

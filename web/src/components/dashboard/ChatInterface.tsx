@@ -13,6 +13,7 @@ interface Message {
 
 interface ChatInterfaceProps {
   sessionId: string;
+  userId?: string;
   onMessageReceived?: () => void;
 }
 
@@ -21,7 +22,7 @@ interface ChatInterfaceProps {
  * Replaces the ArchitectOverlay to provide direct conversation with the Gemini agent.
  * Receives a session ID from the parent dashboard to sync data.
  */
-export default function ChatInterface({ sessionId, onMessageReceived }: ChatInterfaceProps) {
+export default function ChatInterface({ sessionId, userId, onMessageReceived }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: 'agent', 
@@ -31,6 +32,34 @@ export default function ChatInterface({ sessionId, onMessageReceived }: ChatInte
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Fetch history when session changes
+  useEffect(() => {
+    const loadHistory = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/chat/${sessionId}?user_id=${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.history && data.history.length > 0) {
+            setMessages(data.history);
+          } else {
+            // Default greeting for new sessions
+            setMessages([{ 
+              role: 'agent', 
+              content: "Hello! I'm your Travel AIgent. I can help you refine this itinerary or suggest new experiences. What's on your mind?" 
+            }]);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadHistory();
+  }, [sessionId, userId]);
 
   // Auto-scroll to bottom on new messages or loading state change
   useEffect(() => {
@@ -54,6 +83,7 @@ export default function ChatInterface({ sessionId, onMessageReceived }: ChatInte
         body: JSON.stringify({
           message: userMessage,
           session_id: sessionId,
+          user_id: userId,
         }),
       });
 
@@ -92,7 +122,7 @@ export default function ChatInterface({ sessionId, onMessageReceived }: ChatInte
               }`}>
                 {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
               </div>
-              <div className={`p-3 rounded-2xl text-[13px] shadow-sm leading-relaxed ${
+              <div className={`p-3 rounded-2xl text-sm shadow-sm leading-relaxed ${
                 msg.role === 'user' 
                   ? 'bg-primary text-primary-foreground rounded-tr-none font-medium' 
                   : 'bg-white/5 border border-white/10 text-foreground rounded-tl-none backdrop-blur-sm'
@@ -109,7 +139,7 @@ export default function ChatInterface({ sessionId, onMessageReceived }: ChatInte
         {isLoading && (
           <div className="flex gap-2 items-center text-muted-foreground ml-1">
             <Loader2 size={14} className="animate-spin" />
-            <span className="text-[11px] italic">Thinking...</span>
+            <span className="text-xs italic">Thinking...</span>
           </div>
         )}
       </div>

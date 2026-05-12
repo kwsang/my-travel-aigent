@@ -2,9 +2,13 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Menu, X, Plane } from 'lucide-react';
+import { Menu, X, Plane, UserCircle } from 'lucide-react';
 
-export default function Navbar() {
+interface NavbarProps {
+  onEditProfile?: () => void;
+}
+
+export default function Navbar({ onEditProfile }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -22,6 +26,14 @@ export default function Navbar() {
 
           {/* Desktop Links */}
           <div className="hidden md:flex items-center gap-8">
+            {onEditProfile && (
+              <button 
+                onClick={onEditProfile}
+                className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
+              >
+                <UserCircle size={18} /> Profile
+              </button>
+            )}
             <Link href="/#features" className="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors">
               Features
             </Link>

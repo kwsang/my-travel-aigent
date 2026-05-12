@@ -27,7 +27,7 @@ async def chat(
     Main entry point for the agent conversation.
     Orchestrates the ADK Runner to process user input and return the agent's response.
     """
-    user_id = auth_user_id or request.user_id or f"anon_{request.session_id}"
+    user_id = auth_user_id or request.user_id or request.session_id
     logger.info(f"User: {user_id} | Session: {request.session_id} | Message: {request.message[:50]}...")
 
     try:
@@ -120,3 +120,34 @@ async def chat(
     except Exception as e:
         logger.exception("CRITICAL: Error in /chat endpoint")
         raise HTTPException(status_code=500, detail=f"Agent execution error: {str(e)}")
+
+@router.get("/chat/{session_id}")
+async def get_chat_history(
+    session_id: str,
+    user_id: str | None = None,
+    runner: Runner = Depends(get_runner)
+):
+    """Retrieve conversation history for a specific session."""
+    try:
+        identity = user_id or session_id
+        session = await runner.session_service.get_session(
+            app_name="my_travel_aigent",
+            user_id=identity,
+            session_id=session_id
+        )
+        
+        if not session or not session.events:
+            return {"history": []}
+
+        history = []
+        for event in session.events:
+            if event.content and event.content.parts:
+                role = "user" if event.content.role == "user" else "agent"
+                text = "".join([p.text for p in event.content.parts if p.text])
+                if text:
+                    history.append({"role": role, "content": text})
+        
+        return {"history": history}
+    except Exception as e:
+        logger.error(f"Error fetching chat history for session {session_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database connection error occurred while fetching history.")
