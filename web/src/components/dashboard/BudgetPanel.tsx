@@ -44,7 +44,7 @@ export default function BudgetPanel({
         <div className="text-right">
           <div className="flex items-center justify-end gap-1 font-mono text-lg font-bold">
             <Banknote className={`w-5 h-5 mr-1 ${isOverThreshold ? 'text-amber-600' : 'text-slate-400'}`} />
-            <span className={isOverThreshold ? 'text-amber-600' : 'text-slate-900'}>
+            <span className={`${isOverThreshold ? 'text-amber-600' : 'text-slate-900'} text-white-outline`}>
               {currency} {displayTotal.toLocaleString()}
             </span>
             {limit > 0 && (
