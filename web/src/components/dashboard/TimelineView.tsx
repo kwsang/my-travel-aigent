@@ -41,7 +41,7 @@ export default function TimelineView({
 
   if (segments.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 p-12 text-slate-400">
+      <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-12 text-muted-foreground">
         <p className="text-lg font-medium">Your timeline is empty.</p>
         <p className="text-sm">Tell the Architect what you want to do!</p>
       </div>
@@ -52,31 +52,31 @@ export default function TimelineView({
     <div className="flex flex-col gap-10 py-4">
       {days.map((day) => (
         <div key={day} className="flex flex-col gap-4">
-          <div className="sticky top-0 z-10 -mx-6 bg-slate-50/80 px-6 py-2 backdrop-blur-md">
-            <h2 className="text-lg font-bold text-slate-900">Day {day}</h2>
+          <div className="sticky top-0 z-10 -mx-6 bg-card/80 px-6 py-2 backdrop-blur-md border-y border-border/20">
+            <h2 className="text-lg font-bold text-foreground">Day {day}</h2>
           </div>
 
-          <div className="relative space-y-4 pl-6 border-l-2 border-slate-200">
+          <div className="relative space-y-4 pl-6 border-l-2 border-border">
             {segments
               .filter((s) => s.day === day)
               .map((event, idx) => (
                 <div
                   key={`${day}-${idx}`}
-                  className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md"
+                  className="relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex flex-col gap-1">
-                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         {React.createElement(SegmentIcons[event.segment] || DefaultIcon, {
                           className: 'w-3 h-3',
                         })}
                         {event.segment.replace('_', ' ')}
                       </span>
-                      <h4 className="font-semibold text-slate-800">{event.details.name}</h4>
-                      <p className="text-xs text-slate-500">{event.details.category} • {event.details.city}</p>
+                      <h4 className="font-semibold text-foreground">{event.details.name}</h4>
+                      <p className="text-xs text-muted-foreground">{event.details.category} • {event.details.city}</p>
                     </div>
                     <div className="text-right">
-                      <time className="text-sm font-semibold text-slate-600">
+                      <time className="text-sm font-semibold text-foreground/80">
                         {event.schedule.local_start_time}
                       </time>
                       {event.details.price && (
