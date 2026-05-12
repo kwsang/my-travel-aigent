@@ -8,7 +8,7 @@ interface BudgetPanelProps {
   segments: Event[];
   budget?: UserProfile['budget'];
   viewMode: 'total' | 'per_person';
-  partySize: number;
+  partySize?: number;
   onToggleMode: () => void;
 }
 
@@ -16,11 +16,11 @@ export default function BudgetPanel({
   segments,
   budget,
   viewMode,
-  partySize,
+  partySize = 1,
   onToggleMode,
 }: BudgetPanelProps) {
   const totalCost = segments.reduce((acc, s) => acc + (s.details.price?.amount || 0), 0);
-  const limit = budget?.amount || 0;
+  const limit = budget?.total_limit || 0;
   const currency = budget?.currency || 'USD';
 
   const percentage = limit > 0 ? (totalCost / limit) * 100 : 0;
