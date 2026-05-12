@@ -1,25 +1,21 @@
 'use client';
 
 import React from 'react';
-import { Event, UserProfile } from '@/types';
 import { AlertCircle, ArrowLeftRight, Banknote } from 'lucide-react';
 import { BUDGET_CONFIG } from '@/config/constants';
+import { useItinerary } from '@/context/ItineraryContext';
 
-interface BudgetPanelProps {
-  segments: Event[];
-  budget?: UserProfile['budget'];
-  viewMode: 'total' | 'per_person';
-  partySize?: number;
-  onToggleMode: () => void;
-}
+export default function BudgetPanel() {
+  const { itinerary, viewMode, setViewMode } = useItinerary();
 
-export default function BudgetPanel({
-  segments,
-  budget,
-  viewMode,
-  partySize = BUDGET_CONFIG.MIN_PARTY_SIZE,
-  onToggleMode,
-}: BudgetPanelProps) {
+  const segments = itinerary.events || [];
+  const budget = itinerary.user_profile_data?.budget;
+  const partySize = itinerary.user_profile_data?.party_size || BUDGET_CONFIG.MIN_PARTY_SIZE;
+
+  const onToggleMode = () => {
+    setViewMode((v) => (v === 'total' ? 'per_person' : 'total'));
+  };
+
   const totalCost = segments.reduce((acc, s) => acc + (s.details.price?.amount || 0), 0);
   const limit = budget?.total_limit || 0;
   const currency = budget?.currency || BUDGET_CONFIG.DEFAULT_CURRENCY;

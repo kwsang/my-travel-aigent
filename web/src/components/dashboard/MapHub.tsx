@@ -1,19 +1,19 @@
 'use client';
 
 import React from 'react';
-import { Event } from '@/types/models';
 import { Map as MapIcon } from 'lucide-react';
-
-interface MapHubProps {
-  segments: Event[];
-  isRelaxed: boolean;
-}
+import { useItinerary } from '@/context/ItineraryContext';
 
 /**
  * MapHub Component
  * Visualizes itinerary segments on a geographic workspace.
  */
-export default function MapHub({ segments, isRelaxed }: MapHubProps) {
+export default function MapHub() {
+  const { itinerary } = useItinerary();
+  
+  const segments = itinerary.events || [];
+  const isRelaxed = itinerary.user_profile_data?.preferences?.risk_tolerance === 'relaxed';
+
   return (
     <div className="relative h-full w-full bg-background overflow-hidden">
       {/* Mock Map Background */}

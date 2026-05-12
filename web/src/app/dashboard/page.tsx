@@ -12,13 +12,15 @@ import { Itinerary } from '@/types';
 import { API_CONFIG } from '@/config/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Clock, Search, Trash2 } from 'lucide-react';
+import { ItineraryContext } from '@/context/ItineraryContext';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 /**
  * The Visual Planning Dashboard
  * Entry point for ad-hoc travel planning with a fresh session.
  */
 export default function DashboardPage() {
-  const [viewMode, setViewMode] = useState<'total' | 'per_person'>('total');
+  const [viewMode, setViewMode] = useLocalStorage<'total' | 'per_person'>('travel_aigent_view_mode', 'total');
   const [currentSessionId, setCurrentSessionId] = useState<string>(() => uuidv4());
   
   // Persistent Visitor Identity. If not found, we use the first session ID.
@@ -76,7 +78,7 @@ export default function DashboardPage() {
   }, [visitorId]);
 
   const fetchItinerary = useCallback(async () => {
-    if (!currentSessionId) return;
+    if (!currentSessionId || !visitorId) return;
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`);
       if (response.ok) {
@@ -92,10 +94,17 @@ export default function DashboardPage() {
     }
   }, [currentSessionId, visitorId]);
 
-  useEffect(() => {
+  // Centralized dashboard update logic to ensure single points of refresh
+  const refreshDashboard = useCallback(() => {
     fetchItinerary();
     fetchList();
   }, [fetchItinerary, fetchList]);
+
+  useEffect(() => {
+    if (visitorId) {
+      refreshDashboard();
+    }
+  }, [refreshDashboard, visitorId]);
 
   const handleRename = async () => {
     if (!editedName.trim() || editedName === itinerary.trip_name) {
@@ -156,7 +165,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
+    <ItineraryContext.Provider value={{ itinerary, setItinerary, viewMode, setViewMode, refreshDashboard }}>
+      <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <Navbar 
         onEditProfile={() => setShowProfileModal(true)} 
         profileSetStatus={profileHasBeenSet} // Pass the status to Navbar
@@ -240,35 +250,21 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          <TimelineView 
-            segments={itinerary.events || []} 
-            viewMode={viewMode}
-            partySize={itinerary.user_profile_data?.party_size || 1}
-            riskTolerance={itinerary.user_profile_data?.preferences?.risk_tolerance}
-          />
+          <TimelineView />
         </div>
 
         {/* Main Content: Map and Budget */}
         <div className="relative flex-1 bg-background overflow-hidden">
           <div className="absolute top-6 right-6 z-20">
-            <BudgetPanel 
-              segments={itinerary.events || []}
-              budget={itinerary.user_profile_data?.budget}
-              viewMode={viewMode}
-              partySize={itinerary.user_profile_data?.party_size || 1}
-              onToggleMode={() => setViewMode(v => v === 'total' ? 'per_person' : 'total')}
-            />
+            <BudgetPanel />
           </div>
           
-          <MapHub 
-            segments={itinerary.events || []} 
-            isRelaxed={itinerary.user_profile_data?.preferences?.risk_tolerance === 'relaxed'} 
-          />
+          <MapHub />
 
           <ChatInterface 
             sessionId={currentSessionId}
             userId={visitorId}
-            onMessageReceived={() => { fetchItinerary(); fetchList(); }} 
+            onMessageReceived={refreshDashboard} 
           />
         </div>
       </main>
@@ -279,7 +275,7 @@ export default function DashboardPage() {
           initialData={itinerary.user_profile_data}
           onClose={() => setShowProfileModal(false)}
           onSave={() => {
-            fetchItinerary();
+            refreshDashboard();
             setProfileHasBeenSet(true); // Update status after saving
             triggerToast('Traveler profile updated successfully!');
           }}
@@ -293,5 +289,6 @@ export default function DashboardPage() {
         />
       )}
     </div>
+    </ItineraryContext.Provider>
   );
 }

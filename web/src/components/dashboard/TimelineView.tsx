@@ -1,14 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Event } from '@/types/models';
-
-interface TimelineViewProps {
-  segments: Event[];
-  riskTolerance?: 'relaxed' | 'strict';
-  viewMode: 'total' | 'per_person';
-  partySize?: number;
-}
+import { useItinerary } from '@/context/ItineraryContext';
 
 // Map segment types to Lucide icons
 import { Car, Utensils, Sparkles, Hotel, ClipboardList, Plane, LucideIcon } from 'lucide-react';
@@ -30,12 +23,13 @@ const DefaultIcon = Sparkles; // Fallback icon
  * Renders the itinerary segments in a chronological vertical list grouped by day.
  * Supports Phase 4 logic for risk tolerance buffers.
  */
-export default function TimelineView({
-  segments,
-  riskTolerance,
-  viewMode,
-  partySize = 1,
-}: TimelineViewProps) {
+export default function TimelineView() {
+  const { itinerary, viewMode } = useItinerary();
+  
+  const segments = itinerary.events || [];
+  const partySize = itinerary.user_profile_data?.party_size || 1;
+  const riskTolerance = itinerary.user_profile_data?.preferences?.risk_tolerance;
+
   // Extract unique days and sort them
   const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
 
