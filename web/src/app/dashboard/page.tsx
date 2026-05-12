@@ -50,6 +50,7 @@ export default function DashboardPage() {
     user_profile_data: undefined
   });
   const [isLoadingItinerary, setIsLoadingItinerary] = useState(true);
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
 
   // Sync editable name when the itinerary data loads
   useEffect(() => {
@@ -180,8 +181,10 @@ export default function DashboardPage() {
     refreshDashboard,
     sessionId: currentSessionId,
     userId: visitorId,
-    isLoading: isLoadingItinerary
-  }), [itinerary, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoadingItinerary]);
+    isLoading: isLoadingItinerary,
+    activeSegmentIndex,
+    setActiveSegmentIndex
+  }), [itinerary, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoadingItinerary, activeSegmentIndex]);
 
   return (
     <ItineraryContext.Provider value={contextValue}>

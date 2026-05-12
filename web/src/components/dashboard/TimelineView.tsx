@@ -25,10 +25,20 @@ const DefaultIcon = Sparkles; // Fallback icon
  * Supports Phase 4 logic for risk tolerance buffers.
  */
 export default function TimelineView() {
-  const { viewMode, setItinerary, sessionId, userId, segments, partySize, riskTolerance } = useItineraryData();
+  const { viewMode, setItinerary, sessionId, userId, segments, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex } = useItineraryData();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
+  // Auto-scroll the timeline to the focused segment when a map marker is clicked
+  React.useEffect(() => {
+    if (activeSegmentIndex !== null) {
+      const element = document.getElementById(`timeline-item-${activeSegmentIndex}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [activeSegmentIndex]);
+
   // Extract unique days and sort them
   const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
 
@@ -121,6 +131,7 @@ export default function TimelineView() {
               .filter(({ event }) => event.day === day)
               .map(({ event, absoluteIndex }) => (
                 <div
+                  id={`timeline-item-${absoluteIndex}`}
                   key={`${day}-${absoluteIndex}`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, absoluteIndex)}
@@ -129,9 +140,10 @@ export default function TimelineView() {
                     e.stopPropagation(); // Prevent fallback drop zone from firing
                     handleDrop(e, absoluteIndex, day);
                   }}
-                  className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card group ${
+                  onClick={() => setActiveSegmentIndex(absoluteIndex)}
+                  className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card cursor-pointer group ${
                     draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
-                  } ${isSyncing ? 'cursor-wait' : 'cursor-grab active:cursor-grabbing'}`}
+                  } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''} ${isSyncing ? 'cursor-wait' : 'active:cursor-grabbing'}`}
                 >
                   <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
                     <GripVertical size={14} />

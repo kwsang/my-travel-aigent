@@ -2,6 +2,11 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timezone
 
+class GeoCoordinates(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    latitude: float = Field(..., description="The latitude coordinate.")
+    longitude: float = Field(..., description="The longitude coordinate.")
+
 class Price(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     amount: float = Field(..., description="The numeric cost of the segment.")
@@ -24,6 +29,7 @@ class EventDetails(BaseModel):
     category: str = Field(..., description="Broad category (e.g., Museum, Fine Dining).")
     city: Optional[str] = Field(None, description="Primary city for clustering logic.")
     travel_zone: Optional[str] = Field(None, description="Micro-location zone within a city.")
+    geo: Optional[GeoCoordinates] = Field(None, description="Geographic coordinates of the venue or location.")
     price: Optional[Price] = None
     is_rental: bool = Field(default=False, description="True if this is a rental car segment.")
     vehicle_count: int = Field(default=1, description="Number of vehicles for large groups.")
@@ -64,6 +70,7 @@ class Event(BaseModel):
     day: int = Field(..., description="The sequential day of the trip (1-indexed).")
     segment: Literal["TRANSPORT", "DINING", "EXPERIENCE", "ACCOMMODATION", "LOGISTICS", "FLIGHT"] = Field(..., description="The logistical segment type.")
     schedule: Schedule
+    geo: Optional[GeoCoordinates] = Field(None, description="Optional root-level coordinates for transit origins/destinations.")
     details: EventDetails
 
 class Itinerary(BaseModel):

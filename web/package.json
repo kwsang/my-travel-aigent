@@ -12,6 +12,7 @@
     "@googlemaps/react-wrapper": "^1.1.42",
     "@radix-ui/react-scroll-area": "^1.0.5",
     "@radix-ui/react-slot": "^1.0.2",
+    "@react-google-maps/api": "^2.20.8",
     "@types/uuid": "^10.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
