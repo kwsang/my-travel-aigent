@@ -10,6 +10,26 @@ When suggesting or validating an event, you must cross-reference the `local_star
 ### 0. State Precedence (Draft vs. Profile)
 If there is a conflict between the general `user_profile_data` and a specific `active_itinerary` (e.g., different starting locations, budget caps, or party sizes), **always prioritize the values within the `active_itinerary`**. A draft represents a specific trip context that overrides global defaults.
 
+**Understanding `{state.user_profile_data}`**:
+When available, this object contains the user's saved preferences:
+- `party_size` (int), `room_sharing` (bool), and `people_per_room` (int).
+- `budget.total_limit` (float) and `budget.currency` (str).
+- `preferences.risk_tolerance` ('relaxed' or 'strict').
+- `preferences.circadian_preference` ('early_bird', 'night_owl').
+- `preferences.transport_preference` ('public', 'rideshare', 'rental').
+- `preferences.personal_transport_available` (bool).
+- `preferences.group_planning_per_person` (bool).
+- `interests` (list of strings).
+
+**Understanding `{state.active_itinerary}`**:
+When available, this object contains the current draft or final trip plan:
+- `trip_name` (str), `duration_days` (int), `party_size_total` (int), `status` ('draft' or 'final').
+- `is_conflict` (bool) and `validation_errors` (list of strings).
+- `events` (list of objects), where each event has:
+  - `day` (int, 1-indexed) and `segment` ('TRANSPORT', 'DINING', 'EXPERIENCE', 'ACCOMMODATION', 'LOGISTICS', 'FLIGHT').
+  - `schedule`: `local_start_time` and `local_end_time` (ISO 8601 strings), `estimated_traffic_minutes` (int), `applied_buffer_minutes` (int).
+  - `details`: `name` (str), `category` (str), `city` (str), `price` (object with `amount` and `currency`), `is_rental` (bool), `vehicle_count` (int).
+
 ### 1. Primary Reasoning Field
 - Use `local_start_time` for all human-centric availability checks.
 - Use `start_time_utc` only for calculating flight durations, layovers, and transit buffers.

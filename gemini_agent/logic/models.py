@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timezone
 
@@ -30,7 +30,7 @@ class EventDetails(BaseModel):
 
 class UserProfilePreferences(BaseModel):
     risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')
-    circadian_preference: Literal['early_bird', 'night_owl', 'morning_person'] = Field(default='night_owl')
+    circadian_preference: Literal['early_bird', 'night_owl'] = Field(default='night_owl')
     group_planning_per_person: bool = Field(default=False)
     transport_preference: Literal['public', 'rideshare', 'rental'] = Field(default='public')
     personal_transport_available: bool = Field(default=False)
@@ -79,6 +79,13 @@ class Itinerary(BaseModel):
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
     user_profile_data: Optional[UserProfile] = None
+
+    @field_validator('updated_at', mode='before')
+    @classmethod
+    def serialize_datetime(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
 
 class ItineraryPatchRequest(BaseModel):
     events: Optional[List[Event]] = Field(None, description="Updated events from the UI.")

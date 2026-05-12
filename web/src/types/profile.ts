@@ -13,7 +13,7 @@ export interface ProfileFormData {
   };
   preferences: {
     risk_tolerance: 'relaxed' | 'strict';
-    circadian_preference: 'night_owl' | 'early_bird' | 'morning_person';
+    circadian_preference: 'night_owl' | 'early_bird';
     group_planning_per_person: boolean;
     transport_preference: 'public' | 'rideshare' | 'rental';
     personal_transport_available: boolean;
