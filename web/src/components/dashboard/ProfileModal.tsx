@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel } from 'lucide-react';
-import { API_CONFIG } from '@/config/constants';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel, Bus, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
+import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
+import ThemedSelect from './ThemedSelect';
 
 interface ProfileModalProps {
   userId: string;
@@ -12,6 +13,7 @@ interface ProfileModalProps {
 }
 
 export default function ProfileModal({ userId, initialData, onClose, onSave }: ProfileModalProps) {
+  const [page, setPage] = useState(1);
   const [formData, setFormData] = useState({
     party_size: initialData?.party_size || 1,
     room_sharing: initialData?.room_sharing || false,
@@ -22,7 +24,10 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
     },
     preferences: {
       risk_tolerance: initialData?.preferences?.risk_tolerance || 'relaxed',
-      circadian_preference: initialData?.preferences?.circadian_preference || 'night_owl'
+      circadian_preference: initialData?.preferences?.circadian_preference || 'night_owl',
+      group_planning_per_person: initialData?.preferences?.group_planning_per_person || false,
+      transport_preference: initialData?.preferences?.transport_preference || 'public',
+      personal_transport_available: initialData?.preferences?.personal_transport_available || false
     }
   });
   const [isFetching, setIsFetching] = useState(!initialData);
@@ -41,7 +46,13 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
             room_sharing: data.room_sharing || false,
             people_per_room: data.people_per_room || 2,
             budget: data.budget || { total_limit: 0, currency: 'USD' },
-            preferences: data.preferences || { risk_tolerance: 'relaxed', circadian_preference: 'night_owl' }
+            preferences: data.preferences || { 
+              risk_tolerance: 'relaxed', 
+              circadian_preference: 'night_owl',
+              group_planning_per_person: false,
+              transport_preference: 'public',
+              personal_transport_available: false
+            }
           });
         }
       } catch (e) {
@@ -84,8 +95,15 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
         </button>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white text-white-outline tracking-tight">Traveler Profile</h2>
-          <p className="text-sm text-muted-foreground mt-1">Tell us how you like to explore.</p>
+          <div className="flex justify-between items-end">
+            <div>
+              <h2 className="text-2xl font-bold text-white text-white-outline tracking-tight">Traveler Profile</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {page === 1 ? "Step 1: Group & Budget" : "Step 2: Style & Transit"}
+              </p>
+            </div>
+            <span className="text-xs font-bold text-primary mb-1">PAGE {page}/2</span>
+          </div>
         </div>
 
         {isFetching ? (
@@ -94,8 +112,10 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
             <p className="text-sm italic">Loading preferences...</p>
           </div>
         ) : (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          {/* Party & Accommodation */}
+          <div className="space-y-6 min-h-[340px]">
+          {page === 1 ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              {/* Party & Accommodation */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
@@ -136,78 +156,82 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
               Group members share rooms?
             </label>
           </div>
-
-          {/* Budget */}
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+              {/* Style & Preferences */}
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
               <Wallet size={14} /> Total Budget
             </label>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
               <input 
-                type="number"
-                value={formData.budget.total_limit}
-                onChange={(e) => setFormData({...formData, budget: {...formData.budget, total_limit: parseInt(e.target.value) || 0}})}
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                placeholder="Limit"
+                type="checkbox"
+                id="group_planning"
+                checked={formData.preferences.group_planning_per_person}
+                onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, group_planning_per_person: e.target.checked}})}
+                className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
               />
-              <select 
-                value={formData.budget.currency}
-                onChange={(e) => setFormData({...formData, budget: {...formData.budget, currency: e.target.value}})}
-                className="bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
-              >
-                <option value="USD" className="bg-card text-white">USD</option>
-                <option value="EUR" className="bg-card text-white">EUR</option>
-                <option value="GBP" className="bg-card text-white">GBP</option>
-              </select>
+              <label htmlFor="group_planning" className="text-sm font-medium text-white cursor-pointer select-none">
+                Plan budget on a per-person basis?
+              </label>
             </div>
           </div>
 
-          {/* Preferences */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <Shield size={14} /> Buffer
-              </label>
-              <select 
-                value={formData.preferences.risk_tolerance}
-                onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, risk_tolerance: e.target.value as any}})}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
-              >
-                <option value="relaxed" className="bg-card text-white">Relaxed</option>
-                <option value="strict" className="bg-card text-white">Strict</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <SunMoon size={14} /> Vibe
-              </label>
-              <select 
-                value={formData.preferences.circadian_preference}
-                onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: e.target.value as any}})}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
-              >
-                <option value="night_owl" className="bg-card text-white">Night Owl</option>
-                <option value="morning_person" className="bg-card text-white">Early Bird</option>
-              </select>
-            </div>
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <ThemedSelect
+              label="Buffer"
+              icon={Shield}
+              value={formData.preferences.risk_tolerance}
+              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, risk_tolerance: val as any}})}
+              options={PROFILE_OPTIONS.RISK_TOLERANCES}
+            />
+            <ThemedSelect
+              label="Vibe"
+              icon={SunMoon}
+              value={formData.preferences.circadian_preference}
+              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: val as any}})}
+              options={PROFILE_OPTIONS.CIRCADIAN_PREFERENCES}
+            />
           </div>
+
+          <ThemedSelect
+            label="Transport"
+            icon={Bus}
+            value={formData.preferences.transport_preference}
+            onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, transport_preference: val as any}})}
+            options={PROFILE_OPTIONS.TRANSPORT_OPTIONS}
+          />
+
+          <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+            <input 
+              type="checkbox"
+              id="personal_transport"
+              checked={formData.preferences.personal_transport_available}
+              onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, personal_transport_available: e.target.checked}})}
+              className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
+            />
+            <label htmlFor="personal_transport" className="text-sm font-medium text-white cursor-pointer select-none flex items-center gap-2">
+              Own vehicle available? <Zap size={14} className="text-amber-400" />
+            </label>
+          </div>
+            </div>
+          )}
           </div>
         )}
 
         <div className="mt-10 flex gap-3">
-          <button 
-            onClick={onClose}
-            className="flex-1 px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all"
-          >
-            Skip
-          </button>
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            {isSaving ? "Saving..." : <><Save size={18} /> Save Profile</>}
-          </button>
+          {page === 1 ? (
+            <>
+              <button onClick={onClose} className="flex-1 px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all">Skip</button>
+              <button onClick={() => setPage(2)} className="flex-1 bg-white/10 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/20 transition-all flex items-center justify-center gap-2">Next <ArrowRight size={18} /></button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setPage(1)} className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all flex items-center gap-2"><ArrowLeft size={18} /> Back</button>
+              <button onClick={handleSave} disabled={isSaving} className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">{isSaving ? "Saving..." : <><Save size={18} /> Save Profile</>}</button>
+            </>
+          )}
         </div>
       </div>
     </div>

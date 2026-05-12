@@ -30,8 +30,8 @@ async def list_itineraries(
     docs = await cursor.to_list(length=20)
     for doc in docs:
         doc["_id"] = str(doc["_id"])
-        doc.setdefault("duration_days", 0)
-        doc.setdefault("party_size_total", 1)
+        doc["duration_days"] = doc.get("duration_days") or 0
+        doc["party_size_total"] = doc.get("party_size_total") or 1
         doc.setdefault("is_conflict", False)
         doc.setdefault("validation_errors", [])
     return docs
@@ -145,7 +145,7 @@ async def update_itinerary(
         # Prepare the full itinerary object for validation
         itinerary = {**itinerary_doc, **update_data}
 
-        prefs = agent_prefs.get("preferences", {})
+        prefs = profile_for_val.get("preferences", {})
         risk = prefs.get("risk_tolerance", "relaxed")
         vibe = prefs.get("circadian_preference", "night_owl")
 

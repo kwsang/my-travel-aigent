@@ -30,8 +30,10 @@ class EventDetails(BaseModel):
 
 class UserProfilePreferencesModel(BaseModel):
     risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')
-    circadian_preference: Literal['early_bird', 'night_owl'] = Field(default='night_owl')
+    circadian_preference: Literal['early_bird', 'night_owl', 'morning_person'] = Field(default='night_owl')
     group_planning_per_person: bool = Field(default=False)
+    transport_preference: Literal['public', 'rideshare', 'rental'] = Field(default='public')
+    personal_transport_available: bool = Field(default=False)
 
 class UserProfileBudgetModel(BaseModel):
     total_limit: float
@@ -45,6 +47,15 @@ class UserProfileModel(BaseModel):
     preferences: UserProfilePreferencesModel
     room_sharing: bool = Field(default=False)
     people_per_room: int = Field(default=2)
+
+class ProfileUpdateRequest(BaseModel):
+    """Schema for updating a user profile from the UI."""
+    party_size: Optional[int] = None
+    budget: Optional[UserProfileBudgetModel] = None
+    preferences: Optional[UserProfilePreferencesModel] = None
+    room_sharing: Optional[bool] = None
+    people_per_room: Optional[int] = None
+    group_planning_per_person: Optional[bool] = None
 
 class EventModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -67,7 +78,8 @@ class ItineraryModel(BaseModel):
     user_profile_data: Optional[UserProfileModel] = None
 
 class ItineraryPatchRequest(BaseModel):
-    events: List[EventModel] = Field(..., description="The complete set of updated events from the UI.")
+    events: Optional[List[EventModel]] = Field(None, description="Updated events from the UI.")
+    trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
 
 class ValidationResponse(BaseModel):
     status: Literal["success", "warning", "error"] = Field(..., description="The outcome status of the validation.")
