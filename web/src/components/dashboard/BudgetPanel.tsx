@@ -3,6 +3,7 @@
 import React from 'react';
 import { Event, UserProfile } from '@/types/models';
 import { AlertCircle, ArrowLeftRight, Banknote } from 'lucide-react';
+import { BUDGET_CONFIG } from '@/config/constants';
 
 interface BudgetPanelProps {
   segments: Event[];
@@ -16,18 +17,18 @@ export default function BudgetPanel({
   segments,
   budget,
   viewMode,
-  partySize = 1,
+  partySize = BUDGET_CONFIG.MIN_PARTY_SIZE,
   onToggleMode,
 }: BudgetPanelProps) {
   const totalCost = segments.reduce((acc, s) => acc + (s.details.price?.amount || 0), 0);
   const limit = budget?.total_limit || 0;
-  const currency = budget?.currency || 'USD';
+  const currency = budget?.currency || BUDGET_CONFIG.DEFAULT_CURRENCY;
 
   const percentage = limit > 0 ? (totalCost / limit) * 100 : 0;
-  const isOverThreshold = percentage >= 90;
+  const isOverThreshold = percentage >= BUDGET_CONFIG.WARNING_THRESHOLD;
 
-  const displayTotal = viewMode === 'total' ? totalCost : totalCost / Math.max(1, partySize);
-  const displayLimit = viewMode === 'total' ? limit : limit / Math.max(1, partySize);
+  const displayTotal = viewMode === 'total' ? totalCost : totalCost / Math.max(BUDGET_CONFIG.MIN_PARTY_SIZE, partySize);
+  const displayLimit = viewMode === 'total' ? limit : limit / Math.max(BUDGET_CONFIG.MIN_PARTY_SIZE, partySize);
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -69,7 +70,7 @@ export default function BudgetPanel({
       {isOverThreshold && (
         <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-amber-700 border border-amber-100">
           <AlertCircle className="w-3.5 h-3.5" />
-          <span className="text-[11px] font-semibold italic">90% Budget Warning: Limit Approaching</span>
+          <span className="text-[11px] font-semibold italic">{BUDGET_CONFIG.WARNING_THRESHOLD}% Budget Warning: Limit Approaching</span>
         </div>
       )}
     </div>
