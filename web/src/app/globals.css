@@ -127,3 +127,14 @@
     @apply font-sans;
   }
 }
+
+/* Chat Markdown Styles */
+.markdown-content p {
+  @apply mb-2 last:mb-0;
+}
+.markdown-content ul {
+  @apply list-disc ml-4 mb-2;
+}
+.markdown-content ol {
+  @apply list-decimal ml-4 mb-2;
+}

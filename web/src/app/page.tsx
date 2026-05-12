@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import TimelineView from '@/components/dashboard/TimelineView';
 import BudgetPanel from '@/components/dashboard/BudgetPanel';
 import MapHub from '@/components/dashboard/MapHub';
-import ArchitectOverlay from '@/components/dashboard/ArchitectOverlay';
+import ChatInterface from '@/components/dashboard/ChatInterface';
 
 export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<'total' | 'per_person'>('total');
@@ -23,7 +23,7 @@ export default function DashboardPage() {
       <div className="w-1/3 border-r border-slate-200 overflow-y-auto px-6 bg-white">
         <div className="py-8 border-b border-slate-100 mb-4">
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Travel Itinerary</h1>
-          <p className="text-sm text-slate-500">Plan your next adventure with Gemini</p>
+          <p className="text-sm text-slate-500">Plan your next adventure with Travel AIgent</p>
         </div>
         <TimelineView 
           segments={itinerary.events} 
@@ -43,11 +43,8 @@ export default function DashboardPage() {
         </div>
         
         <MapHub segments={itinerary.events} isRelaxed={false} />
-        
-        <ArchitectOverlay 
-          validationErrors={itinerary.validation_errors} 
-          partySize={1} 
-        />
+
+        <ChatInterface />
       </div>
     </main>
   );

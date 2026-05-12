@@ -16,7 +16,7 @@ export default function ArchitectOverlay({ validationErrors, partySize }: Archit
     <div className="absolute bottom-6 right-6 w-96 rounded-xl border border-slate-200 bg-white shadow-2xl z-50">
       <div className="p-4 font-bold border-b border-slate-100 flex items-center gap-2 text-slate-900">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        Gemini Architect
+        Travel AIgent
       </div>
       <div className="h-64 overflow-y-auto p-4 text-sm text-slate-600 leading-relaxed">
         {validationErrors.length > 0 && (
