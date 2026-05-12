@@ -14,6 +14,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { Plus, Clock, Search, Trash2 } from 'lucide-react';
 import { ItineraryContext } from '@/context/ItineraryContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
+import TimelineSkeleton from '@/components/dashboard/TimelineSkeleton';
+import BudgetSkeleton from '@/components/dashboard/BudgetSkeleton';
 
 /**
  * The Visual Planning Dashboard
@@ -46,6 +49,7 @@ export default function DashboardPage() {
     validation_errors: [],
     user_profile_data: undefined
   });
+  const [isLoadingItinerary, setIsLoadingItinerary] = useState(true);
 
   // Sync editable name when the itinerary data loads
   useEffect(() => {
@@ -79,6 +83,7 @@ export default function DashboardPage() {
 
   const fetchItinerary = useCallback(async () => {
     if (!currentSessionId || !visitorId) return;
+    setIsLoadingItinerary(true);
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`);
       if (response.ok) {
@@ -91,6 +96,8 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.warn("Dashboard Sync: Session not active yet.");
+    } finally {
+      setIsLoadingItinerary(false);
     }
   }, [currentSessionId, visitorId]);
 
@@ -165,7 +172,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <ItineraryContext.Provider value={{ itinerary, setItinerary, viewMode, setViewMode, refreshDashboard }}>
+    <ItineraryContext.Provider value={{ itinerary, setItinerary, viewMode, setViewMode, refreshDashboard, sessionId: currentSessionId, userId: visitorId, isLoading: isLoadingItinerary }}>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <Navbar 
         onEditProfile={() => setShowProfileModal(true)} 
@@ -250,13 +257,17 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          <TimelineView />
+          <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<TimelineSkeleton />}>
+            <TimelineView />
+          </SkeletonWrapper>
         </div>
 
         {/* Main Content: Map and Budget */}
         <div className="relative flex-1 bg-background overflow-hidden">
           <div className="absolute top-6 right-6 z-20">
-            <BudgetPanel />
+            <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<BudgetSkeleton />}>
+              <BudgetPanel />
+            </SkeletonWrapper>
           </div>
           
           <MapHub />

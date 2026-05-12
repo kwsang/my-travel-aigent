@@ -7,6 +7,9 @@ export interface ItineraryContextType {
   viewMode: 'total' | 'per_person';
   setViewMode: React.Dispatch<React.SetStateAction<'total' | 'per_person'>>;
   refreshDashboard: () => void;
+  sessionId: string;
+  userId: string;
+  isLoading?: boolean;
 }
 
 export const ItineraryContext = createContext<ItineraryContextType | undefined>(undefined);
