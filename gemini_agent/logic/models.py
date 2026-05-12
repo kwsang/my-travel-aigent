@@ -73,6 +73,7 @@ class ItineraryModel(BaseModel):
     trip_name: str
     duration_days: int
     party_size_total: int
+    status: Literal["draft", "final"] = Field(default="draft")
     events: List[EventModel]
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
@@ -82,6 +83,7 @@ class ItineraryModel(BaseModel):
 class ItineraryPatchRequest(BaseModel):
     events: Optional[List[EventModel]] = Field(None, description="Updated events from the UI.")
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
+    status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
 
 class ValidationResponse(BaseModel):
     status: Literal["success", "warning", "error"] = Field(..., description="The outcome status of the validation.")

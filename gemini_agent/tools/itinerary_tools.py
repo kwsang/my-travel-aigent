@@ -2,9 +2,9 @@ import json
 import datetime
 from typing import Any, Optional
 from gemini_agent.clients import destinations_collection
-from .models import Itinerary
+from gemini_agent.logic.models import ItineraryModel
 
-def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
+def save_itinerary(itinerary: ItineraryModel, tool_context: Any) -> str:
     """
     Persists a travel itinerary to MongoDB Atlas. 
     Updates the existing draft for this session if it exists, otherwise creates it.
@@ -16,16 +16,11 @@ def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
         # Capture context and timestamps for iterative updates
         session_id = tool_context.session.id
         user_id = tool_context.session.user_id
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         
         # Prepare document data with session linkage for UI synchronization
         itinerary_data = itinerary.model_dump()
         itinerary_data["session_id"] = session_id
         itinerary_data["user_id"] = user_id # Enforce consistency with session identity
-        itinerary_data["status"] = "draft" # Always save as a draft through this tool
-        itinerary_data["metadata"]["updated_at"] = now
-        if "created_at" not in itinerary_data["metadata"]:
-            itinerary_data["metadata"]["created_at"] = now
 
         db = destinations_collection.database
         # Use session_id as the primary anchor to ensure we update the same draft
@@ -100,7 +95,7 @@ def update_itinerary_status(user_id: str, trip_name: str, status: str, tool_cont
             {"user_id": user_id, "trip_name": trip_name},
             {"$set": {
                 "status": status, 
-                "metadata.updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                "updated_at": datetime.datetime.now(datetime.timezone.utc)
             }}
         )
         
@@ -132,13 +127,12 @@ def clone_itinerary(user_id: str, source_trip_name: str, new_trip_name: str, too
 
         # Strip the MongoDB ID and validate into the model
         source_doc.pop("_id", None)
-        itinerary = Itinerary.model_validate(source_doc)
+        itinerary = ItineraryModel.model_validate(source_doc)
         
         # Update identifying details
         itinerary.trip_name = new_trip_name
         itinerary.status = "draft"
-        itinerary.metadata["cloned_from"] = source_trip_name
-        itinerary.metadata["created_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        # Note: metadata is no longer in ItineraryModel
         
         db["itineraries"].insert_one(itinerary.model_dump())
         return f"SUCCESS: Itinerary '{source_trip_name}' cloned to '{new_trip_name}' as a draft."
@@ -189,12 +183,8 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
         # If the data in memory matches the requested trip_name, use it for persistence
         if isinstance(raw_itinerary, dict) and raw_itinerary.get("trip_name") == trip_name:
             # Validate/Hydrate into the Pydantic model for schema consistency
-            itinerary = Itinerary.model_validate(raw_itinerary)
+            itinerary = ItineraryModel.model_validate(raw_itinerary)
             
-            # Transition to 'final'
-            itinerary.status = "final"
-            itinerary.metadata["finalized_at"] = now
-            itinerary.metadata["updated_at"] = now
             itinerary.user_id = user_id # Ensure ownership
             
             itinerary_data = itinerary.model_dump()
@@ -220,8 +210,7 @@ def finalize_itinerary(user_id: str, trip_name: str, tool_context: Any) -> str:
             {"session_id": session_id},
             {"$set": {
                 "status": "final",
-                "metadata.finalized_at": now,
-                "metadata.updated_at": now
+                "updated_at": datetime.datetime.now(datetime.timezone.utc)
             }}
         )
         

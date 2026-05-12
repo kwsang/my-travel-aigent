@@ -32,6 +32,7 @@ async def list_itineraries(
         doc["_id"] = str(doc["_id"])
         doc["duration_days"] = doc.get("duration_days") or 0
         doc["party_size_total"] = doc.get("party_size_total") or 1
+        doc["status"] = doc.get("status", "draft")
         doc.setdefault("is_conflict", False)
         doc.setdefault("validation_errors", [])
     return docs
@@ -61,6 +62,7 @@ async def get_itinerary(
                 "trip_name": "New Trip",
                 "duration_days": 0,
                 "party_size_total": 1,
+                "status": "draft",
                 "is_conflict": False,
                 "validation_errors": [],
                 "user_profile_data": None,
@@ -125,6 +127,7 @@ async def update_itinerary(
                 "trip_name": "New Trip",
                 "duration_days": 0,
                 "party_size_total": 1,
+                "status": "draft",
             }
 
         user_profile = await db.user_profiles.find_one({"user_id": identity})
@@ -172,6 +175,7 @@ async def update_itinerary(
         # Explicit assignment to ensure these fields exist and are valid for ItineraryModel
         itinerary_doc["duration_days"] = itinerary_doc.get("duration_days") or 0
         itinerary_doc["party_size_total"] = itinerary_doc.get("party_size_total") or profile_for_val.get("party_size", 1)
+        itinerary_doc["status"] = itinerary_doc.get("status", "draft")
         itinerary_doc["is_conflict"] = bool(is_conflict)
         itinerary_doc["validation_errors"] = all_errors or []
         itinerary_doc["updated_at"] = update_time

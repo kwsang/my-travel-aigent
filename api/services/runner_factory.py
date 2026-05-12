@@ -2,6 +2,7 @@ from google.adk.runners import Runner
 from api.services.session_service import MongoDBSessionService
 from gemini_agent import agent_definition
 from api import config
+from gemini_agent.logic.tools import search_places, google_places_details, google_maps_matrix
 
 def create_agent_runner() -> Runner:
     """Factory to create and configure the ADK Runner and its dependencies."""
@@ -16,5 +17,6 @@ def create_agent_runner() -> Runner:
     return Runner(
         app=agent_app, 
         session_service=session_service,
-        auto_create_session=True
+        auto_create_session=True,
+        tools=[search_places, google_places_details, google_maps_matrix]
     )
