@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from api.dependencies import get_current_user, get_db
@@ -83,6 +83,10 @@ async def get_itinerary(
             all_errors = struct_errors + budget_errors
             is_conflict = len(all_errors) > 0
 
+        # Sanitize User Profile for JSON serialization
+        if user_profile:
+            user_profile["_id"] = str(user_profile["_id"])
+
         itinerary_doc.setdefault("duration_days", 0)
         itinerary_doc.setdefault("party_size_total", user_profile.get("party_size", 1) if user_profile else 1)
         itinerary_doc["_id"] = str(itinerary_doc["_id"])
@@ -107,11 +111,13 @@ async def update_itinerary(
 ):
     """Apply manual updates to an itinerary and re-validate."""
     identity = auth_user_id or user_id or session_id
+    logger.info(f"PATCH Itinerary Request: session={session_id}, user={identity}")
     try:
         itinerary_doc = await db.itineraries.find_one({"session_id": session_id, "user_id": identity})
         
         # If the doc doesn't exist (e.g., renaming a brand new trip), create a skeleton
         if not itinerary_doc:
+            logger.debug(f"Itinerary {session_id} not found in DB. Initializing skeleton for update.")
             itinerary_doc = {
                 "session_id": session_id,
                 "user_id": identity,
@@ -129,21 +135,22 @@ async def update_itinerary(
         update_data = updates.model_dump(exclude_unset=True)
         update_time = datetime.now(timezone.utc)
         update_data["updated_at"] = update_time
+        logger.debug(f"Updates to apply: {list(update_data.keys())}")
 
         # Prepare the full itinerary object for validation
         itinerary = {**itinerary_doc, **update_data}
-        if "events" in update_data and updates.events:
-            update_data["events"] = [event.model_dump() for event in updates.events]
 
         prefs = profile_for_val.get("preferences", {})
         risk = prefs.get("risk_tolerance", "relaxed")
         vibe = prefs.get("circadian_preference", "night_owl")
 
+        logger.info(f"Running structural validation for {session_id} (Risk: {risk})")
         struct_errors = validate_itinerary_structure(itinerary, risk, vibe, profile_for_val)
         _, budget_errors = validate_itinerary_budget(itinerary, profile_for_val)
 
         all_errors = struct_errors + budget_errors
         is_conflict = len(all_errors) > 0
+        logger.debug(f"Validation complete. Conflicts: {is_conflict}, Errors: {len(all_errors)}")
 
         await db.itineraries.update_one(
             {"session_id": session_id, "user_id": identity},
@@ -151,11 +158,17 @@ async def update_itinerary(
             upsert=True
         )
 
-        itinerary_doc.setdefault("duration_days", 0)
-        itinerary_doc.setdefault("party_size_total", profile_for_val.get("party_size", 1))
+        # Sanitize User Profile for JSON serialization
+        if user_profile:
+            user_profile["_id"] = str(user_profile["_id"])
+
         itinerary_doc.update(update_data)
-        itinerary_doc["is_conflict"] = is_conflict
-        itinerary_doc["validation_errors"] = all_errors
+
+        # Explicit assignment to ensure these fields exist and are valid for ItineraryModel
+        itinerary_doc["duration_days"] = itinerary_doc.get("duration_days") or 0
+        itinerary_doc["party_size_total"] = itinerary_doc.get("party_size_total") or profile_for_val.get("party_size", 1)
+        itinerary_doc["is_conflict"] = bool(is_conflict)
+        itinerary_doc["validation_errors"] = all_errors or []
         itinerary_doc["updated_at"] = update_time
         itinerary_doc["user_profile_data"] = user_profile
         itinerary_doc["_id"] = str(itinerary_doc.get("_id", "new"))
@@ -165,18 +178,5 @@ async def update_itinerary(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception(f"CRITICAL: Unhandled exception in PATCH /itinerary/{session_id}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
-@router.post("/profile/{user_id}")
-async def update_user_profile(
-    user_id: str,
-    profile_data: dict = Body(...),
-    db: AsyncIOMotorDatabase = Depends(get_db)
-):
-    """Persist or update user preferences and constraints."""
-    await db.user_profiles.update_one(
-        {"user_id": user_id},
-        {"$set": {**profile_data, "updated_at": datetime.now(timezone.utc)}},
-        upsert=True
-    )
-    return {"status": "success"}

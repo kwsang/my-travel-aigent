@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2 } from 'lucide-react';
 import { API_CONFIG } from '@/config/constants';
 
 interface ProfileModalProps {
@@ -23,12 +23,36 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
       circadian_preference: initialData?.preferences?.circadian_preference || 'night_owl'
     }
   });
+  const [isFetching, setIsFetching] = useState(!initialData);
   const [isSaving, setIsLoading] = useState(false);
+
+  // Fetch latest profile data on mount if not provided by parent
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (initialData) return;
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/profile/${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setFormData({
+            party_size: data.party_size || 1,
+            budget: data.budget || { total_limit: 0, currency: 'USD' },
+            preferences: data.preferences || { risk_tolerance: 'relaxed', circadian_preference: 'night_owl' }
+          });
+        }
+      } catch (e) {
+        console.error("ProfileModal: Error loading data", e);
+      } finally {
+        setIsFetching(false);
+      }
+    };
+    fetchProfile();
+  }, [userId, initialData]);
 
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/profile/${userId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/profile/${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -60,7 +84,13 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
           <p className="text-sm text-muted-foreground mt-1">Tell us how you like to explore.</p>
         </div>
 
-        <div className="space-y-6">
+        {isFetching ? (
+          <div className="py-20 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm italic">Loading preferences...</p>
+          </div>
+        ) : (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
           {/* Party Size */}
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
@@ -129,7 +159,8 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
               </select>
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         <div className="mt-10 flex gap-3">
           <button 

@@ -6,9 +6,10 @@ import { Menu, X, Plane, UserCircle } from 'lucide-react';
 
 interface NavbarProps {
   onEditProfile?: () => void;
+  profileSetStatus?: boolean; // New prop for profile status
 }
 
-export default function Navbar({ onEditProfile }: NavbarProps) {
+export default function Navbar({ onEditProfile, profileSetStatus }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -29,9 +30,12 @@ export default function Navbar({ onEditProfile }: NavbarProps) {
             {onEditProfile && (
               <button 
                 onClick={onEditProfile}
-                className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
+                className="relative flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
               >
                 <UserCircle size={18} /> Profile
+                {!profileSetStatus && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full ring-2 ring-background" />
+                )}
               </button>
             )}
             <Link href="/#features" className="text-sm font-semibold text-muted-foreground hover:text-primary transition-colors">

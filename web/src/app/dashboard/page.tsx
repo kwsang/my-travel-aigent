@@ -6,6 +6,7 @@ import MapHub from '@/components/dashboard/MapHub';
 import BudgetPanel from '@/components/dashboard/BudgetPanel';
 import ChatInterface from '@/components/dashboard/ChatInterface';
 import ProfileModal from '@/components/dashboard/ProfileModal';
+import Toast from '@/components/dashboard/Toast';
 import Navbar from '@/components/layout/Navbar';
 import { Itinerary } from '@/types/models';
 import { API_CONFIG } from '@/config/constants';
@@ -33,7 +34,9 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
+  const [profileHasBeenSet, setProfileHasBeenSet] = useState(false); // New state for profile status
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [itinerary, setItinerary] = useState<Partial<Itinerary>>({
     events: [],
@@ -49,8 +52,11 @@ export default function DashboardPage() {
 
   // First time popup logic
   useEffect(() => {
-    const hasSetProfile = localStorage.getItem('travel_profile_set');
-    if (!hasSetProfile) setShowProfileModal(true);
+    const storedProfileStatus = localStorage.getItem('travel_profile_set') === 'true';
+    setProfileHasBeenSet(storedProfileStatus);
+    if (!storedProfileStatus) {
+      setShowProfileModal(true);
+    }
   }, []);
 
   const filteredItineraries = useMemo(() => {
@@ -111,11 +117,16 @@ export default function DashboardPage() {
         const updated = await response.json();
         setItinerary(updated);
         fetchList(); // Update the sidebar list immediately
+        triggerToast('Itinerary renamed successfully!');
       }
     } catch (e) {
       console.warn("Dashboard: Failed to rename itinerary.");
     }
     setIsEditingName(false);
+  };
+
+  const triggerToast = (message: string) => {
+    setToast({ show: true, message });
   };
 
   const handleNewTrip = () => {
@@ -126,7 +137,10 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
-      <Navbar onEditProfile={() => setShowProfileModal(true)} />
+      <Navbar 
+        onEditProfile={() => setShowProfileModal(true)} 
+        profileSetStatus={profileHasBeenSet} // Pass the status to Navbar
+      />
       <main className="flex flex-1 overflow-hidden">
         {/* Left Sidebar: Timeline */}
         <div className="w-1/3 min-w-[400px] border-r border-border overflow-y-auto px-6 bg-card shadow-sm z-10">
@@ -238,7 +252,18 @@ export default function DashboardPage() {
           userId={visitorId}
           initialData={itinerary.user_profile_data}
           onClose={() => setShowProfileModal(false)}
-          onSave={fetchItinerary}
+          onSave={() => {
+            fetchItinerary();
+            setProfileHasBeenSet(true); // Update status after saving
+            triggerToast('Traveler profile updated successfully!');
+          }}
+        />
+      )}
+
+      {toast.show && (
+        <Toast 
+          message={toast.message} 
+          onClose={() => setToast({ ...toast, show: false })} 
         />
       )}
     </div>
