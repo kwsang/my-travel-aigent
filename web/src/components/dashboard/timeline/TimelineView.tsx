@@ -6,6 +6,7 @@ import { API_CONFIG } from '@/config/constants';
 
 import { Loader2, AlertTriangle } from 'lucide-react';
 import TimelineItem from './TimelineItem';
+import { Event } from '@/types';
 
 /**
  * TimelineView Component
@@ -15,6 +16,7 @@ import TimelineItem from './TimelineItem';
 export default function TimelineView() {
   const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex } = useItineraryData();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
   // Auto-scroll the timeline to the focused segment when a map marker is clicked
@@ -48,6 +50,20 @@ export default function TimelineView() {
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const handleDragEnter = (e: React.DragEvent, index: number | string) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault(); // Necessary to allow dropping
     e.dataTransfer.dropEffect = 'move';
@@ -57,16 +73,70 @@ export default function TimelineView() {
     e.preventDefault();
     if (draggedIndex === null || isSyncing) return;
 
-    const newSegments = [...segments];
+    // Deep copy to safely mutate nested schedule objects
+    const newSegments = JSON.parse(JSON.stringify(segments));
+    
+    const originalDay = segments[draggedIndex].day;
     const [draggedItem] = newSegments.splice(draggedIndex, 1);
-    const updatedItem = { ...draggedItem, day: targetDay }; // Update day if dragged to a different block
+    draggedItem.day = targetDay; // Update day if dragged to a different block
 
     const insertIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
-    newSegments.splice(insertIndex, 0, updatedItem);
+    newSegments.splice(insertIndex, 0, draggedItem);
+
+    // --- Cascade Time Recalculation ---
+    // We recalculate the times for both the day it was removed from, and the day it was dropped into.
+    const daysToRecalculate = Array.from(new Set([originalDay, targetDay]));
+
+    daysToRecalculate.forEach(day => {
+      const daySegments = newSegments.filter((s: Event) => s.day === day);
+      if (daySegments.length === 0) return;
+
+      // Helper to cleanly parse and format "clock time" regardless of the browser's timezone
+      const parseLocal = (iso: string) => new Date(iso);
+      const formatLocal = (d: Date) => {
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+      };
+
+      // Set the anchor time to the first event's start time (or default to 9 AM)
+      let currentStartTime = parseLocal(daySegments[0].schedule?.local_start_time || '');
+      if (isNaN(currentStartTime.getTime())) {
+        currentStartTime = new Date();
+        currentStartTime.setHours(9, 0, 0, 0);
+      }
+
+      daySegments.forEach((seg: Event, idx: number) => {
+        // Calculate original duration (fallback to 1 hour if missing)
+        const originalStart = parseLocal(seg.schedule?.local_start_time || '');
+        const originalEnd = parseLocal(seg.schedule?.local_end_time || '');
+        let durationMs = originalEnd.getTime() - originalStart.getTime();
+        if (isNaN(durationMs) || durationMs <= 0) durationMs = 60 * 60 * 1000; 
+
+        // Apply transit buffer for subsequent items (default 30 mins if the AI didn't provide one)
+        if (idx > 0) {
+          const bufferMins = seg.schedule?.applied_buffer_minutes || 30;
+          currentStartTime = new Date(currentStartTime.getTime() + bufferMins * 60 * 1000);
+        }
+
+        // Update the segment's schedule
+        if (!seg.schedule) {
+          seg.schedule = {
+            local_start_time: '',
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // Fallback to user's local browser timezone
+          };
+        }
+        seg.schedule.local_start_time = formatLocal(currentStartTime);
+        
+        currentStartTime = new Date(currentStartTime.getTime() + durationMs);
+        seg.schedule.local_end_time = formatLocal(currentStartTime);
+      });
+    });
+    // --- End Cascade Recalculation ---
 
     // Optimistically update UI and set syncing state
     setItinerary((prev) => ({ ...prev, events: newSegments }));
     setDraggedIndex(null);
+    setDragOverIndex(null);
     setIsSyncing(true);
 
     try {
@@ -126,7 +196,9 @@ export default function TimelineView() {
           </div>
 
           <div 
-            className="relative space-y-4 pl-6 pb-4 border-l-2 border-border min-h-[60px]"
+            className={`relative space-y-4 pl-6 pb-4 border-l-2 border-border min-h-[60px] rounded-br-xl transition-colors ${dragOverIndex === `day-${day}` ? 'bg-primary/5 border-l-primary' : ''}`}
+            onDragEnter={(e) => handleDragEnter(e, `day-${day}`)}
+            onDragLeave={handleDragLeave}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, segments.length, day)} // Fallback drop zone at the end of the day block
           >
@@ -140,8 +212,12 @@ export default function TimelineView() {
                   absoluteIndex={absoluteIndex}
                   day={day}
                   draggedIndex={draggedIndex}
+                  dragOverIndex={dragOverIndex}
                   isSyncing={isSyncing}
                   onDragStart={handleDragStart}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragEnd={handleDragEnd}
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
                 />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { Car, Utensils, Sparkles, Hotel, ClipboardList, Plane, LucideIcon, GripVertical } from 'lucide-react';
+import { Event } from '@/types';
 
 // Map segment types to Lucide icons
 const SegmentIcons: Record<string, LucideIcon> = {
@@ -15,12 +16,16 @@ const SegmentIcons: Record<string, LucideIcon> = {
 const DefaultIcon = Sparkles; // Fallback icon
 
 interface TimelineItemProps {
-  event: any;
+  event: Event;
   absoluteIndex: number;
   day: number;
   draggedIndex: number | null;
+  dragOverIndex: number | string | null;
   isSyncing: boolean;
   onDragStart: (e: React.DragEvent, index: number) => void;
+  onDragEnter: (e: React.DragEvent, index: number) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDragEnd: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, targetIndex: number, targetDay: number) => void;
 }
@@ -30,8 +35,12 @@ export default function TimelineItem({
   absoluteIndex,
   day,
   draggedIndex,
+  dragOverIndex,
   isSyncing,
   onDragStart,
+  onDragEnter,
+  onDragLeave,
+  onDragEnd,
   onDragOver,
   onDrop,
 }: TimelineItemProps) {
@@ -54,6 +63,9 @@ export default function TimelineItem({
       id={`timeline-item-${absoluteIndex}`}
       draggable
       onDragStart={(e) => onDragStart(e, absoluteIndex)}
+      onDragEnter={(e) => onDragEnter(e, absoluteIndex)}
+      onDragLeave={onDragLeave}
+      onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={(e) => {
         e.stopPropagation(); // Prevent fallback drop zone from firing
@@ -62,7 +74,9 @@ export default function TimelineItem({
       onClick={() => setActiveSegmentIndex(absoluteIndex)}
       className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card cursor-pointer group ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
-      } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''} ${isSyncing ? 'cursor-wait' : 'active:cursor-grabbing'}`}
+      } ${
+        dragOverIndex === absoluteIndex && draggedIndex !== absoluteIndex ? 'mt-8 border-t-2 border-t-primary shadow-[0_-5px_15px_-3px_rgba(var(--primary),0.2)] bg-primary/5' : ''
+      } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''} ${isSyncing ? 'cursor-wait' : 'active:cursor-grab'}`}
     >
       <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
         <GripVertical size={14} />

@@ -5,10 +5,11 @@ import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel, Bus, Zap, Arro
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
+import { UserProfile } from '@/types';
 
 interface ProfileModalProps {
   userId: string;
-  initialData?: any;
+  initialData?: UserProfile;
   onClose: () => void;
   onSave: () => void;
 }
@@ -16,7 +17,7 @@ interface ProfileModalProps {
 export default function ProfileModal({ userId, initialData, onClose, onSave }: ProfileModalProps) {
   const [page, setPage] = useState(1);
 
-  const parseProfileData = (data: any): ProfileFormData => ({
+  const parseProfileData = (data?: UserProfile): ProfileFormData => ({
     party_size: data?.party_size || 1,
     room_sharing: data?.room_sharing || false,
     people_per_room: data?.people_per_room || 2,
@@ -243,14 +244,14 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
               label="Buffer"
               icon={Shield}
               value={formData.preferences.risk_tolerance}
-              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, risk_tolerance: val as any}})}
+              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, risk_tolerance: val as 'relaxed' | 'strict'}})}
               options={PROFILE_OPTIONS.RISK_TOLERANCES}
             />
             <ThemedSelect
               label="Vibe"
               icon={SunMoon}
               value={formData.preferences.circadian_preference}
-              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: val as any}})}
+              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: val as 'early_bird' | 'night_owl'}})}
               options={PROFILE_OPTIONS.CIRCADIAN_PREFERENCES}
             />
           </div>
@@ -259,7 +260,7 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
             label="Transport"
             icon={Bus}
             value={formData.preferences.transport_preference}
-            onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, transport_preference: val as any}})}
+            onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, transport_preference: val as 'public' | 'rideshare' | 'rental'}})}
             options={PROFILE_OPTIONS.TRANSPORT_OPTIONS}
           />
 

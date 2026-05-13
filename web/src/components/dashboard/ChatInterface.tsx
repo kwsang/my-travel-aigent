@@ -109,7 +109,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       </div>
 
       {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
         {messages.map((m: ChatMessage, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex gap-3 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -147,7 +147,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Adjust itinerary..."
-          className="flex-1 text-sm bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-white-outline placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+          className="flex-1 text-sm bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
           disabled={isLoading}
         />
         <button type="submit" disabled={isLoading || !input.trim()} className="bg-primary text-primary-foreground p-2 rounded-xl hover:brightness-110 disabled:opacity-30 transition-all active:scale-95 shadow-lg shadow-primary/20">

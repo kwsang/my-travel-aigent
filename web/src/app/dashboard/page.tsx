@@ -11,12 +11,12 @@ import Navbar from '@/components/layout/Navbar';
 import { Itinerary } from '@/types';
 import { API_CONFIG } from '@/config/constants';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Clock, Search, Trash2 } from 'lucide-react';
 import { ItineraryContext } from '@/context/ItineraryContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/BudgetSkeleton';
+import TripSelector from '@/components/dashboard/TripSelector';
 
 /**
  * The Visual Planning Dashboard
@@ -36,7 +36,6 @@ export default function DashboardPage() {
     setVisitorId(id);
   }, [currentSessionId]);
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [profileHasBeenSet, setProfileHasBeenSet] = useState(false); // New state for profile status
@@ -65,12 +64,6 @@ export default function DashboardPage() {
       setShowProfileModal(true);
     }
   }, []);
-
-  const filteredItineraries = useMemo(() => {
-    return itineraries.filter(item => 
-      (item.trip_name || 'Unnamed Trip').toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [itineraries, searchQuery]);
 
   const fetchList = useCallback(async () => {
     if (!visitorId) return;
@@ -171,7 +164,28 @@ export default function DashboardPage() {
     setCurrentSessionId(uuidv4());
     setIsEditingName(false);
     setItinerary({ events: [], is_conflict: false, validation_errors: [] });
+    triggerToast('Started a new trip!');
   };
+
+  // Center content for the Navbar
+  const navbarCenter = (
+    <TripSelector
+      itineraries={itineraries}
+      currentItinerary={itinerary}
+      currentSessionId={currentSessionId}
+      onSelectTrip={(sessId, item) => {
+        setCurrentSessionId(sessId);
+        setItinerary(item);
+      }}
+      onNewTrip={handleNewTrip}
+      onDeleteTrip={handleDeleteTrip}
+      isEditingName={isEditingName}
+      setIsEditingName={setIsEditingName}
+      editedName={editedName}
+      setEditedName={setEditedName}
+      onRename={handleRename}
+    />
+  );
 
   // Memoize the context value to prevent unnecessary re-renders of all consumer components
   const contextValue = useMemo(() => ({
@@ -193,92 +207,16 @@ export default function DashboardPage() {
       <Navbar 
         onEditProfile={() => setShowProfileModal(true)} 
         profileSetStatus={profileHasBeenSet} // Pass the status to Navbar
+        centerContent={navbarCenter}
       />
       <main className="flex flex-1 overflow-hidden">
         {/* Left Sidebar: Timeline */}
         <div className="w-1/3 min-w-[400px] border-r border-border overflow-y-auto px-6 bg-card shadow-sm z-10">
-          <div className="py-8 border-b border-border/50 mb-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-3">
-                  {isEditingName ? (
-                    <input
-                      autoFocus
-                      className="text-2xl font-bold text-foreground tracking-tight bg-transparent border-b-2 border-primary outline-none w-full"
-                      value={editedName}
-                      onChange={(e) => setEditedName(e.target.value)}
-                      onBlur={handleRename}
-                      onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                    />
-                  ) : (
-                    <h1 
-                      className="text-2xl font-bold text-foreground tracking-tight cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => setIsEditingName(true)}
-                    >
-                      {itinerary.trip_name || 'New Trip'}
-                    </h1>
-                  )}
-                  {!isEditingName && (
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${itinerary.status === 'final' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}>
-                      {itinerary.status || 'draft'}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">Collaborating with Travel AIgent</p>
-              </div>
-              <button 
-                onClick={handleNewTrip}
-                className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                title="Start New Trip"
-              >
-                <Plus size={20} />
-              </button>
-            </div>
-
-            {/* Search Bar */}
-            {itineraries.length > 0 && (
-              <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <input 
-                  type="text"
-                  placeholder="Filter trips..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/5 border border-border rounded-lg pl-9 pr-4 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground/50 transition-all"
-                />
-              </div>
-            )}
-
-            {/* Recent Trips Selector */}
-            {itineraries.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                  <Clock size={12} />
-                  Your Recent Trips
-                </label>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                  {filteredItineraries.map((item) => (
-                    <div
-                      key={item.session_id}
-                      onClick={() => setCurrentSessionId(item.session_id)}
-                      className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all cursor-pointer flex items-center gap-2 group/item ${
-                        currentSessionId === item.session_id
-                          ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20'
-                          : 'border-border bg-white/5 text-muted-foreground hover:border-primary/50'
-                      }`}
-                    >
-                      {item.trip_name || 'Unnamed Trip'}
-                      <button 
-                        onClick={(e) => handleDeleteTrip(e, item.session_id)}
-                        className="opacity-0 group-hover/item:opacity-100 hover:text-red-400 transition-all p-0.5"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="py-6 border-b border-border/50 mb-6 flex items-center justify-between shrink-0">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Itinerary Timeline</h2>
+            <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<BudgetSkeleton />}>
+              <BudgetPanel />
+            </SkeletonWrapper>
           </div>
           <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<TimelineSkeleton />}>
             <TimelineView />
@@ -287,11 +225,6 @@ export default function DashboardPage() {
 
         {/* Main Content: Map and Budget */}
         <div className="relative flex-1 bg-background overflow-hidden">
-          <div className="absolute top-6 right-6 z-20">
-            <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<BudgetSkeleton />}>
-              <BudgetPanel />
-            </SkeletonWrapper>
-          </div>
           
           <MapHub />
 

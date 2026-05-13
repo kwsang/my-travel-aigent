@@ -21,17 +21,17 @@ const InfoWindowComponent = InfoWindow as any;
  */
 export default function MapHub() {
   const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary } = useItineraryData();
-  const selectedSegment = activeSegmentIndex !== null ? (segments[activeSegmentIndex] as any) : null;
+  const selectedSegment = activeSegmentIndex !== null ? segments[activeSegmentIndex] : null;
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
 
   // Extract starting location from profile preferences (populated by the Concierge agent)
-  const startingLocation = (profile?.preferences as any)?.starting_location;
+  const startingLocation = profile?.preferences?.starting_location;
 
   // Extract destination from the events (prioritizing non-transit segments to avoid origin airports)
-  const nonTransitSegments = segments.filter((s: any) => !['FLIGHT', 'TRANSPORT'].includes(s.segment));
+  const nonTransitSegments = segments.filter((s) => !['FLIGHT', 'TRANSPORT'].includes(s.segment));
   const targetSegments = nonTransitSegments.length > 0 ? nonTransitSegments : segments;
-  const cities = Array.from(new Set(targetSegments.map((s: any) => s.details?.city).filter(Boolean)));
+  const cities = Array.from(new Set(targetSegments.map((s) => s.details?.city).filter(Boolean)));
   const destinationCities = cities.filter(city => city !== startingLocation);
   const tripName = itinerary?.trip_name && itinerary.trip_name !== 'New Trip' ? itinerary.trip_name : null;
   const primaryDestination = destinationCities.length > 0 ? destinationCities[0] : (cities.length > 0 ? cities[0] : (tripName || 'Destination TBD'));
@@ -45,32 +45,102 @@ export default function MapHub() {
 
   // Determine the map center based on the first segment with coordinates, defaulting to NYC
   const defaultCenter = { lat: 40.7128, lng: -74.0060 };
-  const centerSegment = segments.find((s: any) => s.geo || s.details?.geo) as any;
-  const mapCenter = centerSegment ? (centerSegment.geo || centerSegment.details?.geo) : defaultCenter;
+  const centerSegment = segments.find((s) => s.geo || s.details?.geo);
+  const mapCenter: any = centerSegment?.geo || centerSegment?.details?.geo || defaultCenter;
 
   // Generate the sequential path for the polyline
   const routePath = React.useMemo(() => {
     return segments
-      .map((segment: any) => {
+      .map((segment) => {
         const geo = segment.geo || segment.details?.geo;
         if (!geo) return null;
-        return { lat: geo.latitude || geo.lat, lng: geo.longitude || geo.lng };
+        return { lat: geo.latitude, lng: geo.longitude };
       })
       .filter(Boolean) as google.maps.LatLngLiteral[];
+  }, [segments]);
+
+  // Generate individual edges for the polyline to style flights differently
+  const routeEdges = React.useMemo(() => {
+    const edges: { path: google.maps.LatLngLiteral[], isFlight: boolean }[] = [];
+    const validSegments = segments.filter((s) => s.geo || s.details?.geo);
+    
+    for (let i = 1; i < validSegments.length; i++) {
+      const prev = validSegments[i - 1];
+      const curr = validSegments[i];
+      const prevGeo = prev.geo || prev.details?.geo;
+      const currGeo = curr.geo || curr.details?.geo;
+      
+      if (prevGeo && currGeo) {
+        edges.push({
+          path: [
+            { lat: prevGeo.latitude, lng: prevGeo.longitude },
+            { lat: currGeo.latitude, lng: currGeo.longitude }
+          ],
+          isFlight: curr.segment === 'FLIGHT'
+        });
+      }
+    }
+    return edges;
   }, [segments]);
 
   // Store the map instance to interact with its API natively
   const [mapInstance, setMapInstance] = React.useState<google.maps.Map | null>(null);
 
-  // Automatically fit bounds to contain all markers when routePath changes
+  // Automatically fit bounds or pan to active segment
   React.useEffect(() => {
-    if (mapInstance && routePath.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      routePath.forEach((pos) => bounds.extend(pos));
-      // Add padding to ensure markers aren't hidden behind the ChatInterface or BudgetPanel
-      mapInstance.panToBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
+    if (!mapInstance) return;
+
+    if (activeSegmentIndex !== null) {
+      const activeSegment = segments[activeSegmentIndex];
+      const isTransport = ['FLIGHT', 'TRANSPORT'].includes(activeSegment.segment);
+
+      let prevGeo: { latitude: number; longitude: number } | null | undefined = null;
+      let nextGeo = activeSegment.geo || activeSegment.details?.geo;
+
+      if (isTransport) {
+        // Try to find the previous location
+        for (let i = activeSegmentIndex - 1; i >= 0; i--) {
+          const s = segments[i];
+          const geo = s.geo || s.details?.geo;
+          if (geo) {
+            prevGeo = geo;
+            break;
+          }
+        }
+        // If the transport segment itself doesn't have a geo, find the next one
+        if (!nextGeo) {
+          for (let i = activeSegmentIndex + 1; i < segments.length; i++) {
+            const s = segments[i];
+            const geo = s.geo || s.details?.geo;
+            if (geo) {
+              nextGeo = geo;
+              break;
+            }
+          }
+        }
+      }
+
+      if (isTransport && prevGeo && nextGeo) {
+        const bounds = new window.google.maps.LatLngBounds();
+        bounds.extend({ lat: prevGeo!.latitude, lng: prevGeo!.longitude });
+        bounds.extend({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
+        mapInstance.panToBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 });
+      } else if (nextGeo) {
+        mapInstance.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
+        mapInstance.setZoom(15);
+      }
+    } else if (routePath.length > 0) {
+      // Zoom to fit all if no active segment is selected
+      if (routePath.length === 1) {
+        mapInstance.panTo(routePath[0]);
+        mapInstance.setZoom(14); // Sensible default zoom for a single marker
+      } else {
+        const bounds = new window.google.maps.LatLngBounds();
+        routePath.forEach((pos) => bounds.extend(pos));
+        mapInstance.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
+      }
     }
-  }, [mapInstance, routePath]);
+  }, [mapInstance, activeSegmentIndex, routePath, segments]);
 
   // Formats raw ISO strings into a clean "09:00 AM" format
   const formatTime = (timeStr?: string) => {
@@ -101,7 +171,7 @@ export default function MapHub() {
           onLoad={setMapInstance}
           onUnmount={() => setMapInstance(null)}
         >
-          {segments.map((segment: any, index: number) => {
+          {segments.map((segment, index: number) => {
             const geo = segment.geo || segment.details?.geo;
             if (geo) {
               return (
@@ -142,18 +212,24 @@ export default function MapHub() {
             );
           })()}
 
-          {/* Polyline Route */}
-          {routePath.length > 1 && (
+          {/* Polyline Routes */}
+          {routeEdges.map((edge, index) => (
             <PolylineComponent
-              path={routePath}
+              key={`route-edge-${index}`}
+              path={edge.path}
               options={{
-                strokeColor: '#6366f1', // Matches the primary theme color
-                strokeOpacity: 0.8,
+                strokeColor: edge.isFlight ? '#0ea5e9' : '#6366f1', // Sky blue for flights
+                strokeOpacity: edge.isFlight ? 0 : 0.8, // Hide solid stroke if dashed
                 strokeWeight: 4,
                 geodesic: true,
+                icons: edge.isFlight ? [{
+                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3 },
+                  offset: '0',
+                  repeat: '15px'
+                }] : undefined,
               }}
             />
-          )}
+          ))}
         </MapComponent>
       ) : (
         <div

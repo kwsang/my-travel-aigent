@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, ValidationInfo
 from typing import List, Optional, Dict, Any, Literal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 class GeoCoordinates(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -15,8 +15,8 @@ class Price(BaseModel):
 
 class Schedule(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    local_start_time: str = Field(..., description="ISO 8601 string for local start time.")
-    local_end_time: Optional[str] = Field(None, description="ISO 8601 string for local end time.")
+    local_start_time: str = Field(..., description="ISO 8601 datetime string for local start time (must include date and time).")
+    local_end_time: Optional[str] = Field(None, description="ISO 8601 datetime string for local end time.")
     start_time_utc: Optional[str] = Field(None, description="UTC normalized start time.")
     end_time_utc: Optional[str] = Field(None, description="UTC normalized end time.")
     timezone: str = Field(default="America/New_York", description="IANA Timezone ID.")
@@ -72,6 +72,25 @@ class Event(BaseModel):
     schedule: Schedule
     geo: Optional[GeoCoordinates] = Field(None, description="Optional root-level coordinates for transit origins/destinations.")
     details: EventDetails
+
+    @field_validator('schedule', mode='before')
+    @classmethod
+    def enforce_datetime_format(cls, v, info: ValidationInfo):
+        if not isinstance(v, dict):
+            return v
+        
+        day = info.data.get('day', 1)
+        base_date = datetime(2024, 1, 1) + timedelta(days=day - 1)
+        date_prefix = base_date.strftime("%Y-%m-%d")
+        
+        for field in ['local_start_time', 'local_end_time']:
+            val = v.get(field)
+            if val and isinstance(val, str) and 'T' not in val:
+                time_part = val.strip()
+                if len(time_part) <= 5: # HH:MM
+                    time_part += ":00"
+                v[field] = f"{date_prefix}T{time_part}"
+        return v
 
 class Itinerary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

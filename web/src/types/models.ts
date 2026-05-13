@@ -14,11 +14,17 @@ export interface Schedule {
   applied_buffer_minutes?: number;
 }
 
+export interface GeoCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export interface EventDetails {
   name: string;
   category: string;
   city?: string;
   travel_zone?: string;
+  geo?: GeoCoordinates;
   price?: Price;
   is_rental: boolean;
   vehicle_count: number;
@@ -36,6 +42,7 @@ export interface Event {
   day: number;
   segment: SegmentType;
   schedule: Schedule;
+  geo?: GeoCoordinates;
   details: EventDetails;
 }
 
@@ -47,6 +54,7 @@ export interface Itinerary {
   duration_days: number;
   party_size_total: number;
   events: Event[];
+  status?: 'draft' | 'final';
   updated_at: string;
   is_conflict: boolean;
   validation_errors: string[];
@@ -64,5 +72,11 @@ export interface UserProfile {
     risk_tolerance: 'relaxed' | 'strict';
     circadian_preference: 'early_bird' | 'night_owl';
     group_planning_per_person?: boolean;
+    starting_location?: string;
+    transport_preference?: 'public' | 'rideshare' | 'rental';
+    personal_transport_available?: boolean;
   };
+  room_sharing?: boolean;
+  people_per_room?: number;
+  interests?: string[];
 }

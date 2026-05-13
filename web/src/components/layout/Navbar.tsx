@@ -7,15 +7,16 @@ import { Menu, X, Plane, UserCircle } from 'lucide-react';
 interface NavbarProps {
   onEditProfile?: () => void;
   profileSetStatus?: boolean; // New prop for profile status
+  centerContent?: React.ReactNode; // New prop for the dynamic title/selector
 }
 
-export default function Navbar({ onEditProfile, profileSetStatus }: NavbarProps) {
+export default function Navbar({ onEditProfile, profileSetStatus, centerContent }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <nav className="w-full bg-background/80 backdrop-blur-md border-b border-border shrink-0 z-[100] sticky top-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
+        <div className="flex justify-between h-16 items-center relative">
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="bg-primary p-1.5 rounded-lg group-hover:scale-110 transition-transform shadow-lg shadow-primary/20">
@@ -24,6 +25,13 @@ export default function Navbar({ onEditProfile, profileSetStatus }: NavbarProps)
               <span className="font-bold text-xl text-foreground tracking-tight">Travel AIgent</span>
             </Link>
           </div>
+
+          {/* Dynamic Center Content */}
+          {centerContent && (
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
+              {centerContent}
+            </div>
+          )}
 
           {/* Desktop Links */}
           <div className="hidden md:flex items-center gap-8">
