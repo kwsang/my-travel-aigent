@@ -20,15 +20,31 @@ export default function TimelineView() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
   
+  const activeDay = activeSegmentIndex !== null ? segments[activeSegmentIndex]?.day : null;
+
   // Auto-scroll the timeline to the focused segment when a map marker is clicked
   React.useEffect(() => {
     if (activeSegmentIndex !== null) {
-      const element = document.getElementById(`timeline-item-${activeSegmentIndex}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const segmentDay = segments[activeSegmentIndex]?.day;
+      if (segmentDay) {
+        // Auto-expand the day if it is currently collapsed
+        setCollapsedDays(prev => {
+          if (!prev.has(segmentDay)) return prev;
+          const next = new Set(prev);
+          next.delete(segmentDay);
+          return next;
+        });
       }
+
+      // Use a slight timeout to ensure the DOM has expanded before scrolling
+      setTimeout(() => {
+        const element = document.getElementById(`timeline-item-${activeSegmentIndex}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     }
-  }, [activeSegmentIndex]);
+  }, [activeSegmentIndex, segments]);
 
   // Determine the baseline start date of the trip for calendar labeling
   const baseTripStartDate = React.useMemo(() => {
@@ -250,17 +266,21 @@ export default function TimelineView() {
         return (
           <div key={day} className="flex flex-col gap-4">
             <div 
-              className="sticky top-0 z-10 -mx-6 bg-card/80 px-6 py-2 backdrop-blur-md border-y border-border/20 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors select-none group"
+              className={`sticky top-0 z-10 -mx-6 px-6 py-2 backdrop-blur-md border-y cursor-pointer flex items-center justify-between transition-colors select-none group ${
+                activeDay === day 
+                  ? 'bg-primary/15 border-primary/30 shadow-sm' 
+                  : 'bg-card/80 border-border/20 hover:bg-white/5'
+              }`}
               onClick={() => toggleDay(day)}
               onDragEnter={(e) => handleDragEnter(e, `day-${day}`)}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, segments.length, day)}
             >
               <div className="flex items-baseline gap-2">
-                <h2 className="text-lg font-bold text-foreground">Day {day}</h2>
-                <span className="text-sm font-medium text-muted-foreground">{dateString}</span>
+                <h2 className={`text-lg font-bold ${activeDay === day ? 'text-primary' : 'text-foreground'}`}>Day {day}</h2>
+                <span className={`text-sm font-medium ${activeDay === day ? 'text-primary/80' : 'text-muted-foreground'}`}>{dateString}</span>
               </div>
-              <ChevronDown size={18} className={`text-muted-foreground transition-transform duration-200 group-hover:text-foreground ${isCollapsed ? '-rotate-90' : ''}`} />
+              <ChevronDown size={18} className={`transition-transform duration-200 ${activeDay === day ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} ${isCollapsed ? '-rotate-90' : ''}`} />
             </div>
 
             {!isCollapsed && (
