@@ -30,31 +30,30 @@ export default function AdvancedSegmentMarker({ position, title, segmentType, is
       case 'DINING': bgColor = '#f43f5e'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/restaurant-71.png'; break;
       case 'EXPERIENCE': bgColor = '#f59e0b'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/museum-71.png'; break;
       case 'FLIGHT': bgColor = '#0ea5e9'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/airport-71.png'; break;
-      case 'TRANSPORT': bgColor = '#0ea5e9'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/taxi-71.png'; break;
+      case 'TRANSPORT': bgColor = '#0ea5e9'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/bus_share_taxi_pinlet.png'; break;
       case 'LOGISTICS': bgColor = '#64748b'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png'; break;
     }
 
-    // Create a custom HTML image element for the glyph
-    let glyphContent: HTMLElement | string = fallbackGlyph;
-    if (iconUrl) {
-      const img = document.createElement('img');
-      img.src = iconUrl;
-      // Style the image to fit beautifully inside the PinElement
-      img.style.width = '18px';
-      img.style.height = '18px';
-      img.style.objectFit = 'contain';
-      glyphContent = img;
-    }
-
-    const pin = new google.maps.marker.PinElement({
+    // We cast to 'any' to bypass TS errors in case @types/google.maps is outdated
+    const pinOptions: any = {
       background: bgColor,
       borderColor: isActive ? '#020617' : '#ffffff', // High contrast dark border when active
-      glyph: glyphContent,
       scale: isActive ? 1.4 : 1.1, // Scale up when active
-    });
+    };
+
+    if (iconUrl) {
+      pinOptions.glyphSrc = iconUrl;
+    } else {
+      pinOptions.glyphText = fallbackGlyph;
+    }
+
+    const pin = new google.maps.marker.PinElement(pinOptions);
 
     const marker = new google.maps.marker.AdvancedMarkerElement({
-      map, position, title, content: pin.element,
+      map,
+      position,
+      title,
+      content: pin,
       zIndex: isActive ? 100 : undefined, // Bring to front
     });
 

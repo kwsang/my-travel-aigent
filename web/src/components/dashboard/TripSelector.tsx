@@ -54,7 +54,7 @@ export default function TripSelector({
       {isEditingName ? (
         <input
           autoFocus
-          className="text-xl font-bold text-foreground tracking-tight bg-transparent border-b-2 border-primary outline-none w-64 text-center"
+          className="text-xl font-bold text-foreground tracking-tight bg-transparent border-b-2 border-primary outline-none w-96 text-center"
           value={editedName}
           onChange={(e) => setEditedName(e.target.value)}
           onBlur={onRename}
@@ -65,7 +65,7 @@ export default function TripSelector({
           className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors px-4 py-2 rounded-xl hover:bg-white/5" 
           onClick={() => setShowTripDropdown(!showTripDropdown)}
         >
-          <span className="font-bold text-xl text-foreground tracking-tight max-w-[200px] truncate">
+          <span className="font-bold text-xl text-foreground tracking-tight max-w-[400px] truncate">
             {currentItinerary.trip_name || 'New Trip'}
           </span>
           <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${currentItinerary.status === 'final' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-primary/10 text-primary border-primary/20'}`}>

@@ -121,7 +121,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
           <h3 className="font-bold text-foreground text-sm tracking-wide">Travel AIgent</h3>
         </div>
-        <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-white transition-colors" title="Close Chat">
+        <button onClick={() => setIsOpen(false)} className="text-white hover:opacity-80 transition-opacity" title="Close Chat">
           <X size={18} />
         </button>
       </div>

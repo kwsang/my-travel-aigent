@@ -5,7 +5,6 @@ import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react'
 import { useItineraryData } from '@/context/ItineraryContext';
 import { GoogleMap, useJsApiLoader, Polyline } from '@react-google-maps/api';
 import AdvancedSegmentMarker from './map/AdvancedSegmentMarker';
-import { darkMapStyle } from './map/mapStyles';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
@@ -152,7 +151,6 @@ export default function MapHub() {
             disableDefaultUI: true, // Hides standard controls for a cleaner, modern look
             zoomControl: true,
             mapId: 'DEMO_MAP_ID', // Required for AdvancedMarkerElements
-            styles: darkMapStyle,
           }}
           onLoad={setMapInstance}
           onUnmount={() => setMapInstance(null)}

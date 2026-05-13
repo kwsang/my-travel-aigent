@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Hotel, Bus, Zap, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
@@ -162,7 +162,7 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <Hotel size={14} /> Per Room
+                <Bed size={14} /> Per Room
               </label>
               <input 
                 type="number"

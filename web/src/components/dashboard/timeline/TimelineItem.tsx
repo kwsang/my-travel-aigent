@@ -1,6 +1,6 @@
 import React from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { Car, Utensils, Sparkles, Hotel, ClipboardList, Plane, LucideIcon, GripVertical } from 'lucide-react';
+import { Car, Utensils, Sparkles, Bed, ClipboardList, Plane, LucideIcon, GripVertical } from 'lucide-react';
 import { Event } from '@/types';
 
 // Map segment types to Lucide icons
@@ -8,7 +8,7 @@ const SegmentIcons: Record<string, LucideIcon> = {
   TRANSPORT: Car,
   DINING: Utensils,
   EXPERIENCE: Sparkles,
-  ACCOMMODATION: Hotel,
+  ACCOMMODATION: Bed,
   LOGISTICS: ClipboardList,
   FLIGHT: Plane,
 };
