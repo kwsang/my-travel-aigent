@@ -98,13 +98,27 @@ export default function TimelineView() {
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
       };
 
+      // Calculate the base date of the entire trip (Day 1) to accurately shift dates
+      const allStartTimes = newSegments
+        .map((s: Event) => parseLocal(s.schedule?.local_start_time || ''))
+        .filter((d: Date) => !isNaN(d.getTime()));
+      
+      let tripStartDate = new Date(2026, 0, 1);
+      if (allStartTimes.length > 0) {
+        tripStartDate = new Date(Math.min(...allStartTimes.map((d: Date) => d.getTime())));
+      }
+      tripStartDate.setHours(0, 0, 0, 0);
+
       // Set the anchor time to the first event's start time (or default to 9 AM)
       let currentStartTime = parseLocal(daySegments[0].schedule?.local_start_time || '');
       if (isNaN(currentStartTime.getTime())) {
-        currentStartTime = new Date(2026, 0, day); // Base date matches backend Pydantic validator
+        currentStartTime = new Date(tripStartDate);
+        currentStartTime.setDate(tripStartDate.getDate() + day - 1);
         currentStartTime.setHours(9, 0, 0, 0);
       } else {
-        currentStartTime.setFullYear(2026, 0, day); // Clamp dragged items to the target day's date
+        const targetDate = new Date(tripStartDate);
+        targetDate.setDate(tripStartDate.getDate() + day - 1);
+        currentStartTime.setFullYear(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
       }
 
       daySegments.forEach((seg: Event, idx: number) => {

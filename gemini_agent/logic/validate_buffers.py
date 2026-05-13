@@ -296,7 +296,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
         return False
 
     for event in itinerary.get("events", []):
-        price_data = event["details"].get("price", {})
+        price_data = event["details"].get("price") or {}
         if price_data:
             # Ensure 'is_estimated' flag is correctly set
             if "is_estimated" not in price_data or not isinstance(price_data["is_estimated"], bool):
