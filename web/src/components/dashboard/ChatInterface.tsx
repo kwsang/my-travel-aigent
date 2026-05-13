@@ -131,21 +131,18 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     }
   };
 
-  if (!isOpen) {
-    return (
+  return (
+    <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="absolute bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-50 ring-1 ring-white/10"
+        className={`absolute bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all duration-300 z-50 ring-1 ring-white/10 ${isOpen ? 'opacity-0 scale-50 invisible pointer-events-none' : 'opacity-100 scale-100 visible'}`}
         title="Open Chat"
       >
         <MessageSquare size={24} />
       </button>
-    );
-  }
 
-  return (
     <div 
-      className="absolute bottom-6 right-6 w-96 h-[500px] flex flex-col bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 ring-1 ring-white/5"
+      className={`absolute bottom-6 right-6 w-96 h-[500px] flex flex-col bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 ring-1 ring-white/5 transition-all duration-300 origin-bottom-right ${isOpen ? 'opacity-100 scale-100 visible' : 'opacity-0 scale-95 invisible pointer-events-none'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -218,5 +215,6 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
         </button>
       </form>
     </div>
+    </>
   );
 }
