@@ -30,9 +30,9 @@ export function useItineraryData() {
   const { itinerary } = context;
 
   const segments = itinerary.events || [];
-  const profile = itinerary.user_profile_data;
+  const profile = itinerary.traveler_profile;
   const partySize = profile?.party_size || 1;
-  const budget = profile?.budget;
+  const budget = itinerary.budget;
   const riskTolerance = profile?.preferences?.risk_tolerance;
   const isRelaxed = riskTolerance === 'relaxed';
 

@@ -8,7 +8,7 @@ import ChatInterface from '@/components/dashboard/ChatInterface';
 import ProfileModal from '@/components/dashboard/ProfileModal';
 import Toast from '@/components/dashboard/Toast';
 import Navbar from '@/components/layout/Navbar';
-import { Itinerary } from '@/types';
+import { Itinerary, TravelerProfile } from '@/types';
 import { API_CONFIG } from '@/config/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { ItineraryContext } from '@/context/ItineraryContext';
@@ -17,7 +17,7 @@ import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/BudgetSkeleton';
 import TripSelector from '@/components/dashboard/TripSelector';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2, AlertTriangle, UserCircle } from 'lucide-react';
 
 /**
  * The Visual Planning Dashboard
@@ -39,19 +39,19 @@ export default function DashboardPage() {
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
-  const [profileHasBeenSet, setProfileHasBeenSet] = useState(false); // New state for profile status
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [tripToDelete, setTripToDelete] = useState<string | null>(null);
   const [showBlankNameAlert, setShowBlankNameAlert] = useState(false);
+  const [profile, setProfile] = useState<TravelerProfile | null>(null);
   const [itinerary, setItinerary] = useState<Partial<Itinerary>>({
     events: [],
     is_conflict: false,
     validation_errors: [],
-    user_profile_data: undefined
   });
   const [isLoadingItinerary, setIsLoadingItinerary] = useState(true);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
 
   // Sidebar Resizing State
@@ -90,14 +90,12 @@ export default function DashboardPage() {
     setEditedName(itinerary.trip_name || 'New Trip');
   }, [itinerary.trip_name]);
 
-  // First time popup logic
+  // Automatically switch to per-person view if the profile is set to it
   useEffect(() => {
-    const storedProfileStatus = localStorage.getItem('travel_profile_set') === 'true';
-    setProfileHasBeenSet(storedProfileStatus);
-    if (!storedProfileStatus) {
-      setShowProfileModal(true);
+    if (profile?.preferences?.group_planning_per_person) {
+      setViewMode('per_person');
     }
-  }, []);
+  }, [profile, setViewMode]);
 
   const fetchList = useCallback(async () => {
     if (!visitorId) return;
@@ -106,6 +104,22 @@ export default function DashboardPage() {
       if (response.ok) setItineraries(await response.json());
     } catch (e) {
       console.warn("Could not fetch trip list.");
+    }
+  }, [visitorId]);
+
+  const fetchProfile = useCallback(async () => {
+    if (!visitorId) return;
+    setIsLoadingProfile(true);
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/profile/${visitorId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+      }
+    } catch (e) {
+      console.warn("Could not fetch user profile.");
+    } finally {
+      setIsLoadingProfile(false);
     }
   }, [visitorId]);
 
@@ -118,10 +132,6 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         setItinerary(data);
-
-        if (data.user_profile_data?.preferences?.group_planning_per_person) {
-          setViewMode('per_person');
-        }
       }
     } catch (error) {
       console.warn("Dashboard Sync: Session not active yet.");
@@ -132,9 +142,10 @@ export default function DashboardPage() {
 
   // Centralized dashboard update logic to ensure single points of refresh
   const refreshDashboard = useCallback(() => {
+    fetchProfile();
     fetchItinerary();
     fetchList();
-  }, [fetchItinerary, fetchList]);
+  }, [fetchItinerary, fetchList, fetchProfile]);
 
   useEffect(() => {
     if (visitorId) {
@@ -215,6 +226,7 @@ export default function DashboardPage() {
     setIsEditingName(false);
     setItinerary({ events: [], is_conflict: false, validation_errors: [] });
     setActiveSegmentIndex(null);
+    setShowProfileModal(true);
     triggerToast('Started a new trip!');
   };
 
@@ -238,26 +250,27 @@ export default function DashboardPage() {
     />
   );
 
+  const isLoading = isLoadingItinerary || isLoadingProfile;
+
   // Memoize the context value to prevent unnecessary re-renders of all consumer components
   const contextValue = useMemo(() => ({
     itinerary,
+    profile,
     setItinerary,
     viewMode,
     setViewMode,
     refreshDashboard,
     sessionId: currentSessionId,
     userId: visitorId,
-    isLoading: isLoadingItinerary,
+    isLoading,
     activeSegmentIndex,
     setActiveSegmentIndex
-  }), [itinerary, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoadingItinerary, activeSegmentIndex]);
+  }), [itinerary, profile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex]);
 
   return (
     <ItineraryContext.Provider value={contextValue}>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <Navbar 
-        onEditProfile={() => setShowProfileModal(true)} 
-        profileSetStatus={profileHasBeenSet} // Pass the status to Navbar
         centerContent={navbarCenter}
       />
       <main className={`flex flex-1 overflow-hidden ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
@@ -267,13 +280,18 @@ export default function DashboardPage() {
           className="shrink-0 overflow-y-auto px-6 bg-card shadow-sm z-10 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40"
           style={{ width: `${sidebarWidth}px` }}
         >
-          <div className="py-6 border-b border-border/50 mb-6 flex items-center justify-between shrink-0">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Itinerary Timeline</h2>
-            <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<BudgetSkeleton />}>
+          <div className="py-6 border-b border-border/50 mb-6 flex flex-col gap-4 shrink-0">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Itinerary Timeline</h2>
+              <button onClick={() => setShowProfileModal(true)} className="text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 transition-colors flex items-center gap-1 bg-primary/10 px-2 py-1 rounded-md">
+                <UserCircle size={12} /> Traveler Profile
+              </button>
+            </div>
+            <SkeletonWrapper isLoading={isLoading} fallback={<BudgetSkeleton />}>
               <BudgetPanel />
             </SkeletonWrapper>
           </div>
-          <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<TimelineSkeleton />}>
+          <SkeletonWrapper isLoading={isLoading} fallback={<TimelineSkeleton />}>
             <TimelineView />
           </SkeletonWrapper>
         </div>
@@ -301,12 +319,13 @@ export default function DashboardPage() {
 
       {showProfileModal && (
         <ProfileModal 
+          sessionId={currentSessionId}
           userId={visitorId}
-          initialData={itinerary.user_profile_data}
+          initialData={profile || undefined}
           onClose={() => setShowProfileModal(false)}
-          onSave={() => {
+          onSave={(newProfile) => {
+            setProfile(newProfile);
             refreshDashboard();
-            setProfileHasBeenSet(true); // Update status after saving
             triggerToast('Traveler profile updated successfully!');
           }}
         />

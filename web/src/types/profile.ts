@@ -3,14 +3,13 @@
  * Used for form state management and profile data synchronization.
  */
 
+import { Budget } from './models';
+
 export interface ProfileFormData {
   party_size: number;
   room_sharing: boolean;
   people_per_room: number;
-  budget: {
-    total_limit: number;
-    currency: string;
-  };
+  budget: Budget;
   preferences: {
     risk_tolerance: 'relaxed' | 'strict';
     circadian_preference: 'night_owl' | 'early_bird';

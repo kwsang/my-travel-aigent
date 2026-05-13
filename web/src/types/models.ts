@@ -46,6 +46,11 @@ export interface Event {
   details: EventDetails;
 }
 
+export interface Budget {
+  total_limit: number;
+  currency: string;
+}
+
 export interface Itinerary {
   _id?: string;
   user_id: string;
@@ -54,20 +59,17 @@ export interface Itinerary {
   duration_days: number;
   party_size_total: number;
   events: Event[];
+  budget?: Budget;
   status?: 'draft' | 'final';
   updated_at: string;
   is_conflict: boolean;
   validation_errors: string[];
-  user_profile_data?: UserProfile;
+  traveler_profile?: TravelerProfile;
 }
 
-export interface UserProfile {
-  user_id: string;
+export interface TravelerProfile {
   party_size: number;
-  budget: {
-    total_limit: number;
-    currency: string;
-  };
+  budget?: Budget;
   preferences: {
     risk_tolerance: 'relaxed' | 'strict';
     circadian_preference: 'early_bird' | 'night_owl';

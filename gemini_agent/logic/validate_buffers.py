@@ -319,7 +319,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
 
     print(f"Validating Budget (Group Size: {total_people}, Per-Person: {per_person_toggle})...")
     total_cost = 0.0
-    limit = user_prefs.get('budget', {}).get('total_limit', 0)
+    limit = itinerary.get('budget', {}).get('total_limit', 0)
     room_sharing = user_prefs.get('room_sharing', False)
     people_per_room = user_prefs.get('people_per_room', 2)
 
@@ -365,7 +365,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
 
     final_val = total_cost / total_people if per_person_toggle else total_cost
     
-    currency = user_prefs.get('budget', {}).get('currency', 'USD')
+    currency = itinerary.get('budget', {}).get('currency', 'USD')
     print(f"  Calculated Value: {final_val:.2f} {currency}")
     print(f"  Budget Limit:     {limit:.2f} {currency}")
 
@@ -458,6 +458,10 @@ def run_scenario_5_validation():
         "duration_days": 2,
         "party_size_total": 12,
         "status": "draft",
+        "budget": {
+            "total_limit": 1500, # 1500 per person
+            "currency": "USD"
+        },
         "events": [
             # Day 1: Positano Hub
             {
@@ -627,10 +631,6 @@ def run_scenario_5_validation():
         "people_per_room": 3,
         "transport_preference": "rideshare",
         "personal_transport_available": False,
-        "budget": {
-            "total_limit": 1500, # 1500 per person
-            "currency": "USD"
-        }
     }
 
     # Mock adding prices for the validation

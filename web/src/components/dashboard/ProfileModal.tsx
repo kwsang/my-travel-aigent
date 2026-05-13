@@ -5,31 +5,29 @@ import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowR
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
-import { UserProfile } from '@/types';
+import { TravelerProfile } from '@/types';
 
 interface ProfileModalProps {
+  sessionId: string;
   userId: string;
-  initialData?: UserProfile;
+  initialData?: TravelerProfile;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (profile: TravelerProfile) => void;
 }
 
-export default function ProfileModal({ userId, initialData, onClose, onSave }: ProfileModalProps) {
+export default function ProfileModal({ sessionId, userId, initialData, onClose, onSave }: ProfileModalProps) {
   const [page, setPage] = useState(1);
 
-  const parseProfileData = (data?: UserProfile): ProfileFormData => ({
+  const parseProfileData = (data?: TravelerProfile): ProfileFormData => ({
     party_size: data?.party_size || 1,
     room_sharing: data?.room_sharing || false,
     people_per_room: data?.people_per_room || 2,
-    budget: {
-      total_limit: data?.budget?.total_limit || 0,
-      currency: 'USD'
-    },
+    budget: data?.budget || { total_limit: 0, currency: 'USD' },
     preferences: {
       risk_tolerance: data?.preferences?.risk_tolerance || 'relaxed',
       circadian_preference: data?.preferences?.circadian_preference || 'night_owl',
       group_planning_per_person: data?.preferences?.group_planning_per_person || false,
-      transport_preference: data?.preferences?.transport_preference || 'public',
+      transport_preference: data?.preferences?.transport_preference || 'rental',
       personal_transport_available: data?.preferences?.personal_transport_available || false
     },
     interests: data?.interests || []
@@ -39,24 +37,14 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
   const [isFetching, setIsFetching] = useState(!initialData);
   const [isSaving, setIsLoading] = useState(false);
 
-  // Fetch latest profile data on mount if not provided by parent
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (initialData) return;
-      try {
-        const response = await fetch(`${API_CONFIG.BASE_URL}/profile/${userId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setFormData(parseProfileData(data));
-        }
-      } catch (e) {
-        console.error("ProfileModal: Error loading data", e);
-      } finally {
-        setIsFetching(false);
-      }
-    };
-    fetchProfile();
-  }, [userId, initialData]);
+    if (initialData) {
+      setFormData(parseProfileData(initialData));
+      setIsFetching(false);
+    } else {
+      setIsFetching(false);
+    }
+  }, [initialData]);
 
   const toggleInterest = (interest: string) => {
     setFormData(prev => ({
@@ -76,8 +64,8 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
         body: JSON.stringify(formData),
       });
       if (response.ok) {
-        localStorage.setItem('travel_profile_set', 'true');
-        onSave();
+        const updatedProfile = await response.json();
+        onSave(updatedProfile);
         onClose();
       }
     } catch (error) {
@@ -212,18 +200,6 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
           ) : (
             <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
               {/* Style & Preferences */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-              <Wallet size={14} /> Total Budget (USD)
-            </label>
-            <div className="space-y-4">
-              <input 
-                type="number"
-                value={formData.budget.total_limit}
-                onChange={(e) => setFormData({...formData, budget: {...formData.budget, total_limit: parseInt(e.target.value) || 0}})}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                placeholder="e.g. 5000"
-              />
               <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
                 <input 
                   type="checkbox"
@@ -236,8 +212,6 @@ export default function ProfileModal({ userId, initialData, onClose, onSave }: P
                   Plan budget on a per-person basis?
                 </label>
               </div>
-            </div>
-          </div>
 
           <div className="grid grid-cols-2 gap-4 mt-2">
             <ThemedSelect

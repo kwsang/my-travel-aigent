@@ -41,28 +41,25 @@ class UserProfilePreferences(BaseModel):
     transport_preference: Literal['public', 'rideshare', 'rental'] = Field(default='public')
     personal_transport_available: bool = Field(default=False)
 
-class UserProfileBudget(BaseModel):
-    total_limit: float
+class TripBudget(BaseModel):
+    total_limit: float = Field(default=0.0)
     currency: str = Field(default="USD")
 
-class UserProfile(BaseModel):
+class TravelerProfile(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
-    user_id: str = ""
     party_size: int = Field(default=1)
-    budget: UserProfileBudget
+    budget: Optional[TripBudget] = None
     preferences: UserProfilePreferences
     room_sharing: bool = Field(default=False)
     people_per_room: int = Field(default=2)
     interests: List[str] = Field(default_factory=list)
 
 class ProfileUpdateRequest(BaseModel):
-    """Schema for updating a user profile from the UI."""
     party_size: Optional[int] = None
-    budget: Optional[UserProfileBudget] = None
+    budget: Optional[TripBudget] = None
     preferences: Optional[UserProfilePreferences] = None
     room_sharing: Optional[bool] = None
     people_per_room: Optional[int] = None
-    group_planning_per_person: Optional[bool] = None
     interests: Optional[List[str]] = None
 
 class Event(BaseModel):
@@ -110,10 +107,11 @@ class Itinerary(BaseModel):
     party_size_total: int
     status: Literal["draft", "final"] = Field(default="draft")
     events: List[Event]
+    budget: Optional[TripBudget] = Field(default_factory=lambda: TripBudget(total_limit=0.0))
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
-    user_profile_data: Optional[UserProfile] = None
+    traveler_profile: Optional[TravelerProfile] = None
 
     @field_validator('updated_at', mode='before')
     @classmethod
@@ -124,8 +122,10 @@ class Itinerary(BaseModel):
 
 class ItineraryPatchRequest(BaseModel):
     events: Optional[List[Event]] = Field(None, description="Updated events from the UI.")
+    budget: Optional[TripBudget] = Field(None, description="Updated budget from the UI.")
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
     status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
+    traveler_profile: Optional[TravelerProfile] = Field(None, description="Updated traveler profile.")
 
 class ValidationResponse(BaseModel):
     status: Literal["success", "warning", "error"] = Field(..., description="The outcome status of the validation.")
