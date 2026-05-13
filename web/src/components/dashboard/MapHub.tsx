@@ -107,7 +107,7 @@ export default function MapHub() {
   React.useEffect(() => {
     if (!mapInstance) return;
 
-    if (activeSegmentIndex !== null) {
+    if (activeSegmentIndex !== null && segments[activeSegmentIndex]) {
       const activeSegment = segments[activeSegmentIndex];
       const isTransport = ['FLIGHT', 'TRANSPORT'].includes(activeSegment.segment);
 

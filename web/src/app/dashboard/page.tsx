@@ -214,6 +214,7 @@ export default function DashboardPage() {
     setCurrentSessionId(uuidv4());
     setIsEditingName(false);
     setItinerary({ events: [], is_conflict: false, validation_errors: [] });
+    setActiveSegmentIndex(null);
     triggerToast('Started a new trip!');
   };
 
