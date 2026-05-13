@@ -36,7 +36,7 @@ export default function AdvancedSegmentMarker({ position, title, segmentType, is
       case 'DINING': bgColor = '#f43f5e'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/restaurant-71.png'; break;
       case 'EXPERIENCE': bgColor = '#f59e0b'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/museum-71.png'; break;
       case 'FLIGHT': bgColor = '#0ea5e9'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/airport-71.png'; break;
-      case 'TRANSPORT': bgColor = '#0ea5e9'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/bus_share_taxi_pinlet.png'; break;
+      case 'TRANSPORT': bgColor = '#0ea5e9'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v2/bus_share_taxi_pinlet.svg'; break;
       case 'LOGISTICS': bgColor = '#64748b'; iconUrl = 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png'; break;
     }
 

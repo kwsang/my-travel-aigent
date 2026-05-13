@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { API_CONFIG } from '@/config/constants';
 
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, ChevronDown } from 'lucide-react';
 import TimelineItem from './TimelineItem';
 import { Event } from '@/types';
 
@@ -18,6 +18,7 @@ export default function TimelineView() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
   
   // Auto-scroll the timeline to the focused segment when a map marker is clicked
   React.useEffect(() => {
@@ -28,6 +29,29 @@ export default function TimelineView() {
       }
     }
   }, [activeSegmentIndex]);
+
+  // Determine the baseline start date of the trip for calendar labeling
+  const baseTripStartDate = React.useMemo(() => {
+    const allStartTimes = segments
+      .map((s: Event) => new Date(s.schedule?.local_start_time || ''))
+      .filter((d: Date) => !isNaN(d.getTime()));
+    
+    let d = new Date(2026, 0, 1);
+    if (allStartTimes.length > 0) {
+      d = new Date(Math.min(...allStartTimes.map(dt => dt.getTime())));
+    }
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [segments]);
+
+  const toggleDay = (day: number) => {
+    setCollapsedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  };
 
   // Extract unique days and sort them
   const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
@@ -53,6 +77,18 @@ export default function TimelineView() {
   const handleDragEnter = (e: React.DragEvent, index: number | string) => {
     e.preventDefault();
     setDragOverIndex(index);
+
+    // Auto-expand collapsed days when hovering over them
+    if (typeof index === 'string' && index.startsWith('day-')) {
+      const dayNum = parseInt(index.split('-')[1], 10);
+      if (collapsedDays.has(dayNum)) {
+        setCollapsedDays(prev => {
+          const next = new Set(prev);
+          next.delete(dayNum);
+          return next;
+        });
+      }
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -205,44 +241,63 @@ export default function TimelineView() {
         </div>
       )}
 
-      {days.map((day) => (
-        <div key={day} className="flex flex-col gap-4">
-          <div className="sticky top-0 z-10 -mx-6 bg-card/80 px-6 py-2 backdrop-blur-md border-y border-border/20">
-            <h2 className="text-lg font-bold text-foreground">Day {day}</h2>
-          </div>
+      {days.map((day) => {
+        const isCollapsed = collapsedDays.has(day);
+        const dayDate = new Date(baseTripStartDate);
+        dayDate.setDate(baseTripStartDate.getDate() + day - 1);
+        const dateString = dayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-          <div 
-            className={`relative space-y-4 pl-6 pb-4 border-l-2 border-border min-h-[60px] rounded-br-xl transition-all ${
-              dragOverIndex === `day-${day}` ? 'pb-20 after:content-["Drop_Here"] after:flex after:items-center after:justify-center after:text-[11px] after:font-bold after:text-primary after:uppercase after:tracking-widest after:absolute after:bottom-4 after:left-6 after:right-0 after:h-12 after:border-2 after:border-dashed after:border-primary/60 after:rounded-xl after:bg-primary/10' : ''
-            }`}
-            onDragEnter={(e) => handleDragEnter(e, `day-${day}`)}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, segments.length, day)} // Fallback drop zone at the end of the day block
-          >
-            {segments
-              .map((event, absoluteIndex) => ({ event, absoluteIndex }))
-              .filter(({ event }) => event.day === day)
-              .map(({ event, absoluteIndex }) => (
-                <TimelineItem
-                  key={`${day}-${absoluteIndex}`}
-                  event={event}
-                  absoluteIndex={absoluteIndex}
-                  day={day}
-                  draggedIndex={draggedIndex}
-                  dragOverIndex={dragOverIndex}
-                  isSyncing={isSyncing}
-                  onDragStart={handleDragStart}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                />
-              ))}
+        return (
+          <div key={day} className="flex flex-col gap-4">
+            <div 
+              className="sticky top-0 z-10 -mx-6 bg-card/80 px-6 py-2 backdrop-blur-md border-y border-border/20 cursor-pointer flex items-center justify-between hover:bg-white/5 transition-colors select-none group"
+              onClick={() => toggleDay(day)}
+              onDragEnter={(e) => handleDragEnter(e, `day-${day}`)}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, segments.length, day)}
+            >
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-lg font-bold text-foreground">Day {day}</h2>
+                <span className="text-sm font-medium text-muted-foreground">{dateString}</span>
+              </div>
+              <ChevronDown size={18} className={`text-muted-foreground transition-transform duration-200 group-hover:text-foreground ${isCollapsed ? '-rotate-90' : ''}`} />
+            </div>
+
+            {!isCollapsed && (
+              <div 
+                className={`relative space-y-4 pl-6 pb-4 border-l-2 border-border min-h-[60px] rounded-br-xl transition-all ${
+                  dragOverIndex === `day-${day}` ? 'pb-20 after:content-["Drop_Here"] after:flex after:items-center after:justify-center after:text-[11px] after:font-bold after:text-primary after:uppercase after:tracking-widest after:absolute after:bottom-4 after:left-6 after:right-0 after:h-12 after:border-2 after:border-dashed after:border-primary/60 after:rounded-xl after:bg-primary/10' : ''
+                }`}
+                onDragEnter={(e) => handleDragEnter(e, `day-${day}`)}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, segments.length, day)} // Fallback drop zone at the end of the day block
+              >
+                {segments
+                  .map((event, absoluteIndex) => ({ event, absoluteIndex }))
+                  .filter(({ event }) => event.day === day)
+                  .map(({ event, absoluteIndex }) => (
+                    <TimelineItem
+                      key={`${day}-${absoluteIndex}`}
+                      event={event}
+                      absoluteIndex={absoluteIndex}
+                      day={day}
+                      draggedIndex={draggedIndex}
+                      dragOverIndex={dragOverIndex}
+                      isSyncing={isSyncing}
+                      onDragStart={handleDragStart}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                    />
+                  ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
