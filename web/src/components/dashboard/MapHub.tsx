@@ -40,10 +40,13 @@ export default function MapHub() {
     libraries: MAPS_LIBRARIES
   });
 
-  // Determine the map center based on the first segment with coordinates, defaulting to continental US
-  const defaultCenter = { lat: 39.8283, lng: -98.5795 };
-  const centerSegment = segments.find((s) => s.geo || s.details?.geo);
-  const mapCenter: any = centerSegment?.geo || centerSegment?.details?.geo || defaultCenter;
+  // Memoize the map center so it doesn't cause the map to re-pan on every context render
+  const mapCenter = React.useMemo(() => {
+    const defaultCenter = { lat: 39.8283, lng: -98.5795 };
+    const centerSegment = segments.find((s) => s.geo || s.details?.geo);
+    const raw: any = centerSegment?.geo || centerSegment?.details?.geo || defaultCenter;
+    return { lat: raw.latitude || raw.lat, lng: raw.longitude || raw.lng };
+  }, [segments]);
 
   // Generate the sequential path for the polyline
   const routePath = React.useMemo(() => {
@@ -58,7 +61,7 @@ export default function MapHub() {
 
   // Generate individual edges for the polyline to style flights differently
   const routeEdges = React.useMemo(() => {
-    const edges: { path: google.maps.LatLngLiteral[], isFlight: boolean }[] = [];
+    const edges: { path: google.maps.LatLngLiteral[], options: any }[] = [];
     const validSegments = segments.filter((s) => s.geo || s.details?.geo);
     
     for (let i = 1; i < validSegments.length; i++) {
@@ -73,12 +76,29 @@ export default function MapHub() {
             { lat: prevGeo.latitude, lng: prevGeo.longitude },
             { lat: currGeo.latitude, lng: currGeo.longitude }
           ],
-          isFlight: curr.segment === 'FLIGHT'
+          options: {
+            strokeColor: curr.segment === 'FLIGHT' ? '#0ea5e9' : '#6366f1',
+            strokeOpacity: curr.segment === 'FLIGHT' ? 0 : 0.8,
+            strokeWeight: 4,
+            geodesic: true,
+            icons: curr.segment === 'FLIGHT' ? [{
+              icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3 },
+              offset: '0',
+              repeat: '15px'
+            }] : undefined,
+          }
         });
       }
     }
     return edges;
   }, [segments]);
+
+  // Stable map options to prevent re-renders
+  const mapOptions = React.useMemo(() => ({
+    disableDefaultUI: true,
+    zoomControl: true,
+    mapId: 'DEMO_MAP_ID',
+  }), []);
 
   // Store the map instance to interact with its API natively
   const [mapInstance, setMapInstance] = React.useState<google.maps.Map | null>(null);
@@ -145,13 +165,9 @@ export default function MapHub() {
       {isLoaded ? (
         <MapComponent
           mapContainerClassName="w-full h-full"
-          center={{ lat: mapCenter.latitude || mapCenter.lat, lng: mapCenter.longitude || mapCenter.lng }}
+          center={mapCenter}
           zoom={segments.length === 0 ? 4 : 11}
-          options={{
-            disableDefaultUI: true, // Hides standard controls for a cleaner, modern look
-            zoomControl: true,
-            mapId: 'DEMO_MAP_ID', // Required for AdvancedMarkerElements
-          }}
+          options={mapOptions}
           onLoad={setMapInstance}
           onUnmount={() => setMapInstance(null)}
         >
@@ -177,17 +193,7 @@ export default function MapHub() {
             <PolylineComponent
               key={`route-edge-${index}`}
               path={edge.path}
-              options={{
-                strokeColor: edge.isFlight ? '#0ea5e9' : '#6366f1', // Sky blue for flights
-                strokeOpacity: edge.isFlight ? 0 : 0.8, // Hide solid stroke if dashed
-                strokeWeight: 4,
-                geodesic: true,
-                icons: edge.isFlight ? [{
-                  icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3 },
-                  offset: '0',
-                  repeat: '15px'
-                }] : undefined,
-              }}
+              options={edge.options}
             />
           ))}
         </MapComponent>

@@ -8,7 +8,8 @@ import { useItineraryData } from '@/context/ItineraryContext';
 export default function BudgetPanel() {
   const { viewMode, setViewMode, segments, budget, partySize } = useItineraryData();
 
-  const onToggleMode = () => {
+  const onToggleMode = (e: React.MouseEvent) => {
+    e.preventDefault();
     setViewMode((v) => (v === 'total' ? 'per_person' : 'total'));
   };
 
@@ -26,6 +27,7 @@ export default function BudgetPanel() {
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-3">
         <button
+          type="button"
           onClick={onToggleMode}
           className="flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold uppercase tracking-tight text-muted-foreground transition-colors hover:bg-white/10"
         >

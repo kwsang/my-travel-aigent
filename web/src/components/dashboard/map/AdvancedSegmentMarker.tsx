@@ -18,6 +18,12 @@ interface AdvancedSegmentMarkerProps {
 export default function AdvancedSegmentMarker({ position, title, segmentType, isActive, onClick }: AdvancedSegmentMarkerProps) {
   const map = useGoogleMap();
 
+  // Stable callback ref to avoid effect re-runs when onClick changes reference
+  const onClickRef = React.useRef(onClick);
+  React.useEffect(() => {
+    onClickRef.current = onClick;
+  }, [onClick]);
+
   React.useEffect(() => {
     if (!map || !window.google) return;
 
@@ -58,13 +64,15 @@ export default function AdvancedSegmentMarker({ position, title, segmentType, is
     });
 
     // AdvancedMarkerElements use 'gmp-click' instead of standard 'click'
-    const listener = marker.addListener('gmp-click', onClick);
+    const listener = marker.addListener('gmp-click', () => {
+      if (onClickRef.current) onClickRef.current();
+    });
 
     return () => {
       listener.remove();
       marker.map = null;
     };
-  }, [map, position, title, segmentType, isActive, onClick]);
+  }, [map, position.lat, position.lng, title, segmentType, isActive]);
 
   return null;
 }
