@@ -17,6 +17,7 @@ import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/BudgetSkeleton';
 import TripSelector from '@/components/dashboard/TripSelector';
+import { Trash2 } from 'lucide-react';
 
 /**
  * The Visual Planning Dashboard
@@ -42,6 +43,7 @@ export default function DashboardPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
+  const [tripToDelete, setTripToDelete] = useState<string | null>(null);
   const [itinerary, setItinerary] = useState<Partial<Itinerary>>({
     events: [],
     is_conflict: false,
@@ -76,7 +78,7 @@ export default function DashboardPage() {
 
   // Sync editable name when the itinerary data loads
   useEffect(() => {
-    setEditedName(itinerary.trip_name || '');
+    setEditedName(itinerary.trip_name || 'New Trip');
   }, [itinerary.trip_name]);
 
   // First time popup logic
@@ -132,17 +134,22 @@ export default function DashboardPage() {
   }, [refreshDashboard, visitorId]);
 
   const handleRename = async () => {
-    if (!editedName.trim() || editedName === itinerary.trip_name) {
+    const newName = editedName.trim() || 'New Trip';
+    if (newName === (itinerary.trip_name || 'New Trip')) {
       setIsEditingName(false);
+      setEditedName(newName);
       return;
     }
+
+    setIsEditingName(false);
+    setItinerary(prev => ({ ...prev, trip_name: newName })); // Optimistic UI update
 
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          trip_name: editedName,
+          trip_name: newName,
           events: itinerary.events || []
         }),
       });
@@ -155,27 +162,33 @@ export default function DashboardPage() {
       }
     } catch (e) {
       console.warn("Dashboard: Failed to rename itinerary.");
+      setItinerary(prev => ({ ...prev, trip_name: itinerary.trip_name })); // Revert on failure
     }
-    setIsEditingName(false);
   };
 
-  const handleDeleteTrip = async (e: React.MouseEvent, sessId: string) => {
+  const handleDeleteTrip = (e: React.MouseEvent, sessId: string) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this trip and its history?")) return;
-    
+    setTripToDelete(sessId);
+  };
+
+  const confirmDeleteTrip = async () => {
+    if (!tripToDelete) return;
+
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessId}?user_id=${visitorId}`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${tripToDelete}?user_id=${visitorId}`, {
         method: 'DELETE'
       });
       if (response.ok) {
         fetchList();
-        if (currentSessionId === sessId) {
+        if (currentSessionId === tripToDelete) {
           handleNewTrip();
         }
         triggerToast('Trip deleted successfully.');
       }
     } catch (e) {
       console.error("Dashboard: Delete failed", e);
+    } finally {
+      setTripToDelete(null);
     }
   };
 
@@ -281,6 +294,34 @@ export default function DashboardPage() {
             triggerToast('Traveler profile updated successfully!');
           }}
         />
+      )}
+
+      {tripToDelete && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm p-6 relative ring-1 ring-white/5 flex flex-col items-center text-center">
+            <div className="bg-destructive/20 p-3 rounded-full mb-4">
+              <Trash2 className="w-6 h-6 text-destructive" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Delete Trip?</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Are you sure you want to delete this trip and its history? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button 
+                onClick={() => setTripToDelete(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDeleteTrip}
+                className="flex-1 bg-destructive text-destructive-foreground px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-destructive/20 hover:brightness-110 active:scale-95 transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast.show && (

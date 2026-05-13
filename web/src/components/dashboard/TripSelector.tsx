@@ -58,7 +58,7 @@ export default function TripSelector({
           value={editedName}
           onChange={(e) => setEditedName(e.target.value)}
           onBlur={onRename}
-          onKeyDown={(e) => e.key === 'Enter' && onRename()}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         />
       ) : (
         <div 
