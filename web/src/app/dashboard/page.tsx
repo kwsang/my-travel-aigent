@@ -51,6 +51,29 @@ export default function DashboardPage() {
   const [isLoadingItinerary, setIsLoadingItinerary] = useState(true);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
 
+  // Sidebar Resizing State
+  const [sidebarWidth, setSidebarWidth] = useLocalStorage<number>('travel_aigent_sidebar_width', 400);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      // Clamp the sidebar width between 300px and 800px
+      const newWidth = Math.max(300, Math.min(e.clientX, 800));
+      setSidebarWidth(newWidth);
+    };
+    const handleMouseUp = () => setIsDragging(false);
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, setSidebarWidth]);
+
   // Sync editable name when the itinerary data loads
   useEffect(() => {
     setEditedName(itinerary.trip_name || '');
@@ -209,9 +232,12 @@ export default function DashboardPage() {
         profileSetStatus={profileHasBeenSet} // Pass the status to Navbar
         centerContent={navbarCenter}
       />
-      <main className="flex flex-1 overflow-hidden">
+      <main className={`flex flex-1 overflow-hidden ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
         {/* Left Sidebar: Timeline */}
-        <div className="w-[350px] shrink-0 border-r border-border overflow-y-auto px-6 bg-card shadow-sm z-10">
+        <div 
+          className="shrink-0 overflow-y-auto px-6 bg-card shadow-sm z-10"
+          style={{ width: `${sidebarWidth}px` }}
+        >
           <div className="py-6 border-b border-border/50 mb-6 flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Itinerary Timeline</h2>
             <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<BudgetSkeleton />}>
@@ -223,8 +249,16 @@ export default function DashboardPage() {
           </SkeletonWrapper>
         </div>
 
+        {/* Resizable Drag Handle */}
+        <div
+          className={`w-1 cursor-col-resize shrink-0 z-20 hover:bg-primary transition-colors ${
+            isDragging ? 'bg-primary' : 'bg-border'
+          }`}
+          onMouseDown={(e) => { e.preventDefault(); setIsDragging(true); }}
+        />
+
         {/* Main Content: Map and Budget */}
-        <div className="relative flex-1 bg-background overflow-hidden">
+        <div className={`relative flex-1 bg-background overflow-hidden ${isDragging ? 'pointer-events-none' : ''}`}>
           
           <MapHub />
 
