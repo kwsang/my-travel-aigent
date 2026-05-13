@@ -54,21 +54,27 @@ def check_event_overlap(current_event: dict, next_event: dict):
     to allow other activities during the stay.
     """
     # 1. Determine End Time of Current Event
-    # If it's a 'Stay', we treat the 'end' as 30 mins after start for overlap purposes.
-    # This prevents the hotel stay from 'blocking' the rest of the trip.
-    if current_event["segment"] == "ACCOMMODATION" and "Stay" in current_event["details"].get("name", ""):
-        current_start = to_utc_aware(current_event["schedule"].get("start_time_utc") or 
-                                     current_event["schedule"]["local_start_time"])
+    current_schedule = current_event.get("schedule", {})
+    current_details = current_event.get("details", {})
+
+    if current_event.get("segment") == "ACCOMMODATION" and "Stay" in current_details.get("name", ""):
+        current_start_str = current_schedule.get("start_time_utc") or current_schedule.get("local_start_time")
+        if not current_start_str: return False, 0
+        current_start = to_utc_aware(current_start_str)
         current_end = current_start + datetime.timedelta(minutes=30)
     else:
-        current_end = to_utc_aware(current_event["schedule"].get("end_time_utc") or 
-                                   current_event["schedule"].get("local_end_time") or 
-                                   current_event["schedule"].get("start_time_utc") or 
-                                   current_event["schedule"]["local_start_time"])
+        current_end_str = (current_schedule.get("end_time_utc") or 
+                           current_schedule.get("local_end_time") or 
+                           current_schedule.get("start_time_utc") or 
+                           current_schedule.get("local_start_time"))
+        if not current_end_str: return False, 0
+        current_end = to_utc_aware(current_end_str)
 
     # 2. Determine Start Time of Next Event
-    next_start = to_utc_aware(next_event["schedule"].get("start_time_utc") or 
-                              next_event["schedule"]["local_start_time"])
+    next_schedule = next_event.get("schedule", {})
+    next_start_str = next_schedule.get("start_time_utc") or next_schedule.get("local_start_time")
+    if not next_start_str: return False, 0
+    next_start = to_utc_aware(next_start_str)
 
     # 3. Check for Collision
     if current_end > next_start:
@@ -91,20 +97,28 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         return []
 
     # Establish the trip's start date to verify the 'day' property increments correctly
-    start_date = min(datetime.datetime.fromisoformat(e["schedule"]["local_start_time"]).date() for e in events)
+    valid_start_times = [
+        e.get("schedule", {}).get("local_start_time") 
+        for e in events 
+        if e.get("schedule", {}).get("local_start_time")
+    ]
+    if not valid_start_times:
+        return [] # Cannot validate structure without any valid start times
+    start_date = min(datetime.datetime.fromisoformat(t).date() for t in valid_start_times)
 
     # Determine if a rental is used at any point for Rule 6.5
     uses_rental = any(e["details"].get("is_rental") is True for e in events)
 
     events_by_day = {}
     for event in events:
-        current_dt = datetime.datetime.fromisoformat(event["schedule"]["local_start_time"]).date()
-        expected_day = (current_dt - start_date).days + 1
-        day = event.get("day")
+        event_start_str = event.get("schedule", {}).get("local_start_time")
+        if event_start_str:
+            current_dt = datetime.datetime.fromisoformat(event_start_str).date()
+            expected_day = (current_dt - start_date).days + 1
+            day = event.get("day")
 
-        if day is not None:
-            if day != expected_day:
-                errors.append(f"FAIL: Day index mismatch for '{event['details'].get('name', 'Unknown')}'. "
+            if day is not None and day != expected_day:
+                errors.append(f"FAIL: Day index mismatch for '{event.get('details', {}).get('name', 'Unknown')}'. "
                               f"Date {current_dt} corresponds to Day {expected_day}, but 'day' property is {day}.")
         
         day = expected_day # Force normalized integer day for grouping
@@ -122,11 +136,11 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
 
     for day, day_events in events_by_day.items():
         # Ensure chronological order for sequence-based checks
-        # Use UTC for sorting to accurately handle timezone transitions
-        day_events.sort(key=lambda x: to_utc_aware(x["schedule"].get("start_time_utc") or 
-                                                  x["schedule"].get("local_start_time") or 
-                                                  # Fallback for events missing specific keys
-                                                  "1970-01-01T00:00:00Z"))
+        day_events.sort(key=lambda x: to_utc_aware(
+            x.get("schedule", {}).get("start_time_utc") or 
+            x.get("schedule", {}).get("local_start_time") or 
+            "1970-01-01T00:00:00Z" # Fallback for events missing schedule
+        ))
 
         # 1.5 Overlap Check
         for i in range(len(day_events) - 1):
@@ -136,8 +150,8 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
             is_overlapping, minutes = check_event_overlap(current_event, next_event)
             if is_overlapping:
                 errors.append(
-                    f"FAIL: Overlap on {day}. '{current_event['details'].get('name')}' overlaps with "
-                    f"'{next_event['details'].get('name')}' by {minutes:.0f} minutes."
+                    f"FAIL: Overlap on {day}. '{current_event.get('details', {}).get('name')}' overlaps with "
+                    f"'{next_event.get('details', {}).get('name')}' by {minutes:.0f} minutes."
                 )
 
         # 2. Night Owl Check
@@ -146,42 +160,51 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
             # Logistical transitions (TRANSPORT/FLIGHT) are considered essential and excluded from this check.
             activities = [e for e in day_events if e["segment"] not in ["TRANSPORT", "FLIGHT"]]
             if activities:
-                first_activity_dt = datetime.datetime.fromisoformat(activities[0]["schedule"]["local_start_time"])
-                if first_activity_dt.hour < 10:
-                    errors.append(f"FAIL: Night Owl violation on {day}. First activity starts at {first_activity_dt.time()}.")
+                first_activity_schedule = activities[0].get("schedule", {})
+                first_activity_start_str = first_activity_schedule.get("local_start_time")
+                if first_activity_start_str:
+                    first_activity_dt = datetime.datetime.fromisoformat(first_activity_start_str)
+                    if first_activity_dt.hour < 10:
+                        errors.append(f"FAIL: Night Owl violation on {day}. First activity starts at {first_activity_dt.time()}.")
 
             # Night Owl Dinner Window: 20:00 - 23:00
-            dinner_event = next((e for e in day_events if e["segment"] == "DINING" and e["details"].get("category") == "Dinner"), None)
+            dinner_event = next((e for e in day_events if e.get("segment") == "DINING" and e.get("details", {}).get("category") == "Dinner"), None)
             if dinner_event:
-                dinner_time = datetime.datetime.fromisoformat(dinner_event["schedule"]["local_start_time"]).time()
-                if not (datetime.time(20, 0) <= dinner_time <= datetime.time(23, 0)):
-                    errors.append(f"FAIL: Night Owl dinner violation on {day}. Dinner at {dinner_time} (expected 20:00-23:00).")
+                dinner_schedule = dinner_event.get("schedule", {})
+                dinner_start_str = dinner_schedule.get("local_start_time")
+                if dinner_start_str:
+                    dinner_time = datetime.datetime.fromisoformat(dinner_start_str).time()
+                    if not (datetime.time(20, 0) <= dinner_time <= datetime.time(23, 0)):
+                        errors.append(f"FAIL: Night Owl dinner violation on {day}. Dinner at {dinner_time} (expected 20:00-23:00).")
 
         # 3. Location Clustering Check (Relaxed)
         if risk_tolerance.lower() == "relaxed":
             # Clustering refers to the city or travel zone, not individual venues
-            zones = {e["details"].get("city") or e["details"].get("travel_zone") 
-                     for e in day_events if "city" in e["details"] or "travel_zone" in e["details"]}
+            zones = {e.get("details", {}).get("city") or e.get("details", {}).get("travel_zone") 
+                     for e in day_events if e.get("details", {}).get("city") or e.get("details", {}).get("travel_zone")}
             if len(zones) > 1:
                 errors.append(f"FAIL: Clustering violation on {day}. Found multiple zones: {zones}")
 
         # 4. The "Retreat" Rule Check (Relaxed)
         if risk_tolerance.lower() == "relaxed":
             dinner_idx = next((i for i, e in enumerate(day_events) 
-                             if e["segment"] == "DINING" and e["details"].get("category") == "Dinner"), -1)
+                             if e.get("segment") == "DINING" and e.get("details", {}).get("category") == "Dinner"), -1)
             
             if dinner_idx > 0:
                 # Check for an explicit accommodation retreat or a 2+ hour gap from the last activity's end
                 prev_event = day_events[dinner_idx-1]
-                is_retreat = prev_event["segment"] == "ACCOMMODATION"
+                is_retreat = prev_event.get("segment") == "ACCOMMODATION"
                 
                 # Physical duration gap calculation using UTC aware datetimes
-                dinner_start_utc = to_utc_aware(day_events[dinner_idx]["schedule"].get("start_time_utc") or 
-                                                day_events[dinner_idx]["schedule"]["local_start_time"])
-                prev_end = to_utc_aware(prev_event["schedule"].get("end_time_utc") or 
-                                        prev_event["schedule"].get("local_end_time") or 
-                                        prev_event["schedule"].get("start_time_utc") or 
-                                        prev_event["schedule"]["local_start_time"])
+                dinner_schedule = day_events[dinner_idx].get("schedule", {})
+                prev_schedule = prev_event.get("schedule", {})
+                dinner_start_str = dinner_schedule.get("start_time_utc") or dinner_schedule.get("local_start_time")
+                prev_end_str = (prev_schedule.get("end_time_utc") or prev_schedule.get("local_end_time") or 
+                                prev_schedule.get("start_time_utc") or prev_schedule.get("local_start_time"))
+
+                if not dinner_start_str or not prev_end_str: continue
+                dinner_start_utc = to_utc_aware(dinner_start_str)
+                prev_end = to_utc_aware(prev_end_str)
                 
                 gap = (dinner_start_utc - prev_end).total_seconds() / 3600
                 
@@ -190,26 +213,30 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
 
         # 5. Transport Logic Check (Preference & Necessity)
         if user_prefs and user_prefs.get("personal_transport_available") is True:
-            rentals = [e for e in day_events if e["segment"] == "TRANSPORT" and e["details"].get("is_rental") is True]
+            rentals = [e for e in day_events if e.get("segment") == "TRANSPORT" and e.get("details", {}).get("is_rental") is True]
             if rentals:
                 errors.append(f"FAIL: Rental car suggested on {day} despite personal transport being available.")
 
         # 5. Large Group Transport Check (Rule 6 in SYSTEM_PROMPT.md)
         for event in day_events:
-            if event["segment"] == "TRANSPORT":
-                vehicle_count = event["details"].get("vehicle_count", 1)
+            if event.get("segment") == "TRANSPORT":
+                vehicle_count = event.get("details", {}).get("vehicle_count", 1)
                 # We assume a standard vehicle holds ~5 people. Rule 6 says 6+ needs multiple.
                 if (itinerary.get("party_size_total", 0) >= 6) and vehicle_count < 2:
                     errors.append(f"FAIL: Transport logistics violation on {day}. Party size >= 6 requires multiple vehicles.")
 
         # 5.5 Transit Realism (Rule 11)
         for i in range(len(day_events) - 1):
-            if day_events[i]["segment"] == "FLIGHT":
-                arrival_dt = to_utc_aware(day_events[i]["schedule"].get("end_time_utc") or day_events[i]["schedule"].get("local_end_time"))
+            current_event = day_events[i]
+            if current_event.get("segment") == "FLIGHT":
+                schedule = current_event.get("schedule", {})
+                arrival_str = schedule.get("end_time_utc") or schedule.get("local_end_time")
+                if not arrival_str: continue
+                arrival_dt = to_utc_aware(arrival_str)
                 if arrival_dt.hour >= 22:
                     next_ev = day_events[i+1]
                     # Skip transport to hotel check
-                    if next_ev["segment"] == "TRANSPORT" and i + 2 < len(day_events):
+                    if next_ev.get("segment") == "TRANSPORT" and i + 2 < len(day_events):
                         next_ev = day_events[i+2]
                     if next_ev["segment"] not in ["ACCOMMODATION", "TRANSPORT"]:
                         errors.append(f"FAIL: Transit realism on day {day}. Late flight arrival ({arrival_dt.time()}) must be followed by ACCOMMODATION.")
@@ -218,42 +245,50 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         if day == last_day_idx:
             # Find checkout time (end of accommodation) that falls on this day
             checkout_time = None
-            for e in events:
-                e_end_dt = datetime.datetime.fromisoformat(e["schedule"].get("local_end_time") or e["schedule"]["local_start_time"])
-                e_end_day = (e_end_dt.date() - start_date).days + 1
-                
-                # Check if this accommodation ends on the current day we are validating
-                if e["segment"] == "ACCOMMODATION" and e_end_day == day:
-                    checkout_time = e_end_dt
-                    break
+            for e in events: # Iterate through all events to find the checkout
+                e_schedule = e.get("schedule", {})
+                e_end_str = e_schedule.get("local_end_time") or e_schedule.get("local_start_time")
+                if e_end_str:
+                    e_end_dt = datetime.datetime.fromisoformat(e_end_str)
+                    e_end_day = (e_end_dt.date() - start_date).days + 1
+                    
+                    if e.get("segment") == "ACCOMMODATION" and e_end_day == day:
+                        checkout_time = e_end_dt
+                        break
             
             if checkout_time:
                 for event in day_events:
-                    if event["details"].get("category") in ["Water/Pool", "Active/Sports"]:
-                        event_start = datetime.datetime.fromisoformat(event["schedule"]["local_start_time"])
-                        if event_start >= checkout_time:
-                            errors.append(f"FAIL: Last day constraint violation on {day}. "
-                                          f"'{event['details'].get('name')}' (Water/Active) scheduled after checkout ({checkout_time.time()}).")
+                    if event.get("details", {}).get("category") in ["Water/Pool", "Active/Sports"]:
+                        event_start_str = event.get("schedule", {}).get("local_start_time")
+                        if event_start_str:
+                            event_start = datetime.datetime.fromisoformat(event_start_str)
+                            if event_start >= checkout_time:
+                                errors.append(f"FAIL: Last day constraint violation on {day}. "
+                                              f"'{event.get('details', {}).get('name')}' (Water/Active) scheduled after checkout ({checkout_time.time()}).")
 
             # 7. Rental Return Check (Rule 6.5)
             if uses_rental:
                 final_transport_idx = -1
                 for idx, e in enumerate(day_events):
-                    if e["segment"] in ["TRANSPORT", "FLIGHT"] and "Return" in e["details"].get("name", ""):
+                    if e.get("segment") in ["TRANSPORT", "FLIGHT"] and "Return" in e.get("details", {}).get("name", ""):
                         final_transport_idx = idx
                         break
                 
                 if final_transport_idx > 0:
                     prev_event = day_events[final_transport_idx - 1]
-                    is_return_logistics = prev_event["segment"] == "LOGISTICS" and "Rental Return" in prev_event["details"].get("name", "")
+                    is_return_logistics = prev_event.get("segment") == "LOGISTICS" and "Rental Return" in prev_event.get("details", {}).get("name", "")
                     if not is_return_logistics:
                         errors.append(f"FAIL: Missing mandatory 'Car Rental Return' logistics segment before return journey on day {day}.")
                     else:
                         # Verify 45m duration
-                        l_start = to_utc_aware(prev_event["schedule"].get("start_time_utc") or prev_event["schedule"]["local_start_time"])
-                        l_end = to_utc_aware(prev_event["schedule"].get("end_time_utc") or prev_event["schedule"].get("local_end_time") or prev_event["schedule"]["local_start_time"])
-                        if (l_end - l_start).total_seconds() < 2700:
-                             errors.append(f"FAIL: Rental return buffer too short on day {day}. Found {(l_end - l_start).total_seconds()/60:.0f}m, expected 45m.")
+                        prev_schedule = prev_event.get("schedule", {})
+                        l_start_str = prev_schedule.get("start_time_utc") or prev_schedule.get("local_start_time")
+                        l_end_str = prev_schedule.get("end_time_utc") or prev_schedule.get("local_end_time") or l_start_str
+                        if l_start_str and l_end_str:
+                            l_start = to_utc_aware(l_start_str)
+                            l_end = to_utc_aware(l_end_str)
+                            if (l_end - l_start).total_seconds() < 2700:
+                                 errors.append(f"FAIL: Rental return buffer too short on day {day}. Found {(l_end - l_start).total_seconds()/60:.0f}m, expected 45m.")
 
     if not errors:
         print("  Result: PASS - Structure adheres to clustering and temporal rules.\n")
@@ -284,7 +319,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
 
     print(f"Validating Budget (Group Size: {total_people}, Per-Person: {per_person_toggle})...")
     total_cost = 0.0
-    limit = user_prefs['budget']['total_limit']
+    limit = user_prefs.get('budget', {}).get('total_limit', 0)
     room_sharing = user_prefs.get('room_sharing', False)
     people_per_room = user_prefs.get('people_per_room', 2)
 
@@ -296,11 +331,11 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
         return False
 
     for event in itinerary.get("events", []):
-        price_data = event["details"].get("price") or {}
+        price_data = event.get("details", {}).get("price") or {}
         if price_data:
             # Ensure 'is_estimated' flag is correctly set
             if "is_estimated" not in price_data or not isinstance(price_data["is_estimated"], bool):
-                errors.append(f"FAIL: 'is_estimated' flag missing or invalid in price object for '{event['details'].get('name', 'Unknown')}'.")
+                errors.append(f"FAIL: 'is_estimated' flag missing or invalid in price object for '{event.get('details', {}).get('name', 'Unknown')}'.")
 
         base_amt = price_data.get("amount", 0.0)
         
@@ -317,7 +352,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
             total_cost += (base_amt * adults) + (base_amt * 0.5 * children)
         elif event["segment"] == "TRANSPORT":
             # Transport is priced per vehicle, not per person
-            v_count = event["details"].get("vehicle_count", 1)
+            v_count = event.get("details", {}).get("vehicle_count", 1)
             total_cost += (base_amt * v_count)
         else:
             # Experience/Logistics usually full price per head
@@ -330,7 +365,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
 
     final_val = total_cost / total_people if per_person_toggle else total_cost
     
-    currency = user_prefs['budget'].get('currency', 'USD')
+    currency = user_prefs.get('budget', {}).get('currency', 'USD')
     print(f"  Calculated Value: {final_val:.2f} {currency}")
     print(f"  Budget Limit:     {limit:.2f} {currency}")
 
