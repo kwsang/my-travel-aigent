@@ -6,7 +6,7 @@ import { BUDGET_CONFIG } from '@/config/constants';
 import { useItineraryData } from '@/context/ItineraryContext';
 
 export default function BudgetPanel() {
-  const { viewMode, setViewMode, segments, budget, partySize } = useItineraryData();
+  const { viewMode, setViewMode, segments, budget, partySize, profile } = useItineraryData();
 
   const onToggleMode = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -14,43 +14,42 @@ export default function BudgetPanel() {
   };
 
   const totalCost = segments.reduce((acc, s) => acc + (s.details.price?.amount || 0), 0);
-  const limit = budget?.total_limit || 0;
+  const rawLimit = budget?.total_limit || 0;
   const currency = budget?.currency || BUDGET_CONFIG.DEFAULT_CURRENCY;
 
-  const percentage = limit > 0 ? (totalCost / limit) * 100 : 0;
-  const isOverThreshold = percentage >= BUDGET_CONFIG.WARNING_THRESHOLD;
+  // Determine if the profile's budget limit was entered as a per-person limit
+  const isPerPersonProfile = profile?.preferences?.group_planning_per_person || false;
+  const actualPartySize = Math.max(BUDGET_CONFIG.MIN_PARTY_SIZE, partySize);
 
-  const displayTotal = viewMode === 'total' ? totalCost : totalCost / Math.max(BUDGET_CONFIG.MIN_PARTY_SIZE, partySize);
-  const displayLimit = viewMode === 'total' ? limit : limit / Math.max(BUDGET_CONFIG.MIN_PARTY_SIZE, partySize);
+  // Calculate the absolute total and per person limits based on the profile's intent
+  const absoluteTotalLimit = isPerPersonProfile ? rawLimit * actualPartySize : rawLimit;
+  const absolutePerPersonLimit = isPerPersonProfile ? rawLimit : rawLimit / actualPartySize;
+
+  const displayTotal = viewMode === 'total' ? totalCost : totalCost / actualPartySize;
+  const displayLimit = viewMode === 'total' ? absoluteTotalLimit : absolutePerPersonLimit;
+
+  const percentage = absoluteTotalLimit > 0 ? (totalCost / absoluteTotalLimit) * 100 : 0;
+  const isOverThreshold = percentage >= BUDGET_CONFIG.WARNING_THRESHOLD;
 
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onToggleMode}
-          className="flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold uppercase tracking-tight text-muted-foreground transition-colors hover:bg-white/10"
-        >
-          <ArrowLeftRight className="w-3 h-3" />
-          {viewMode === 'total' ? 'Show Per Person' : 'Show Total Trip'}
-        </button>
-        
         <div className="text-right">
           <div className="flex items-center justify-end gap-1 font-mono text-lg font-bold">
             <Banknote className={`w-5 h-5 mr-1 ${isOverThreshold ? 'text-amber-600' : 'text-slate-400'}`} />
             <span className={`${isOverThreshold ? 'text-amber-600' : 'text-white'} text-stroke-1`}>
               {currency} {displayTotal.toLocaleString()}
             </span>
-            {limit > 0 && (
+            {rawLimit > 0 && (
               <span className="text-slate-400 font-medium mx-1">/</span>
             )}
-            {limit > 0 && (
+            {rawLimit > 0 && (
               <span className="text-slate-500 text-sm">
                 {currency} {displayLimit.toLocaleString()}
               </span>
             )}
           </div>
-          {limit > 0 && (
+          {rawLimit > 0 && (
             <div className="w-full bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
               <div 
                 className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-amber-500' : 'bg-emerald-500'}`}
@@ -59,6 +58,15 @@ export default function BudgetPanel() {
             </div>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={onToggleMode}
+          className="flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold uppercase tracking-tight text-muted-foreground transition-colors hover:bg-white/10"
+        >
+          <ArrowLeftRight className="w-3 h-3" />
+          {viewMode === 'total' ? 'Show Per Person' : 'Show Total Trip'}
+        </button>
       </div>
 
       {isOverThreshold && (
