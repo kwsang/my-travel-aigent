@@ -235,7 +235,7 @@ export default function DashboardPage() {
       <main className={`flex flex-1 overflow-hidden ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
         {/* Left Sidebar: Timeline */}
         <div 
-          className="shrink-0 overflow-y-auto px-6 bg-card shadow-sm z-10"
+          className="shrink-0 overflow-y-auto px-6 bg-card shadow-sm z-10 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40"
           style={{ width: `${sidebarWidth}px` }}
         >
           <div className="py-6 border-b border-border/50 mb-6 flex items-center justify-between shrink-0">
