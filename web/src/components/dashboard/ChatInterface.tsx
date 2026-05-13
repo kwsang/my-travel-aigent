@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2 } from 'lucide-react';
+import { Send, User, Bot, Loader2, MessageSquare, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import { API_CONFIG } from '@/config/constants';
@@ -27,6 +27,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Fetch history when session changes
@@ -100,12 +101,29 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     }
   };
 
+  if (!isOpen) {
+    return (
+      <button 
+        onClick={() => setIsOpen(true)}
+        className="absolute bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-50 ring-1 ring-white/10"
+        title="Open Chat"
+      >
+        <MessageSquare size={24} />
+      </button>
+    );
+  }
+
   return (
     <div className="absolute bottom-6 right-6 w-96 h-[500px] flex flex-col bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 ring-1 ring-white/5">
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex items-center gap-2 bg-white/5 shrink-0">
-        <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
-        <h3 className="font-bold text-foreground text-sm tracking-wide">Travel AIgent</h3>
+      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
+          <h3 className="font-bold text-foreground text-sm tracking-wide">Travel AIgent</h3>
+        </div>
+        <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-white transition-colors" title="Close Chat">
+          <X size={18} />
+        </button>
       </div>
 
       {/* Messages Area */}

@@ -211,7 +211,7 @@ export default function DashboardPage() {
       />
       <main className="flex flex-1 overflow-hidden">
         {/* Left Sidebar: Timeline */}
-        <div className="w-1/3 min-w-[400px] border-r border-border overflow-y-auto px-6 bg-card shadow-sm z-10">
+        <div className="w-[350px] shrink-0 border-r border-border overflow-y-auto px-6 bg-card shadow-sm z-10">
           <div className="py-6 border-b border-border/50 mb-6 flex items-center justify-between shrink-0">
             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Itinerary Timeline</h2>
             <SkeletonWrapper isLoading={isLoadingItinerary} fallback={<BudgetSkeleton />}>

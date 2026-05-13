@@ -3,7 +3,7 @@
 import React from 'react';
 import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { GoogleMap, useJsApiLoader, Polyline, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Polyline } from '@react-google-maps/api';
 import AdvancedSegmentMarker from './map/AdvancedSegmentMarker';
 import { darkMapStyle } from './map/mapStyles';
 
@@ -13,7 +13,6 @@ const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
 // Workaround for React 18 type conflicts with @react-google-maps/api
 const MapComponent = GoogleMap as any;
 const PolylineComponent = Polyline as any;
-const InfoWindowComponent = InfoWindow as any;
 
 /**
  * MapHub Component
@@ -21,7 +20,6 @@ const InfoWindowComponent = InfoWindow as any;
  */
 export default function MapHub() {
   const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary } = useItineraryData();
-  const selectedSegment = activeSegmentIndex !== null ? segments[activeSegmentIndex] : null;
 
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
 
@@ -43,8 +41,8 @@ export default function MapHub() {
     libraries: MAPS_LIBRARIES
   });
 
-  // Determine the map center based on the first segment with coordinates, defaulting to NYC
-  const defaultCenter = { lat: 40.7128, lng: -74.0060 };
+  // Determine the map center based on the first segment with coordinates, defaulting to continental US
+  const defaultCenter = { lat: 39.8283, lng: -98.5795 };
   const centerSegment = segments.find((s) => s.geo || s.details?.geo);
   const mapCenter: any = centerSegment?.geo || centerSegment?.details?.geo || defaultCenter;
 
@@ -142,18 +140,6 @@ export default function MapHub() {
     }
   }, [mapInstance, activeSegmentIndex, routePath, segments]);
 
-  // Formats raw ISO strings into a clean "09:00 AM" format
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr) return '';
-    try {
-      const d = new Date(timeStr);
-      if (isNaN(d.getTime())) return timeStr;
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return timeStr;
-    }
-  };
-
   return (
     <div className="relative h-full w-full bg-background overflow-hidden">
       {/* Google Map */}
@@ -161,7 +147,7 @@ export default function MapHub() {
         <MapComponent
           mapContainerClassName="w-full h-full"
           center={{ lat: mapCenter.latitude || mapCenter.lat, lng: mapCenter.longitude || mapCenter.lng }}
-          zoom={11}
+          zoom={segments.length === 0 ? 4 : 11}
           options={{
             disableDefaultUI: true, // Hides standard controls for a cleaner, modern look
             zoomControl: true,
@@ -187,30 +173,6 @@ export default function MapHub() {
             }
             return null;
           })}
-
-          {/* Info Window */}
-          {selectedSegment && (() => {
-            const geo = selectedSegment.geo || selectedSegment.details?.geo;
-            if (!geo) return null;
-            
-            return (
-              <InfoWindowComponent
-                position={{ lat: geo.latitude, lng: geo.longitude }}
-                onCloseClick={() => setActiveSegmentIndex(null)}
-              >
-                {/* Using hardcoded text colors because InfoWindows don't automatically adapt to app-level dark mode */}
-                <div className="p-1 max-w-[200px] text-slate-900">
-                  <h3 className="font-bold text-sm mb-0.5 leading-tight">{selectedSegment.details?.name}</h3>
-                  <p className="text-xs text-slate-600 mb-1">{selectedSegment.details?.category}</p>
-                  {selectedSegment.schedule?.local_start_time && (
-                    <p className="text-[11px] font-semibold text-indigo-600">
-                      {formatTime(selectedSegment.schedule.local_start_time)}
-                    </p>
-                  )}
-                </div>
-              </InfoWindowComponent>
-            );
-          })()}
 
           {/* Polyline Routes */}
           {routeEdges.map((edge, index) => (

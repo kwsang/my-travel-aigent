@@ -80,7 +80,7 @@ class Event(BaseModel):
             return v
         
         day = info.data.get('day', 1)
-        base_date = datetime(2024, 1, 1) + timedelta(days=day - 1)
+        base_date = datetime(2026, 1, 1) + timedelta(days=day - 1)
         date_prefix = base_date.strftime("%Y-%m-%d")
         
         for field in ['local_start_time', 'local_end_time']:

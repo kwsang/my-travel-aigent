@@ -101,8 +101,10 @@ export default function TimelineView() {
       // Set the anchor time to the first event's start time (or default to 9 AM)
       let currentStartTime = parseLocal(daySegments[0].schedule?.local_start_time || '');
       if (isNaN(currentStartTime.getTime())) {
-        currentStartTime = new Date();
+        currentStartTime = new Date(2026, 0, day); // Base date matches backend Pydantic validator
         currentStartTime.setHours(9, 0, 0, 0);
+      } else {
+        currentStartTime.setFullYear(2026, 0, day); // Clamp dragged items to the target day's date
       }
 
       daySegments.forEach((seg: Event, idx: number) => {

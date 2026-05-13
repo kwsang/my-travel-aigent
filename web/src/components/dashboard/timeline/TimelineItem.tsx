@@ -46,16 +46,22 @@ export default function TimelineItem({
 }: TimelineItemProps) {
   const { viewMode, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex } = useItineraryData();
 
-  // Formats raw ISO strings into a clean "09:00 AM" format
+  // Formats raw ISO strings into a clean "8:30 AM" format
   const formatTime = (timeStr?: string) => {
     if (!timeStr) return '';
-    try {
-      const d = new Date(timeStr);
-      if (isNaN(d.getTime())) return timeStr;
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return timeStr;
+    
+    // Manually extract time to avoid browser timezone shifts and 
+    // handle malformed ISO strings (e.g., missing leading zeros)
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1], 10);
+      const minutes = timeMatch[2];
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // the hour '0' should be '12'
+      return `${hours}:${minutes} ${ampm}`;
     }
+    return timeStr;
   };
 
   return (

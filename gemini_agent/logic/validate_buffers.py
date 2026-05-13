@@ -428,8 +428,8 @@ def run_scenario_5_validation():
             {
                 "segment": "DINING",
                 "schedule": {
-                    "local_start_time": "2024-07-01T11:00:00",
-                    "local_end_time": "2024-07-01T12:30:00",
+                    "local_start_time": "2026-07-01T11:00:00",
+                    "local_end_time": "2026-07-01T12:30:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -441,8 +441,8 @@ def run_scenario_5_validation():
             {
                 "segment": "EXPERIENCE",
                 "schedule": {
-                    "local_start_time": "2024-07-01T13:00:00",
-                    "local_end_time": "2024-07-01T16:00:00",
+                    "local_start_time": "2026-07-01T13:00:00",
+                    "local_end_time": "2026-07-01T16:00:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -454,8 +454,8 @@ def run_scenario_5_validation():
             {
                 "segment": "EXPERIENCE",
                 "schedule": {
-                    "local_start_time": "2024-07-01T16:30:00",
-                    "local_end_time": "2024-07-01T18:00:00",
+                    "local_start_time": "2026-07-01T16:30:00",
+                    "local_end_time": "2026-07-01T18:00:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -467,8 +467,8 @@ def run_scenario_5_validation():
             {
                 "segment": "ACCOMMODATION", # Explicit retreat
                 "schedule": {
-                    "local_start_time": "2024-07-01T18:00:00",
-                    "local_end_time": "2024-07-01T20:00:00",
+                    "local_start_time": "2026-07-01T18:00:00",
+                    "local_end_time": "2026-07-01T20:00:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -480,8 +480,8 @@ def run_scenario_5_validation():
             {
                 "segment": "DINING",
                 "schedule": {
-                    "local_start_time": "2024-07-01T20:30:00",
-                    "local_end_time": "2024-07-01T22:00:00",
+                    "local_start_time": "2026-07-01T20:30:00",
+                    "local_end_time": "2026-07-01T22:00:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -493,8 +493,8 @@ def run_scenario_5_validation():
             {
                 "segment": "EXPERIENCE",
                 "schedule": {
-                    "local_start_time": "2024-07-01T22:30:00",
-                    "local_end_time": "2024-07-02T01:00:00",
+                    "local_start_time": "2026-07-01T22:30:00",
+                    "local_end_time": "2026-07-02T01:00:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -507,8 +507,8 @@ def run_scenario_5_validation():
             {
                 "segment": "DINING",
                 "schedule": {
-                    "local_start_time": "2024-07-02T12:00:00",
-                    "local_end_time": "2024-07-02T13:30:00",
+                    "local_start_time": "2026-07-02T12:00:00",
+                    "local_end_time": "2026-07-02T13:30:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -520,8 +520,8 @@ def run_scenario_5_validation():
             {
                 "segment": "EXPERIENCE",
                 "schedule": {
-                    "local_start_time": "2024-07-02T14:30:00",
-                    "local_end_time": "2024-07-02T15:30:00",
+                    "local_start_time": "2026-07-02T14:30:00",
+                    "local_end_time": "2026-07-02T15:30:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -533,8 +533,8 @@ def run_scenario_5_validation():
             {
                 "segment": "EXPERIENCE",
                 "schedule": {
-                    "local_start_time": "2024-07-02T16:00:00",
-                    "local_end_time": "2024-07-02T17:30:00",
+                    "local_start_time": "2026-07-02T16:00:00",
+                    "local_end_time": "2026-07-02T17:30:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -546,8 +546,8 @@ def run_scenario_5_validation():
             {
                 "segment": "ACCOMMODATION", # Explicit retreat
                 "schedule": {
-                    "local_start_time": "2024-07-02T17:30:00",
-                    "local_end_time": "2024-07-02T20:30:00",
+                    "local_start_time": "2026-07-02T17:30:00",
+                    "local_end_time": "2026-07-02T20:30:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -559,8 +559,8 @@ def run_scenario_5_validation():
             {
                 "segment": "DINING",
                 "schedule": {
-                    "local_start_time": "2024-07-02T21:00:00",
-                    "local_end_time": "2024-07-02T22:30:00",
+                    "local_start_time": "2026-07-02T21:00:00",
+                    "local_end_time": "2026-07-02T22:30:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
@@ -572,8 +572,8 @@ def run_scenario_5_validation():
             {
                 "segment": "EXPERIENCE",
                 "schedule": {
-                    "local_start_time": "2024-07-02T23:00:00",
-                    "local_end_time": "2024-07-03T01:30:00",
+                    "local_start_time": "2026-07-02T23:00:00",
+                    "local_end_time": "2026-07-03T01:30:00",
                     "timezone": "Europe/Rome"
                 },
                 "details": {
