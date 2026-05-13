@@ -81,7 +81,7 @@ export default function TimelineItem({
       className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card cursor-pointer group ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
       } ${
-        dragOverIndex === absoluteIndex && draggedIndex !== absoluteIndex ? 'mt-8 border-t-2 border-t-primary shadow-[0_-5px_15px_-3px_rgba(var(--primary),0.2)] bg-primary/5' : ''
+        dragOverIndex === absoluteIndex && draggedIndex !== absoluteIndex ? 'mt-16 before:content-["Drop_Here"] before:flex before:items-center before:justify-center before:text-[10px] before:font-bold before:text-primary before:uppercase before:tracking-widest before:absolute before:-top-14 before:left-0 before:right-0 before:h-10 before:border-2 before:border-dashed before:border-primary/40 before:rounded-xl before:bg-primary/5' : ''
       } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''} ${isSyncing ? 'cursor-wait' : 'active:cursor-grab'}`}
     >
       <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
