@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, MessageSquare, X } from 'lucide-react';
+import { Send, User, Bot, Loader2, MessageSquare, X, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import { API_CONFIG } from '@/config/constants';
@@ -28,6 +28,8 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Fetch history when session changes
@@ -64,6 +66,34 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    // Show button if user scrolls up more than 50px from bottom
+    setShowScrollButton(scrollHeight - scrollTop - clientHeight > 50);
+  };
+
+  // Spacebar to scroll down when hovering
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && isHovered) {
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+          e.preventDefault();
+          scrollToBottom();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isHovered]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -114,7 +144,11 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   }
 
   return (
-    <div className="absolute bottom-6 right-6 w-96 h-[500px] flex flex-col bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 ring-1 ring-white/5">
+    <div 
+      className="absolute bottom-6 right-6 w-96 h-[500px] flex flex-col bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 ring-1 ring-white/5"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5 shrink-0">
         <div className="flex items-center gap-2">
@@ -127,7 +161,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       </div>
 
       {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
         {messages.map((m: ChatMessage, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex gap-3 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -157,6 +191,17 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           </div>
         )}
       </div>
+
+      {/* Scroll to Bottom Button */}
+      {showScrollButton && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-20 right-6 p-2 bg-primary/90 text-primary-foreground rounded-full shadow-lg hover:bg-primary transition-all z-10 animate-in fade-in zoom-in-95"
+          title="Scroll to bottom (Space)"
+        >
+          <ChevronDown size={18} />
+        </button>
+      )}
 
       {/* Input Area */}
       <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-4 border-t border-white/10 bg-black/20 flex gap-2 shrink-0">
