@@ -71,6 +71,7 @@ export default function TimelineView() {
 
   // Extract unique days and sort them
   const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
+  const hasAnyCollapsed = collapsedDays.size > 0;
 
   if (segments.length === 0) {
     return (
@@ -254,6 +255,18 @@ export default function TimelineView() {
               <li key={idx}>{error}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Expand / Collapse All */}
+      {days.length > 1 && (
+        <div className="flex justify-end -mb-6 z-10 relative">
+          <button
+            onClick={() => hasAnyCollapsed ? setCollapsedDays(new Set()) : setCollapsedDays(new Set(days))}
+            className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/5"
+          >
+            {hasAnyCollapsed ? 'Expand All' : 'Collapse All'}
+          </button>
         </div>
       )}
 
