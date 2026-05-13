@@ -213,7 +213,7 @@ export default function TimelineView() {
 
           <div 
             className={`relative space-y-4 pl-6 pb-4 border-l-2 border-border min-h-[60px] rounded-br-xl transition-all ${
-              dragOverIndex === `day-${day}` ? 'pb-16 after:content-["Drop_Here"] after:flex after:items-center after:justify-center after:text-[10px] after:font-bold after:text-primary after:uppercase after:tracking-widest after:absolute after:bottom-2 after:left-6 after:right-0 after:h-10 after:border-2 after:border-dashed after:border-primary/40 after:rounded-xl after:bg-primary/5' : ''
+              dragOverIndex === `day-${day}` ? 'pb-20 after:content-["Drop_Here"] after:flex after:items-center after:justify-center after:text-[11px] after:font-bold after:text-primary after:uppercase after:tracking-widest after:absolute after:bottom-4 after:left-6 after:right-0 after:h-12 after:border-2 after:border-dashed after:border-primary/60 after:rounded-xl after:bg-primary/10' : ''
             }`}
             onDragEnter={(e) => handleDragEnter(e, `day-${day}`)}
             onDragLeave={handleDragLeave}

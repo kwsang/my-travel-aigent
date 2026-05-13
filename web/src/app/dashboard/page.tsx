@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TimelineView from '@/components/dashboard/timeline/TimelineView';
 import MapHub from '@/components/dashboard/MapHub';
 import BudgetPanel from '@/components/dashboard/BudgetPanel';
@@ -17,7 +17,7 @@ import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/BudgetSkeleton';
 import TripSelector from '@/components/dashboard/TripSelector';
-import { Trash2 } from 'lucide-react';
+import { Trash2, AlertTriangle } from 'lucide-react';
 
 /**
  * The Visual Planning Dashboard
@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [tripToDelete, setTripToDelete] = useState<string | null>(null);
+  const [showBlankNameAlert, setShowBlankNameAlert] = useState(false);
   const [itinerary, setItinerary] = useState<Partial<Itinerary>>({
     events: [],
     is_conflict: false,
@@ -56,15 +57,23 @@ export default function DashboardPage() {
   // Sidebar Resizing State
   const [sidebarWidth, setSidebarWidth] = useLocalStorage<number>('travel_aigent_sidebar_width', 400);
   const [isDragging, setIsDragging] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
       // Clamp the sidebar width between 300px and 800px
       const newWidth = Math.max(300, Math.min(e.clientX, 800));
-      setSidebarWidth(newWidth);
+      if (sidebarRef.current) {
+        sidebarRef.current.style.width = `${newWidth}px`;
+      }
     };
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!isDragging) return;
+      setIsDragging(false);
+      const finalWidth = Math.max(300, Math.min(e.clientX, 800));
+      setSidebarWidth(finalWidth);
+    };
 
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -134,10 +143,15 @@ export default function DashboardPage() {
   }, [refreshDashboard, visitorId]);
 
   const handleRename = async () => {
-    const newName = editedName.trim() || 'New Trip';
-    if (newName === (itinerary.trip_name || 'New Trip')) {
+    const newName = editedName.trim();
+    
+    if (!newName) {
+      setShowBlankNameAlert(true);
+      return;
+    }
+
+    if (newName === itinerary.trip_name) {
       setIsEditingName(false);
-      setEditedName(newName);
       return;
     }
 
@@ -248,6 +262,7 @@ export default function DashboardPage() {
       <main className={`flex flex-1 overflow-hidden ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
         {/* Left Sidebar: Timeline */}
         <div 
+          ref={sidebarRef}
           className="shrink-0 overflow-y-auto px-6 bg-card shadow-sm z-10 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40"
           style={{ width: `${sidebarWidth}px` }}
         >
@@ -318,6 +333,38 @@ export default function DashboardPage() {
                 className="flex-1 bg-destructive text-destructive-foreground px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-destructive/20 hover:brightness-110 active:scale-95 transition-all"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBlankNameAlert && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm p-6 relative ring-1 ring-white/5 flex flex-col items-center text-center">
+            <div className="bg-amber-500/20 p-3 rounded-full mb-4">
+              <AlertTriangle className="w-6 h-6 text-amber-500" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Blank Trip Name</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              A trip name cannot be empty. Please enter a valid name or discard changes.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button 
+                onClick={() => {
+                  setEditedName(itinerary.trip_name || 'New Trip');
+                  setShowBlankNameAlert(false);
+                  setIsEditingName(false);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all"
+              >
+                Discard
+              </button>
+              <button 
+                onClick={() => setShowBlankNameAlert(false)}
+                className="flex-1 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+              >
+                Keep Editing
               </button>
             </div>
           </div>

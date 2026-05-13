@@ -85,11 +85,20 @@ class Event(BaseModel):
         
         for field in ['local_start_time', 'local_end_time']:
             val = v.get(field)
-            if val and isinstance(val, str) and 'T' not in val:
-                time_part = val.strip()
-                if len(time_part) <= 5: # HH:MM
+            if val and isinstance(val, str):
+                if 'T' not in val:
+                    date_part = date_prefix
+                    time_part = val.strip()
+                else:
+                    date_part, time_part = val.split('T', 1)
+                
+                if len(time_part) <= 5 and time_part.count(':') == 1:
                     time_part += ":00"
-                v[field] = f"{date_prefix}T{time_part}"
+                
+                parts = time_part.split(':')
+                if len(parts[0]) == 1:
+                    parts[0] = f"0{parts[0]}"
+                v[field] = f"{date_part}T{':'.join(parts)}"
         return v
 
 class Itinerary(BaseModel):
