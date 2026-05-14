@@ -78,11 +78,11 @@ export default function TimelineItem({
         onDrop(e, absoluteIndex, day);
       }}
       onClick={() => setActiveSegmentIndex(absoluteIndex)}
-      className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card cursor-pointer group ${
+      className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card cursor-pointer active:cursor-grab group ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
       } ${
         dragOverIndex === absoluteIndex && draggedIndex !== absoluteIndex ? 'mt-20 before:content-["Drop_Here"] before:flex before:items-center before:justify-center before:text-[11px] before:font-bold before:text-primary before:uppercase before:tracking-widest before:absolute before:-top-16 before:left-0 before:right-0 before:h-12 before:border-2 before:border-dashed before:border-primary/60 before:rounded-xl before:bg-primary/10' : ''
-      } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''} ${isSyncing ? 'cursor-wait' : 'active:cursor-grab'}`}
+      } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''}`}
     >
       <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
         <GripVertical size={14} />
@@ -93,12 +93,12 @@ export default function TimelineItem({
             {React.createElement(SegmentIcons[event.segment] || DefaultIcon, { className: 'w-3 h-3' })}
             {event.segment.replace('_', ' ')}
           </span>
-          <h4 className="font-semibold text-foreground">{event.details.name}</h4>
-          <p className="text-sm text-muted-foreground">{event.details.category} • {event.details.city}</p>
+          <h4 className="font-semibold text-foreground">{event.details?.name || 'Unnamed Event'}</h4>
+          <p className="text-sm text-muted-foreground">{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
         </div>
         <div className="text-right">
-          <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule.local_start_time)}</time>
-          {event.details.price && (
+          <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule?.local_start_time)}</time>
+          {event.details?.price && (
             <p className="text-sm font-bold text-emerald-600">
               {event.details.price.currency}{' '}
               {viewMode === 'total' ? event.details.price.amount.toLocaleString() : (event.details.price.amount / Math.max(1, partySize)).toLocaleString()}
@@ -107,7 +107,7 @@ export default function TimelineItem({
         </div>
       </div>
       {/* Indication for the Retreat Rule (from ARCHITECT_PROMPT logic) */}
-      {riskTolerance === 'relaxed' && event.details.name.toLowerCase().includes('retreat') && (
+      {riskTolerance === 'relaxed' && event.details?.name?.toLowerCase().includes('retreat') && (
         <div className="mt-3 rounded-md bg-amber-50 px-2 py-1 text-xs font-bold uppercase text-amber-600 border border-amber-100">
           Mandatory Retreat Block (16:00 - 18:30)
         </div>

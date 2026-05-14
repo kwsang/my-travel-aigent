@@ -13,7 +13,7 @@ export default function BudgetPanel() {
     setViewMode((v) => (v === 'total' ? 'per_person' : 'total'));
   };
 
-  const totalCost = segments.reduce((acc, s) => acc + (s.details.price?.amount || 0), 0);
+  const totalCost = segments.reduce((acc, s) => acc + (s.details?.price?.amount || 0), 0);
   const rawLimit = budget?.total_limit || 0;
   const currency = budget?.currency || BUDGET_CONFIG.DEFAULT_CURRENCY;
 

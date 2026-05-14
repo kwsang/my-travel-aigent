@@ -3,24 +3,131 @@
 import React from 'react';
 import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { GoogleMap, useJsApiLoader, Polyline } from '@react-google-maps/api';
+import { APIProvider, Map, useMap, useApiIsLoaded } from '@vis.gl/react-google-maps';
 import AdvancedSegmentMarker from './map/AdvancedSegmentMarker';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
 
-// Workaround for React 18 type conflicts with @react-google-maps/api
-const MapComponent = GoogleMap as any;
-const PolylineComponent = Polyline as any;
+// Custom Google Maps theme matching the "Deep Twilight" dark UI
+const twilightMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#13111c" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#13111c" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8b8698" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#c4b5fd" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8b8698" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#1b1829" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b6580" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#252138" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#2f2a47" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8b8698" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#363052" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#463f68" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#c4b5fd" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#252138" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#c4b5fd" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#0b0914" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#463f68" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#13111c" }],
+  },
+];
 
 /**
  * MapHub Component
  * Visualizes itinerary segments on a geographic workspace.
  */
 export default function MapHub() {
-  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary } = useItineraryData();
-
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
+
+  if (!apiKey) {
+    return (
+      <div className="relative h-full w-full bg-background overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 text-destructive p-6 rounded-2xl bg-card border border-destructive/10 shadow-xl">
+            <AlertTriangle className="w-8 h-8 text-destructive/80" />
+            <div className="text-center">
+              <h3 className="font-bold uppercase tracking-widest text-xs mb-1">Map Unavailable</h3>
+              <p className="text-xs font-medium opacity-80">Google Maps API key is missing.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full bg-background overflow-hidden">
+      {/* Using `any` cast on libraries as @vis.gl types can sometimes conflict with native arrays */}
+      <APIProvider apiKey={apiKey} libraries={MAPS_LIBRARIES as any}>
+        <MapInner />
+      </APIProvider>
+    </div>
+  );
+}
+
+function MapInner() {
+  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary } = useItineraryData();
+  const map = useMap();
+  const isLoaded = useApiIsLoaded();
 
   // Extract starting location from profile preferences (populated by the Concierge agent)
   const startingLocation = profile?.preferences?.starting_location;
@@ -32,13 +139,6 @@ export default function MapHub() {
   const destinationCities = cities.filter(city => city !== startingLocation);
   const tripName = itinerary?.trip_name && itinerary.trip_name !== 'New Trip' ? itinerary.trip_name : null;
   const primaryDestination = destinationCities.length > 0 ? destinationCities[0] : (cities.length > 0 ? cities[0] : (tripName || 'Destination TBD'));
-
-  // Load the Google Maps script
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: apiKey,
-    libraries: MAPS_LIBRARIES
-  });
 
   // Memoize the map center so it doesn't cause the map to re-pan on every context render
   const mapCenter = React.useMemo(() => {
@@ -93,19 +193,14 @@ export default function MapHub() {
     return edges;
   }, [segments]);
 
-  // Stable map options to prevent re-renders
-  const mapOptions = React.useMemo(() => ({
-    disableDefaultUI: true,
-    zoomControl: true,
-    mapId: 'DEMO_MAP_ID',
-  }), []);
-
-  // Store the map instance to interact with its API natively
-  const [mapInstance, setMapInstance] = React.useState<google.maps.Map | null>(null);
+  // Stable callback for marker clicks to prevent breaking memoization
+  const handleMarkerClick = React.useCallback((index: number) => {
+    setActiveSegmentIndex(index);
+  }, [setActiveSegmentIndex]);
 
   // Automatically fit bounds or pan to active segment
   React.useEffect(() => {
-    if (!mapInstance) return;
+    if (!map) return;
 
     if (activeSegmentIndex !== null && segments[activeSegmentIndex]) {
       const activeSegment = segments[activeSegmentIndex];
@@ -141,35 +236,36 @@ export default function MapHub() {
         const bounds = new window.google.maps.LatLngBounds();
         bounds.extend({ lat: prevGeo!.latitude, lng: prevGeo!.longitude });
         bounds.extend({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
-        mapInstance.panToBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 });
+        map.panToBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 });
       } else if (nextGeo) {
-        mapInstance.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
-        mapInstance.setZoom(15);
+        map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
+        map.setZoom(15);
       }
     } else if (routePath.length > 0) {
       // Zoom to fit all if no active segment is selected
       if (routePath.length === 1) {
-        mapInstance.panTo(routePath[0]);
-        mapInstance.setZoom(14); // Sensible default zoom for a single marker
+        map.panTo(routePath[0]);
+        map.setZoom(14); // Sensible default zoom for a single marker
       } else {
         const bounds = new window.google.maps.LatLngBounds();
         routePath.forEach((pos) => bounds.extend(pos));
-        mapInstance.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
+        map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
     }
-  }, [mapInstance, activeSegmentIndex, routePath, segments]);
+  }, [map, activeSegmentIndex, routePath, segments]);
 
   return (
-    <div className="relative h-full w-full bg-background overflow-hidden">
-      {/* Google Map */}
+    <>
       {isLoaded ? (
-        <MapComponent
-          mapContainerClassName="w-full h-full"
-          center={mapCenter}
-          zoom={segments.length === 0 ? 4 : 11}
-          options={mapOptions}
-          onLoad={setMapInstance}
-          onUnmount={() => setMapInstance(null)}
+        <Map
+          className="w-full h-full"
+          defaultCenter={mapCenter}
+          defaultZoom={segments.length === 0 ? 4 : 11}
+          disableDefaultUI={true}
+          zoomControl={true}
+          mapId="DEMO_MAP_ID"
+          styles={twilightMapStyle}
+          colorScheme={"DARK" as any}
         >
           {segments.map((segment, index: number) => {
             const geo = segment.geo || segment.details?.geo;
@@ -181,7 +277,8 @@ export default function MapHub() {
                   title={segment.details?.name}
                   segmentType={segment.segment}
                   isActive={activeSegmentIndex === index}
-                  onClick={() => setActiveSegmentIndex(index)}
+                  index={index}
+                  onClick={handleMarkerClick}
                 />
               );
             }
@@ -190,13 +287,13 @@ export default function MapHub() {
 
           {/* Polyline Routes */}
           {routeEdges.map((edge, index) => (
-            <PolylineComponent
+            <RoutePolyline
               key={`route-edge-${index}`}
               path={edge.path}
               options={edge.options}
             />
           ))}
-        </MapComponent>
+        </Map>
       ) : (
         <div
           className="absolute inset-0 opacity-20"
@@ -230,7 +327,7 @@ export default function MapHub() {
       </div>
 
       {/* Loading State / Fallback UI */}
-      {!isLoaded && !loadError && apiKey && (
+      {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-3 text-muted-foreground">
             <div className="rounded-full bg-card p-4 shadow-xl border border-border">
@@ -242,19 +339,31 @@ export default function MapHub() {
           </div>
         </div>
       )}
-
-      {/* Error / Missing API Key State */}
-      {(!apiKey || loadError) && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 bg-background/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 text-destructive p-6 rounded-2xl bg-card border border-destructive/10 shadow-xl">
-            <AlertTriangle className="w-8 h-8 text-destructive/80" />
-            <div className="text-center">
-              <h3 className="font-bold uppercase tracking-widest text-xs mb-1">Map Unavailable</h3>
-              <p className="text-xs font-medium opacity-80">{!apiKey ? "Google Maps API key is missing." : "Failed to load Google Maps."}</p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
+}
+
+// Custom Polyline wrapper since @vis.gl/react-google-maps doesn't provide a <Polyline> natively
+function RoutePolyline({ path, options }: { path: google.maps.LatLngLiteral[], options: any }) {
+  const map = useMap();
+  const polylineRef = React.useRef<google.maps.Polyline | null>(null);
+
+  React.useEffect(() => {
+    if (!map) return;
+    if (!polylineRef.current) {
+      polylineRef.current = new window.google.maps.Polyline({ ...options, path });
+      polylineRef.current.setMap(map);
+    } else {
+      polylineRef.current.setOptions(options);
+      polylineRef.current.setPath(path);
+    }
+  }, [map, path, options]);
+
+  React.useEffect(() => {
+    return () => {
+      if (polylineRef.current) polylineRef.current.setMap(null);
+    };
+  }, []);
+
+  return null;
 }

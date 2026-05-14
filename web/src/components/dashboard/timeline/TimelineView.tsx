@@ -19,11 +19,13 @@ export default function TimelineView() {
   const [dragOverIndex, setDragOverIndex] = useState<number | string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
+  const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   
   const activeDay = activeSegmentIndex !== null ? segments[activeSegmentIndex]?.day : null;
 
   // Auto-scroll the timeline to the focused segment when a map marker is clicked
   React.useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
     if (activeSegmentIndex !== null) {
       const segmentDay = segments[activeSegmentIndex]?.day;
       if (segmentDay) {
@@ -37,14 +39,24 @@ export default function TimelineView() {
       }
 
       // Use a slight timeout to ensure the DOM has expanded before scrolling
-      setTimeout(() => {
+      scrollTimeout = setTimeout(() => {
         const element = document.getElementById(`timeline-item-${activeSegmentIndex}`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }, 100);
     }
+    return () => {
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+    };
   }, [activeSegmentIndex, segments]);
+
+  // Cleanup the sync timeout on unmount to prevent memory leaks
+  React.useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, []);
 
   // Determine the baseline start date of the trip for calendar labeling
   const baseTripStartDate = React.useMemo(() => {
@@ -73,6 +85,16 @@ export default function TimelineView() {
   const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
   const hasAnyCollapsed = collapsedDays.size > 0;
 
+  // Memoize grouped segments to prevent O(D * S) filtering loops on every render
+  const segmentsByDay = React.useMemo(() => {
+    const grouped = new Map<number, { event: Event; absoluteIndex: number }[]>();
+    segments.forEach((event, absoluteIndex) => {
+      if (!grouped.has(event.day)) grouped.set(event.day, []);
+      grouped.get(event.day)!.push({ event, absoluteIndex });
+    });
+    return grouped;
+  }, [segments]);
+
   if (segments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-12 text-muted-foreground">
@@ -83,10 +105,6 @@ export default function TimelineView() {
   }
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
-    if (isSyncing) {
-      e.preventDefault();
-      return;
-    }
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -124,10 +142,10 @@ export default function TimelineView() {
 
   const handleDrop = async (e: React.DragEvent, targetIndex: number, targetDay: number) => {
     e.preventDefault();
-    if (draggedIndex === null || isSyncing) return;
+    if (draggedIndex === null) return;
 
     // Deep copy to safely mutate nested schedule objects
-    const newSegments = JSON.parse(JSON.stringify(segments));
+    const newSegments = structuredClone(segments);
     
     const originalDay = segments[draggedIndex].day;
     const [draggedItem] = newSegments.splice(draggedIndex, 1);
@@ -202,38 +220,50 @@ export default function TimelineView() {
     });
     // --- End Cascade Recalculation ---
 
-    // Optimistically update UI and set syncing state
-    setItinerary((prev) => ({ ...prev, events: newSegments }));
+    // Re-sort the segments by day to prevent absolute indexing desync in the UI
+    newSegments.sort((a: Event, b: Event) => a.day - b.day);
+
+    // Optimistically update UI, clear conflicts, and set syncing state
+    setItinerary((prev) => ({ 
+      ...prev, 
+      events: newSegments,
+      is_conflict: false,
+      validation_errors: []
+    }));
     setDraggedIndex(null);
     setDragOverIndex(null);
     setIsSyncing(true);
 
-    try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessionId}?user_id=${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events: newSegments }),
-      });
-
-      if (response.ok) {
-        const updatedItinerary = await response.json();
-        // Re-sync with the server's response to get validation results
-        setItinerary(updatedItinerary);
-      } else {
-        // On failure, revert to the original state before the drop
-        console.error("Failed to sync reordered itinerary.");
-        setItinerary((prev) => ({ ...prev, events: segments }));
-      }
-    } catch (error) {
-      console.error("Error syncing itinerary:", error);
-      setItinerary((prev) => ({ ...prev, events: segments }));
-    } finally {
-      setIsSyncing(false);
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
     }
+
+    // Debounce the backend API call by 1.5 seconds
+    syncTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessionId}?user_id=${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ events: newSegments }),
+        });
+
+        if (response.ok) {
+          const updatedItinerary = await response.json();
+          // Re-sync with the server's response to get validation results back
+          setItinerary(updatedItinerary);
+        } else {
+          console.error("Failed to sync reordered itinerary.");
+        }
+      } catch (error) {
+        console.error("Error syncing itinerary:", error);
+      } finally {
+        setIsSyncing(false);
+      }
+    }, 1500);
   };
 
   return (
-    <div className={`relative flex flex-col gap-10 py-4 ${isSyncing ? 'opacity-70 pointer-events-none' : ''}`}>
+    <div className={`relative flex flex-col gap-10 py-4 transition-opacity ${isSyncing ? 'opacity-90' : ''}`}>
       {isSyncing && (
         <div className="sticky top-4 z-50 flex justify-center w-full transition-all">
           <div className="flex items-center gap-2 bg-primary/90 backdrop-blur-md text-primary-foreground px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-in fade-in slide-in-from-top-4">
@@ -306,10 +336,7 @@ export default function TimelineView() {
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, segments.length, day)} // Fallback drop zone at the end of the day block
               >
-                {segments
-                  .map((event, absoluteIndex) => ({ event, absoluteIndex }))
-                  .filter(({ event }) => event.day === day)
-                  .map(({ event, absoluteIndex }) => (
+                {segmentsByDay.get(day)?.map(({ event, absoluteIndex }) => (
                     <TimelineItem
                       key={`${day}-${absoluteIndex}`}
                       event={event}
