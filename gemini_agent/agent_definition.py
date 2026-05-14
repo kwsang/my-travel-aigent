@@ -123,7 +123,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=activity_planner_goal,
-        tools=[places_search_tool, events_tool, traffic_tool, details_tool],
+        tools=[places_search_tool, events_tool, traffic_tool, details_tool, persist_tool],
         description="Fills the itinerary with incredible EXPERIENCE and DINING segments that match the user's interests, vibe, and circadian rhythm."
     )
 

@@ -66,6 +66,7 @@ export interface Itinerary {
   is_conflict: boolean;
   validation_errors: string[];
   suggested_accommodations?: any[];
+  suggested_activities?: any[];
   traveler_profile?: TravelerProfile;
 }
 

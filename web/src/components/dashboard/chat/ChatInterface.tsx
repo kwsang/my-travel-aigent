@@ -177,6 +177,22 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
   }, [sendMessage, isLoading]);
 
+  // Listen for activity selection events from the map
+  useEffect(() => {
+    const handleSelectActivity = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      const place = customEvent.detail;
+      
+      if (place && !isLoading) {
+        const placeName = place.details?.name || 'that option';
+        sendMessage(`Awesome, please add "${placeName}" to my itinerary.`);
+      }
+    };
+
+    window.addEventListener('travel_aigent_select_activity', handleSelectActivity);
+    return () => window.removeEventListener('travel_aigent_select_activity', handleSelectActivity);
+  }, [sendMessage, isLoading]);
+
   return (
     <>
       <button 
