@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TimelineView from '@/components/dashboard/timeline/TimelineView';
-import MapHub from '@/components/dashboard/MapHub';
-import BudgetPanel from '@/components/dashboard/BudgetPanel';
-import ChatInterface from '@/components/dashboard/ChatInterface';
+import MapHub from '@/components/dashboard/map/MapHub';
+import BudgetPanel from '@/components/dashboard/budget/BudgetPanel';
+import ChatInterface from '@/components/dashboard/chat/ChatInterface';
 import ProfileModal from '@/components/dashboard/ProfileModal';
 import Toast from '@/components/dashboard/Toast';
 import Navbar from '@/components/layout/Navbar';
@@ -15,7 +15,7 @@ import { ItineraryContext } from '@/context/ItineraryContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
-import BudgetSkeleton from '@/components/dashboard/BudgetSkeleton';
+import BudgetSkeleton from '@/components/dashboard/budget/BudgetSkeleton';
 import TripSelector from '@/components/dashboard/TripSelector';
 import { Trash2, AlertTriangle, UserCircle } from 'lucide-react';
 

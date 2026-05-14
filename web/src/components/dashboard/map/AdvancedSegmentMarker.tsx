@@ -2,32 +2,13 @@
 
 import React, { memo } from 'react';
 import { AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
-import { Car, Utensils, Sparkles, Bed, ClipboardList, Plane, LucideIcon } from 'lucide-react';
-
-// Map segment types to Lucide icons
-const SegmentIcons: Record<string, LucideIcon> = {
-  TRANSPORT: Car,
-  DINING: Utensils,
-  EXPERIENCE: Sparkles,
-  ACCOMMODATION: Bed,
-  LOGISTICS: ClipboardList,
-  FLIGHT: Plane,
-};
-
-// Updated map segment colors matching the new theme
-const SegmentColors: Record<string, { bg: string }> = {
-  ACCOMMODATION: { bg: '#ffd07b' }, // Jasmine
-  DINING: { bg: '#b1740f' }, // Copperwood
-  EXPERIENCE: { bg: '#fdb833' }, // Sunflower Gold
-  FLIGHT: { bg: '#296eb4' }, // Bright Marine
-  TRANSPORT: { bg: '#1789fc' }, // Blue Energy
-  LOGISTICS: { bg: '#b1740f' }, // Copperwood
-};
+import { Sparkles } from 'lucide-react';
+import { SegmentType, SegmentIcons, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
 
 interface AdvancedSegmentMarkerProps {
   position: { lat: number; lng: number };
   title?: string;
-  segmentType: string;
+  segmentType: SegmentType;
   isActive: boolean;
   index: number;
   onClick: (index: number) => void;

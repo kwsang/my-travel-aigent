@@ -27,6 +27,7 @@ As a user, I want to view different potential trip ideas, making modifications a
 ## Out of Scope
 International Travel
 Currency Conversion
+Many-to-many relationship between itineraries and users
 
 ## Enforce Restrictions
 Do not hallucinate that the module agents is in 'vertexai.preview.'

@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from api.dependencies import get_db
 from gemini_agent.logic.models import (
@@ -46,3 +46,21 @@ async def update_user_profile(
     updated_profile = await db.user_profiles.find_one({"user_id": user_id})
     updated_profile["_id"] = str(updated_profile["_id"])
     return updated_profile
+
+@router.delete("/{user_id}")
+async def delete_user_profile(
+    user_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """Delete a user's global profile and preferences."""
+    logger.info(f"Deleting profile for user: {user_id}")
+    try:
+        result = await db.user_profiles.delete_one({"user_id": user_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="User profile not found.")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting profile {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during deletion.")

@@ -4,7 +4,7 @@ import React from 'react';
 import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { APIProvider, Map, useMap, useApiIsLoaded } from '@vis.gl/react-google-maps';
-import AdvancedSegmentMarker from './map/AdvancedSegmentMarker';
+import AdvancedSegmentMarker from './AdvancedSegmentMarker';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
