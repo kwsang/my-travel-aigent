@@ -29,7 +29,7 @@ async def chat(
     Orchestrates the ADK Runner to process user input and return the agent's response.
     """
     user_id = auth_user_id or request.user_id or request.session_id
-    logger.info(f"User: {user_id} | Session: {request.session_id} | Message: {request.message[:50]}...")
+    logger.info(f"User: {user_id} | Session: {request.session_id} | Message: {request.message}")
 
     try:
         # Pre-inject UI state directly into the agent's memory collection before running
@@ -64,6 +64,8 @@ async def chat(
                     if part.text and not getattr(part, "thought", False):
                         agent_text += part.text
 
+        logger.info(f"Agent response for session {request.session_id}: {agent_text}")
+
         # 2. Retrieve the updated session state to check for conflicts
         session = await runner.session_service.get_session(
             app_name="my_travel_aigent",
@@ -85,10 +87,6 @@ async def chat(
                 try: user_profile = json.loads(user_profile)
                 except: pass
                 
-             # Debugging: Log the suggested accommodations found in the state
-            if isinstance(itinerary, dict):
-                logger.info(f"DEBUG - Suggested Accommodations from Agent: {json.dumps(itinerary.get('suggested_accommodations', []), indent=2)}")
-
              # Sync the extracted state to the materialized collections
             # This ensures the visual dashboard can find the latest plans
             if isinstance(itinerary, dict):

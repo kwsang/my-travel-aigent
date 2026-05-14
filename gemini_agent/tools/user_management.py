@@ -6,7 +6,7 @@ from gemini_agent.logic.models import TravelerProfile
 
 logger = logging.getLogger(__name__)
 
-def record_user_profile(profile: TravelerProfile, tool_context: Any) -> str:
+async def record_user_profile(profile: TravelerProfile, tool_context: Any) -> str:
     """
     Saves the gathered user travel preferences into the session state.
     Enforces Couple-First Pricing Logic and updates the profile in DB.
@@ -24,7 +24,7 @@ def record_user_profile(profile: TravelerProfile, tool_context: Any) -> str:
     user_id = tool_context.session.user_id
     try:
         db = destinations_collection.database
-        db["itineraries"].update_one(
+        await db["itineraries"].update_one(
             {"session_id": session_id, "user_id": user_id},
             {"$set": {"traveler_profile": profile.model_dump()}},
             upsert=True
@@ -35,7 +35,7 @@ def record_user_profile(profile: TravelerProfile, tool_context: Any) -> str:
     tool_context.state.update({"traveler_profile": profile.model_dump()})
     return "User profile recorded successfully. Transitioning to Architect mode."
 
-def query_user_profile(tool_context: Any) -> str:
+async def query_user_profile(tool_context: Any) -> str:
     """
     Retrieves the current traveler profile for this active itinerary session.
     """
@@ -46,7 +46,7 @@ def query_user_profile(tool_context: Any) -> str:
         user_id = tool_context.session.user_id
         session_id = tool_context.session.id
         db = destinations_collection.database
-        itinerary = db["itineraries"].find_one({"session_id": session_id, "user_id": user_id})
+        itinerary = await db["itineraries"].find_one({"session_id": session_id, "user_id": user_id})
         if not itinerary or "traveler_profile" not in itinerary:
             return "No traveler profile found for this itinerary yet."
         return json.dumps(itinerary["traveler_profile"], default=str)

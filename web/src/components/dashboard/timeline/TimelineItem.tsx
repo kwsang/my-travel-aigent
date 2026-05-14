@@ -7,6 +7,16 @@ import { formatTime } from '@/utils/dateUtils';
 
 const DefaultIcon = Sparkles; // Fallback icon
 
+const formatStringPrice = (priceVal: any) => {
+  const str = String(priceVal);
+  if (str === 'PRICE_LEVEL_FREE') return 'Free';
+  if (str === 'PRICE_LEVEL_INEXPENSIVE') return '$';
+  if (str === 'PRICE_LEVEL_MODERATE') return '$$';
+  if (str === 'PRICE_LEVEL_EXPENSIVE') return '$$$';
+  if (str === 'PRICE_LEVEL_VERY_EXPENSIVE') return '$$$$';
+  return str;
+};
+
 interface TimelineItemProps {
   event: Event;
   absoluteIndex: number;
@@ -84,8 +94,16 @@ export default function TimelineItem({
           <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule?.local_start_time)}</time>
           {event.details?.price && (
             <p className="text-sm font-bold text-emerald-600">
-              {event.details.price.currency}{' '}
-              {viewMode === 'total' ? event.details.price.amount.toLocaleString() : (event.details.price.amount / Math.max(1, partySize)).toLocaleString()}
+              {typeof event.details.price === 'object' ? (
+                <>
+                  {event.details.price.currency}{' '}
+                  {viewMode === 'total' 
+                    ? event.details.price.amount?.toLocaleString() 
+                    : (event.details.price.amount / Math.max(1, partySize))?.toLocaleString()}
+                </>
+              ) : (
+                formatStringPrice(event.details.price)
+              )}
             </p>
           )}
         </div>

@@ -33,9 +33,12 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isProcessingRef = useRef(false);
 
   // Fetch history when session changes
   useEffect(() => {
+    if (!sessionId || !userId) return;
+
     const loadHistory = async () => {
       setIsLoading(true);
       try {
@@ -97,7 +100,10 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isHovered]);
 
-  const sendMessage = useCallback(async (userMessage: string, overrideItinerary?: any) => {
+  const sendMessage = useCallback(async (userMessage: string, overrideItinerary?: any, overrideProfile?: any) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
 
@@ -109,7 +115,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           message: userMessage,
           session_id: sessionId,
           user_id: userId,
-          user_profile: profile,
+          user_profile: overrideProfile || profile,
           itinerary: overrideItinerary || itinerary,
         }),
       });
@@ -121,7 +127,13 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
 
       // Immediately update the dashboard with the agent's latest state
       if (data.itinerary && setItinerary) {
-        setItinerary(data.itinerary);
+        // Sanitize incoming itinerary to ensure arrays are not null
+        setItinerary({
+          ...data.itinerary,
+          suggested_accommodations: data.itinerary.suggested_accommodations || [],
+          suggested_activities: data.itinerary.suggested_activities || [],
+          events: data.itinerary.events || [],
+        });
       }
       if (data.user_profile && setProfile) {
         setProfile(data.user_profile);
@@ -136,6 +148,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       setMessages(prev => [...prev, { role: 'agent', content: "Sorry, I lost my connection to the server. Please check if the API is running." }]);
     } finally {
       setIsLoading(false);
+      isProcessingRef.current = false;
     }
   }, [sessionId, userId, profile, itinerary, onMessageReceived]);
 
@@ -153,7 +166,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       const destination = customEvent.detail;
       
       if (destination && !isLoading) {
-        sendMessage(`I'd like to plan a trip to ${destination}.`, { ...itinerary, destination });
+        sendMessage(`I'd like to plan a trip to ${destination}. Please suggest some accommodations.`, { ...itinerary, destination });
       }
     };
 
@@ -168,14 +181,19 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       const place = customEvent.detail;
       
       if (place && !isLoading) {
-        const placeName = place.details?.name || 'that accommodation';
-        sendMessage(`Great, please select "${placeName}" as my accommodation and continue planning.`);
+        const placeName = place.details?.name || place.displayName?.text || place.name || 'that accommodation';
+        
+        // Optimistically clear the suggestions from the map
+        const updatedItinerary = { ...itinerary, suggested_accommodations: [] };
+        if (setItinerary) setItinerary(updatedItinerary);
+        
+        sendMessage(`Great, please select "${placeName}" as my accommodation and continue planning. Please suggest some activities.`, updatedItinerary);
       }
     };
 
     window.addEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
     return () => window.removeEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
-  }, [sendMessage, isLoading]);
+  }, [sendMessage, isLoading, itinerary, setItinerary]);
 
   // Listen for activity selection events from the map
   useEffect(() => {
@@ -184,13 +202,33 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       const place = customEvent.detail;
       
       if (place && !isLoading) {
-        const placeName = place.details?.name || 'that option';
-        sendMessage(`Awesome, please add "${placeName}" to my itinerary.`);
+        const placeName = place.details?.name || place.displayName?.text || place.name || 'that option';
+        
+        // Optimistically clear the suggestions from the map
+        const updatedItinerary = { ...itinerary, suggested_activities: [] };
+        if (setItinerary) setItinerary(updatedItinerary);
+        
+        sendMessage(`Awesome, please add "${placeName}" to my itinerary.`, updatedItinerary);
       }
     };
 
     window.addEventListener('travel_aigent_select_activity', handleSelectActivity);
     return () => window.removeEventListener('travel_aigent_select_activity', handleSelectActivity);
+  }, [sendMessage, isLoading, itinerary, setItinerary]);
+
+  // Listen for profile update events from the profile modal
+  useEffect(() => {
+    const handleProfileUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      const updatedProfile = customEvent.detail;
+      
+      if (updatedProfile && !isLoading) {
+        sendMessage(`I've updated my traveler profile and budget constraints. Please review and adjust the itinerary if needed.`, undefined, updatedProfile);
+      }
+    };
+
+    window.addEventListener('travel_aigent_profile_updated', handleProfileUpdated);
+    return () => window.removeEventListener('travel_aigent_profile_updated', handleProfileUpdated);
   }, [sendMessage, isLoading]);
 
   return (

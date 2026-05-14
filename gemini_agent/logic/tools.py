@@ -1,11 +1,17 @@
 import os
-import requests
+import httpx
 import logging
 from typing import List, Optional
+from gemini_agent.tools.cache import LRUTTLCache
 
 logger = logging.getLogger(__name__)
 
-def search_places(
+# Simple in-memory cache to prevent duplicate API calls
+_MATRIX_CACHE = LRUTTLCache()
+_DETAILS_CACHE = LRUTTLCache()
+_PLACES_CACHE = LRUTTLCache()
+
+async def search_places(
     query: str,
     location_type: str,
     location_bias: Optional[str] = None,
@@ -21,6 +27,11 @@ def search_places(
         location_bias: Optional geographic anchor (address or venue name) to center the search.
         interests: Optional list of user interests from their profile to refine results.
     """
+    cache_key = (query, location_type, location_bias, tuple(interests) if interests else None)
+    cached_data = _PLACES_CACHE.get(cache_key)
+    if cached_data is not None:
+        return cached_data
+
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
     url = "https://places.googleapis.com/v1/places:searchText"
 
@@ -52,19 +63,26 @@ def search_places(
         )
     }
 
-    try:
-        logger.info(f"Executing Enriched Search: {enhanced_query}")
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        return response.json().get("places", [])
-    except Exception as e:
-        logger.error(f"Places Search Error: {e}")
-        return []
+    async with httpx.AsyncClient() as client:
+        try:
+            logger.info(f"Executing Enriched Search: {enhanced_query}")
+            response = await client.post(url, json=payload, headers=headers, timeout=10.0)
+            response.raise_for_status()
+            data = response.json().get("places", [])
+            _PLACES_CACHE.set(cache_key, data)
+            return data
+        except Exception as e:
+            logger.error(f"Places Search Error: {e}")
+            return []
 
-def google_places_details(place_id: str) -> dict:
+async def google_places_details(place_id: str) -> dict:
     """
     Retrieves deep metadata for a specific venue to verify operating hours and status.
     """
+    cached_data = _DETAILS_CACHE.get(place_id)
+    if cached_data is not None:
+        return cached_data
+
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
     url = f"https://places.googleapis.com/v1/places/{place_id}"
     
@@ -73,19 +91,28 @@ def google_places_details(place_id: str) -> dict:
         "X-Goog-FieldMask": "id,businessStatus,currentOpeningHours,utcOffsetMinutes"
     }
 
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        logger.error(f"Places Details Error: {e}")
-        return {}
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, headers=headers, timeout=10.0)
+            response.raise_for_status()
+            data = response.json()
+            _DETAILS_CACHE.set(place_id, data)
+            return data
+        except Exception as e:
+            logger.error(f"Places Details Error: {e}")
+            return {}
 
-def google_maps_matrix(origins: List[str], destinations: List[str]) -> dict:
+async def google_maps_matrix(origins: List[str], destinations: List[str]) -> dict:
     """
     Invokes the Distance Matrix API to get ground-truth transit durations in traffic.
     Used to calculate precision buffers for the visual timeline.
     """
+    # Convert lists to tuples to make them hashable for the cache dictionary
+    cache_key = (tuple(origins), tuple(destinations))
+    cached_data = _MATRIX_CACHE.get(cache_key)
+    if cached_data is not None:
+        return cached_data
+
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
     
@@ -96,10 +123,13 @@ def google_maps_matrix(origins: List[str], destinations: List[str]) -> dict:
         "key": api_key
     }
 
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        logger.error(f"Maps Matrix Error: {e}")
-        return {}
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, params=params, timeout=10.0)
+            response.raise_for_status()
+            data = response.json()
+            _MATRIX_CACHE.set(cache_key, data)
+            return data
+        except Exception as e:
+            logger.error(f"Maps Matrix Error: {e}")
+            return {}

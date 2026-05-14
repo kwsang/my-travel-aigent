@@ -7,7 +7,7 @@ from gemini_agent.logic.models import Itinerary
 
 logger = logging.getLogger(__name__)
 
-def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
+async def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
     """
     Persists a travel itinerary to MongoDB Atlas. 
     Updates the existing draft for this session if it exists, otherwise creates it.
@@ -31,7 +31,7 @@ def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
 
         db = destinations_collection.database
         # Use session_id as the primary anchor to ensure we update the same draft
-        result = db["itineraries"].update_one(
+        result = await db["itineraries"].update_one(
             {"session_id": session_id, "user_id": user_id},
             {"$set": itinerary_data},
             upsert=True
@@ -43,7 +43,7 @@ def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
     except Exception as e:
         return f"Error saving itinerary: {str(e)}"
 
-def get_itinerary(trip_name: Optional[str] = None, tool_context: Any = None) -> str:
+async def get_itinerary(trip_name: Optional[str] = None, tool_context: Any = None) -> str:
     """
     Retrieves saved itineraries for a given user from MongoDB Atlas.
     If trip_name is provided, it filters for that specific trip.
@@ -59,7 +59,7 @@ def get_itinerary(trip_name: Optional[str] = None, tool_context: Any = None) -> 
         if trip_name:
             query["trip_name"] = trip_name
 
-        results = list(db["itineraries"].find(query))
+        results = await db["itineraries"].find(query).to_list(length=None)
         if not results:
             msg = f"No itineraries found for user '{user_id}'"
             if trip_name:
@@ -70,7 +70,7 @@ def get_itinerary(trip_name: Optional[str] = None, tool_context: Any = None) -> 
     except Exception as e:
         return f"Error retrieving itinerary: {str(e)}"
 
-def delete_itinerary(trip_name: str, tool_context: Any = None) -> str:
+async def delete_itinerary(trip_name: str, tool_context: Any = None) -> str:
     """
     Deletes a specific itinerary for a given user from MongoDB Atlas by trip name.
     """
@@ -81,7 +81,7 @@ def delete_itinerary(trip_name: str, tool_context: Any = None) -> str:
             
         user_id = tool_context.session.user_id
         db = destinations_collection.database
-        result = db["itineraries"].delete_one({"user_id": user_id, "trip_name": trip_name})
+        result = await db["itineraries"].delete_one({"user_id": user_id, "trip_name": trip_name})
         
         if result.deleted_count == 0:
             return f"No itinerary found with name '{trip_name}' for user '{user_id}'."
@@ -90,7 +90,7 @@ def delete_itinerary(trip_name: str, tool_context: Any = None) -> str:
     except Exception as e:
         return f"Error deleting itinerary: {str(e)}"
 
-def update_itinerary_status(trip_name: str, status: str, tool_context: Any = None) -> str:
+async def update_itinerary_status(trip_name: str, status: str, tool_context: Any = None) -> str:
     """
     Updates the status of a specific itinerary (e.g., from 'draft' to 'final').
     """
@@ -104,7 +104,7 @@ def update_itinerary_status(trip_name: str, status: str, tool_context: Any = Non
             return f"Error: Invalid status '{status}'. Must be 'draft' or 'final'."
 
         db = destinations_collection.database
-        result = db["itineraries"].update_one(
+        result = await db["itineraries"].update_one(
             {"user_id": user_id, "trip_name": trip_name},
             {"$set": {
                 "status": status, 
@@ -119,7 +119,7 @@ def update_itinerary_status(trip_name: str, status: str, tool_context: Any = Non
     except Exception as e:
         return f"Error updating itinerary status: {str(e)}"
 
-def clone_itinerary(source_trip_name: str, new_trip_name: str, tool_context: Any = None) -> str:
+async def clone_itinerary(source_trip_name: str, new_trip_name: str, tool_context: Any = None) -> str:
     """
     Creates a new draft itinerary by cloning an existing one.
     Useful for exploring variations of a trip while keeping the original plan intact.
@@ -131,13 +131,13 @@ def clone_itinerary(source_trip_name: str, new_trip_name: str, tool_context: Any
             
         user_id = tool_context.session.user_id
         db = destinations_collection.database
-        source_doc = db["itineraries"].find_one({"user_id": user_id, "trip_name": source_trip_name})
+        source_doc = await db["itineraries"].find_one({"user_id": user_id, "trip_name": source_trip_name})
         
         if not source_doc:
             return f"Error: Source itinerary '{source_trip_name}' not found for user '{user_id}'."
 
         # Prevent overwriting an existing trip with the same new name
-        if db["itineraries"].find_one({"user_id": user_id, "trip_name": new_trip_name}):
+        if await db["itineraries"].find_one({"user_id": user_id, "trip_name": new_trip_name}):
             return f"Error: An itinerary named '{new_trip_name}' already exists for this user."
 
         # Strip the MongoDB ID and validate into the model
@@ -154,7 +154,7 @@ def clone_itinerary(source_trip_name: str, new_trip_name: str, tool_context: Any
     except Exception as e:
         return f"Error cloning itinerary: {str(e)}"
 
-def list_trip_versions(source_trip_name: str, tool_context: Any = None) -> str:
+async def list_trip_versions(source_trip_name: str, tool_context: Any = None) -> str:
     """
     Retrieves all draft versions cloned from a specific itinerary.
     """
@@ -171,7 +171,7 @@ def list_trip_versions(source_trip_name: str, tool_context: Any = None) -> str:
             "metadata.cloned_from": source_trip_name
         }
 
-        results = list(db["itineraries"].find(query))
+        results = await db["itineraries"].find(query).to_list(length=None)
         if not results:
             return f"No draft versions found cloned from '{source_trip_name}' for user '{user_id}'."
 
@@ -179,7 +179,7 @@ def list_trip_versions(source_trip_name: str, tool_context: Any = None) -> str:
     except Exception as e:
         return f"Error listing trip versions: {str(e)}"
 
-def finalize_itinerary(trip_name: str, tool_context: Any) -> str:
+async def finalize_itinerary(trip_name: str, tool_context: Any) -> str:
     """
     Finalizes the trip by updating its status to 'final' and ensuring the latest 
     state from the agent's memory is persisted to MongoDB.
@@ -210,7 +210,7 @@ def finalize_itinerary(trip_name: str, tool_context: Any) -> str:
             itinerary_data["session_id"] = session_id
             
             # Upsert into MongoDB to ensure latest edits are captured
-            db["itineraries"].update_one(
+            await db["itineraries"].update_one(
                 {"session_id": session_id},
                 {"$set": itinerary_data},
                 upsert=True
@@ -225,7 +225,7 @@ def finalize_itinerary(trip_name: str, tool_context: Any) -> str:
             return f"SUCCESS: Active itinerary '{trip_name}' has been finalized and persisted to your profile."
         
         # 2. Fallback: If not in memory, just update the status of the existing record in DB
-        result = db["itineraries"].update_one(
+        result = await db["itineraries"].update_one(
             {"session_id": session_id},
             {"$set": {
                 "status": "final",

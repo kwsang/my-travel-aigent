@@ -16,6 +16,9 @@ export interface ProfileFormData {
     group_planning_per_person: boolean;
     transport_preference: 'public' | 'rideshare' | 'rental';
     personal_transport_available: boolean;
+    start_date?: string;
+    end_date?: string;
+    target_duration_days?: number;
   };
   interests: string[];
 }

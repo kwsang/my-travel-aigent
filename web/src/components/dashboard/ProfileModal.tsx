@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles, Calendar } from 'lucide-react';
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
@@ -22,10 +22,14 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
   const [formData, setFormData] = useState<ProfileFormData>(parseProfileData(initialData));
   const [isFetching, setIsFetching] = useState(!initialData);
   const [isSaving, setIsLoading] = useState(false);
+  const [startDate, setStartDate] = useState(initialData?.preferences?.start_date || '');
+  const [endDate, setEndDate] = useState(initialData?.preferences?.end_date || '');
 
   useEffect(() => {
     if (initialData) {
       setFormData(parseProfileData(initialData));
+      setStartDate(initialData.preferences?.start_date || '');
+      setEndDate(initialData.preferences?.end_date || '');
       setIsFetching(false);
     } else {
       setIsFetching(false);
@@ -52,6 +56,10 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
       if (response.ok) {
         const updatedProfile = await response.json();
         onSave(updatedProfile);
+
+        // Notify the chat interface that the profile was updated
+        window.dispatchEvent(new CustomEvent('travel_aigent_profile_updated', { detail: updatedProfile }));
+
         onClose();
       }
     } catch (error) {
@@ -76,7 +84,7 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
             <div>
               <h2 className="text-2xl font-bold text-white text-white-outline tracking-tight">Traveler Profile</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {page === 1 ? "Step 1: Group & Budget" : "Step 2: Style & Transit"}
+                {page === 1 ? "Step 1: Group & Budget" : page === 2 ? "Step 2: Style & Transit" : "Step 3: Dates & Duration"}
               </p>
             </div>
             <ProfileProgressRing page={page} />
@@ -92,8 +100,15 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
           <div className="space-y-6 min-h-[340px]">
           {page === 1 ? (
             <ProfilePageOne formData={formData} setFormData={setFormData} toggleInterest={toggleInterest} />
-          ) : (
+          ) : page === 2 ? (
             <ProfilePageTwo formData={formData} setFormData={setFormData} />
+          ) : (
+            <ProfilePageThree 
+              formData={formData} 
+              setFormData={setFormData} 
+              startDate={startDate} setStartDate={setStartDate}
+              endDate={endDate} setEndDate={setEndDate}
+            />
           )}
           </div>
         )}
@@ -104,9 +119,14 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
               <button onClick={onClose} className="flex-1 px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all">Skip</button>
               <button onClick={() => setPage(2)} className="flex-1 bg-white/10 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/20 transition-all flex items-center justify-center gap-2">Next <ArrowRight size={18} /></button>
             </>
-          ) : (
+          ) : page === 2 ? (
             <>
               <button onClick={() => setPage(1)} className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all flex items-center gap-2"><ArrowLeft size={18} /> Back</button>
+              <button onClick={() => setPage(3)} className="flex-1 bg-white/10 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/20 transition-all flex items-center justify-center gap-2">Next <ArrowRight size={18} /></button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setPage(2)} className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all flex items-center gap-2"><ArrowLeft size={18} /> Back</button>
               <button onClick={handleSave} disabled={isSaving} className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">{isSaving ? "Saving..." : <><Save size={18} /> Save Profile</>}</button>
             </>
           )}
@@ -142,12 +162,12 @@ function ProfileProgressRing({ page }: { page: number }) {
           cy="50"
           r="40"
           fill="transparent"
-          strokeDasharray={`${page === 1 ? 50 * 2.51 : 100 * 2.51}, 251.2`}
+          strokeDasharray={`${(page / 3) * 100 * 2.51}, 251.2`}
           strokeDashoffset="0"
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-sm font-bold text-primary">{page * 50}%</span>
+        <span className="text-sm font-bold text-primary">{Math.round((page / 3) * 100)}%</span>
       </div>
     </div>
   );
@@ -235,6 +255,75 @@ function ProfilePageOne({ formData, setFormData, toggleInterest }: ProfilePagePr
           Group members share rooms?
         </label>
       </div>
+    </div>
+  );
+}
+
+interface ProfilePageThreeProps extends ProfilePageProps {
+  startDate: string;
+  setStartDate: React.Dispatch<React.SetStateAction<string>>;
+  endDate: string;
+  setEndDate: React.Dispatch<React.SetStateAction<string>>;
+}
+
+function ProfilePageThree({ formData, setFormData, startDate, setStartDate, endDate, setEndDate }: ProfilePageThreeProps) {
+  
+  const handleDateChange = (newStart: string, newEnd: string) => {
+    setStartDate(newStart);
+    setEndDate(newEnd);
+    
+    if (newStart && newEnd) {
+      const start = new Date(newStart);
+      const end = new Date(newEnd);
+      if (end >= start) {
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        setFormData(prev => ({
+          ...prev,
+          preferences: {
+            ...prev.preferences,
+            target_duration_days: diffDays,
+            start_date: newStart,
+            end_date: newEnd
+          }
+        }));
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+      <div className="space-y-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+          <Calendar size={14} /> Start Date
+        </label>
+        <input 
+          type="date"
+          value={startDate}
+          onChange={(e) => handleDateChange(e.target.value, endDate)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all [color-scheme:dark]"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+          <Calendar size={14} /> End Date
+        </label>
+        <input 
+          type="date"
+          value={endDate}
+          min={startDate}
+          onChange={(e) => handleDateChange(startDate, e.target.value)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all [color-scheme:dark]"
+        />
+      </div>
+      {!!formData.preferences.target_duration_days && startDate && endDate && (
+        <div className="mt-8 flex items-center justify-center gap-3 bg-primary/10 border border-primary/20 p-4 rounded-xl">
+          <Sparkles className="text-primary w-5 h-5" />
+          <span className="text-sm font-medium text-white">
+            Trip Duration: <span className="font-bold text-primary">{formData.preferences.target_duration_days} Days</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

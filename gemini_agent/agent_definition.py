@@ -126,16 +126,35 @@ def create_travel_agent():
         # Add explicit formatting rules to ensure reliable UI splitting
         prompt += "\n\nFORMATTING RULE: Use Markdown H3 headers ('### Section Name') for all major itinerary components (e.g., '### Accommodation', '### Transport', '### Dining', '### Day 1'). Do not use these headers for regular text."
         
+        # Explicitly enforce exact dates if they exist in the profile
+        prefs = profile.get("preferences", {})
+        start_date = prefs.get("start_date")
+        end_date = prefs.get("end_date")
+        if start_date and end_date:
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested dates from {start_date} to {end_date}. Every generated event MUST be scheduled strictly within this exact window. Day 1 MUST begin on {start_date}."
+
         prompt += f"\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
         return prompt
 
     def get_pioneer_instructions(ctx: Context) -> str:
         profile, itinerary = _get_safe_state(ctx)
-        return f"{pioneer_goal}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+        prompt = pioneer_goal
+        
+        prefs = profile.get("preferences", {})
+        if prefs.get("start_date") and prefs.get("end_date"):
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST be scheduled strictly between {prefs.get('start_date')} and {prefs.get('end_date')}. Day 1 MUST begin on {prefs.get('start_date')}."
+            
+        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
 
     def get_activity_planner_instructions(ctx: Context) -> str:
         profile, itinerary = _get_safe_state(ctx)
-        return f"{activity_planner_goal}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+        prompt = activity_planner_goal
+        
+        prefs = profile.get("preferences", {})
+        if prefs.get("start_date") and prefs.get("end_date"):
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST be scheduled strictly between {prefs.get('start_date')} and {prefs.get('end_date')}."
+            
+        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
 
     pioneer_agent = Agent(
         name="travel_pioneer",

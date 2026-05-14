@@ -5,7 +5,7 @@ import googlemaps
 import vertexai
 from vertexai.generative_models import GenerativeModel
 from google.cloud import secretmanager
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from google.maps import places_v1
 from dotenv import load_dotenv
 
@@ -63,12 +63,10 @@ except Exception:
     voyage_client = None
 
 try:
-    mongo_client = MongoClient(MONGODB_URI)
+    mongo_client = AsyncIOMotorClient(MONGODB_URI)
     db = mongo_client["my-travel-aigent"]
     destinations_collection = db["destinations"]
-    # Verify MongoDB connection (MongoClient is lazy)
-    mongo_client.admin.command('ping')
-    logger.info("MongoDB connection verified (Database: %s)", db.name)
+    logger.info("Async Motor MongoDB client initialized (Database: %s)", db.name)
 except Exception:
     logger.exception("Failed to initialize or connect to MongoDB")
     mongo_client = db = destinations_collection = None

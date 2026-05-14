@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { API_CONFIG } from '@/config/constants';
 
-import { Loader2, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Loader2, AlertTriangle, ChevronDown, CalendarRange } from 'lucide-react';
 import TimelineItem from './TimelineItem';
 import { Event } from '@/types';
 import { recalculateTimelineCascade } from './timelineUtils';
@@ -16,7 +16,7 @@ import { useTimelineSync } from '@/hooks/useTimelineSync';
  * Supports Phase 4 logic for risk tolerance buffers.
  */
 export default function TimelineView() {
-  const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex } = useItineraryData();
+  const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex, profile } = useItineraryData();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | string | null>(null);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
@@ -54,6 +54,12 @@ export default function TimelineView() {
 
   // Determine the baseline start date of the trip for calendar labeling
   const baseTripStartDate = React.useMemo(() => {
+    // First check if user explicitly set a start date in their profile
+    if (profile?.preferences?.start_date) {
+      const [year, month, day] = profile.preferences.start_date.split('-');
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+
     const allStartTimes = segments
       .map((s: Event) => new Date(s.schedule?.local_start_time || ''))
       .filter((d: Date) => !isNaN(d.getTime()));
@@ -64,7 +70,7 @@ export default function TimelineView() {
     }
     d.setHours(0, 0, 0, 0);
     return d;
-  }, [segments]);
+  }, [segments, profile?.preferences?.start_date]);
 
   const toggleDay = (day: number) => {
     setCollapsedDays(prev => {
@@ -79,6 +85,31 @@ export default function TimelineView() {
   const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
   const hasAnyCollapsed = collapsedDays.size > 0;
 
+  const formatDateString = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const dateHeader = profile?.preferences?.start_date && profile?.preferences?.end_date ? (
+    <div className="flex items-center justify-between bg-card/80 backdrop-blur-md border border-border rounded-xl px-4 py-3 mb-2 shadow-sm animate-in fade-in slide-in-from-top-4">
+      <div className="flex items-center gap-3">
+        <div className="bg-primary/20 p-2 rounded-lg text-primary">
+          <CalendarRange size={18} />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Trip Dates</span>
+          <span className="text-sm font-bold text-foreground">
+            {formatDateString(profile.preferences.start_date)} — {formatDateString(profile.preferences.end_date)}
+          </span>
+        </div>
+      </div>
+      <div className="bg-primary/10 text-primary text-xs font-bold px-2.5 py-1 rounded-md border border-primary/20">
+        {profile.preferences.target_duration_days} Days
+      </div>
+    </div>
+  ) : null;
+
   // Memoize grouped segments to prevent O(D * S) filtering loops on every render
   const segmentsByDay = React.useMemo(() => {
     const grouped = new Map<number, { event: Event; absoluteIndex: number }[]>();
@@ -91,9 +122,12 @@ export default function TimelineView() {
 
   if (segments.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-12 text-muted-foreground">
-        <p className="text-lg font-medium">Your timeline is empty.</p>
-        <p className="text-sm">Tell the Architect what you want to do!</p>
+      <div className="flex flex-col gap-4 py-4">
+        {dateHeader}
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-12 text-muted-foreground">
+          <p className="text-lg font-medium">Your timeline is empty.</p>
+          <p className="text-sm">Tell the Architect what you want to do!</p>
+        </div>
       </div>
     );
   }
@@ -180,6 +214,8 @@ export default function TimelineView() {
         </div>
       )}
       
+      {dateHeader}
+
       {/* Validation Errors / Overlap Warnings Banner */}
       {itinerary.is_conflict && itinerary.validation_errors && itinerary.validation_errors.length > 0 && (
         <div className="flex flex-col gap-2 bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-4 -mt-4 mb-2">

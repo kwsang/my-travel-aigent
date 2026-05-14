@@ -80,6 +80,9 @@ export interface TravelerProfile {
     starting_location?: string;
     transport_preference?: 'public' | 'rideshare' | 'rental';
     personal_transport_available?: boolean;
+    start_date?: string;
+    end_date?: string;
+    target_duration_days?: number;
   };
   room_sharing?: boolean;
   people_per_room?: number;
