@@ -112,6 +112,7 @@ class Itinerary(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
+    suggested_accommodations: Optional[List[Dict[str, Any]]] = Field(None, description="A list of accommodation options suggested by the agent.")
     traveler_profile: Optional[TravelerProfile] = None
 
     @field_validator('updated_at', mode='before')
@@ -127,6 +128,7 @@ class ItineraryPatchRequest(BaseModel):
     destination: Optional[str] = Field(None, description="Manual override for the primary destination.")
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
     status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
+    suggested_accommodations: Optional[List[Dict[str, Any]]] = Field(None, description="A list of accommodation options suggested by the agent.")
     traveler_profile: Optional[TravelerProfile] = Field(None, description="Updated traveler profile.")
 
 class ValidationResponse(BaseModel):

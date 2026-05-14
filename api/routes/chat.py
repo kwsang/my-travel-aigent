@@ -6,7 +6,7 @@ from google.genai import types
 from google.adk.runners import Runner
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from api.dependencies import get_current_user, get_runner, get_db
+from api.dependencies import get_current_user, get_runner, get_db, get_session_db
 from gemini_agent.logic.models import ChatRequest, ChatResponse
 from gemini_agent.logic.validate_buffers import (
     validate_itinerary_structure, 
@@ -21,7 +21,8 @@ async def chat(
     request: ChatRequest,
     auth_user_id: str | None = Depends(get_current_user),
     runner: Runner = Depends(get_runner),
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    session_db: AsyncIOMotorDatabase = Depends(get_session_db)
 ):
     """
     Main entry point for the agent conversation.
@@ -31,6 +32,23 @@ async def chat(
     logger.info(f"User: {user_id} | Session: {request.session_id} | Message: {request.message[:50]}...")
 
     try:
+        # Pre-inject UI state directly into the agent's memory collection before running
+        if request.user_profile is not None or request.itinerary is not None:
+            update_state = {}
+            if request.user_profile is not None:
+                update_state["state.data.user_profile_data"] = request.user_profile
+            if request.itinerary is not None:
+                update_state["state.data.final_itinerary"] = request.itinerary
+                
+            await session_db.sessions.update_one(
+                {"session_id": request.session_id, "user_id": user_id, "app_name": "my_travel_aigent"},
+                {
+                    "$set": update_state,
+                    "$setOnInsert": {"data.events": []}
+                },
+                upsert=True
+            )
+
         # 1. Process Message via Runner
         agent_text = ""
         async for event in runner.run_async(
@@ -39,11 +57,7 @@ async def chat(
             new_message=types.Content(
                 role="user",
                 parts=[types.Part(text=request.message)]
-            ),
-            state={
-                "user_profile_data": request.user_profile,
-                "final_itinerary": request.itinerary
-            }
+            )
         ):
             if event.content and event.content.parts:
                 for part in event.content.parts:

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react';
+import { Map as MapIcon, MapPin, Navigation, AlertTriangle, Bed, Star } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { APIProvider, Map, useMap, useApiIsLoaded, AdvancedMarker } from '@vis.gl/react-google-maps';
 import AdvancedSegmentMarker from './AdvancedSegmentMarker';
@@ -80,12 +80,21 @@ function MapInner() {
     if (geo) {
       return { lat: geo.latitude, lng: geo.longitude };
     }
+    
+    if (itinerary.suggested_accommodations && itinerary.suggested_accommodations.length > 0) {
+      const firstSugg = itinerary.suggested_accommodations[0];
+      const suggGeo = firstSugg.geo || firstSugg.details?.geo;
+      if (suggGeo) {
+        return { lat: suggGeo.latitude, lng: suggGeo.longitude };
+      }
+    }
+
     const dest = popularDestinations.find(d => d.name === itinerary.destination);
     if (dest) {
       return { lat: dest.lat, lng: dest.lng };
     }
     return defaultCenter;
-  }, [segments, itinerary.destination, popularDestinations]);
+  }, [segments, itinerary.destination, popularDestinations, itinerary.suggested_accommodations]);
 
   // Generate the sequential path for the polyline
   const routePath = React.useMemo(() => {
@@ -144,6 +153,11 @@ function MapInner() {
     window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: destName }));
   }, [setItinerary]);
 
+  const handleSuggestionClick = React.useCallback((place: any) => {
+    // This should send a message to the agent to select this accommodation
+    window.dispatchEvent(new CustomEvent('travel_aigent_select_accommodation', { detail: place }));
+  }, []);
+
   // Automatically fit bounds or pan to active segment
   React.useEffect(() => {
     if (!map) return;
@@ -187,14 +201,32 @@ function MapInner() {
         map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.setZoom(15);
       }
-    } else if (routePath.length > 0) {
-      // Zoom to fit all if no active segment is selected
-      if (routePath.length === 1) {
-        map.panTo(routePath[0]);
+    } else if (routePath.length > 0 || itinerary.suggested_accommodations?.length) {
+      // Zoom to fit all segments and suggestions if no active segment is selected
+      const bounds = new (window as any).google.maps.LatLngBounds();
+      let pointCount = 0;
+      let lastPoint: { lat: number; lng: number } | null = null;
+
+      routePath.forEach((pos) => {
+        bounds.extend(pos);
+        pointCount++;
+        lastPoint = pos;
+      });
+
+      itinerary.suggested_accommodations?.forEach((place: any) => {
+        const geo = place.geo || place.details?.geo;
+        if (geo) {
+          const pos = { lat: geo.latitude, lng: geo.longitude };
+          bounds.extend(pos);
+          pointCount++;
+          lastPoint = pos;
+        }
+      });
+
+      if (pointCount === 1 && lastPoint) {
+        map.panTo(lastPoint);
         map.setZoom(14); // Sensible default zoom for a single marker
-      } else {
-        const bounds = new (window as any).google.maps.LatLngBounds();
-        routePath.forEach((pos) => bounds.extend(pos));
+      } else if (pointCount > 1) {
         map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
     } else if (segments.length === 0) {
@@ -207,7 +239,7 @@ function MapInner() {
         map.panTo({ lat: 39.8283, lng: -98.5795 });
       }
     }
-  }, [map, activeSegmentIndex, routePath, segments, itinerary.destination, popularDestinations]);
+  }, [map, activeSegmentIndex, routePath, segments, itinerary.destination, popularDestinations, itinerary.suggested_accommodations]);
 
   return (
     <>
@@ -240,6 +272,41 @@ function MapInner() {
               </div>
             </AdvancedMarker>
           ))}
+
+          {itinerary.suggested_accommodations?.map((place: any, idx: number) => {
+            const geo = place.geo || place.details?.geo;
+            if (!geo) return null;
+            
+            return (
+                <AdvancedMarker
+                    key={`suggestion-${idx}`}
+                    position={{ lat: geo.latitude, lng: geo.longitude }}
+                    title={place.details?.name || 'Suggested Place'}
+                    onClick={() => handleSuggestionClick(place)}
+                    className="cursor-pointer"
+                >
+                    <div className="flex flex-col items-center group transition-transform hover:scale-110 animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div className="relative bg-violet-500 border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-violet-300 group-hover:shadow-violet-500/30 transition-all">
+                            <Bed size={18} className="text-white" />
+                            {(place.details?.price || place.details?.rating) && (
+                                <div className="absolute -top-2 -right-4 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
+                                    {place.details?.price && (
+                                        <span>{place.details.price.currency === 'USD' ? '$' : place.details.price.currency}{place.details.price.amount}</span>
+                                    )}
+                                    {place.details?.price && place.details?.rating && <span className="opacity-70">•</span>}
+                                    {place.details?.rating && (
+                                        <span className="flex items-center gap-0.5"><Star size={9} className="fill-white" /> {place.details.rating}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-foreground/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                            {place.details?.name || 'Suggested Place'}
+                        </div>
+                    </div>
+                </AdvancedMarker>
+            );
+          })}
 
           {segments.map((segment: Event, index: number) => {
             const geo = segment.geo || segment.details?.geo;

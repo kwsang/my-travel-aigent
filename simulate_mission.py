@@ -115,7 +115,11 @@ async def run_full_agent_test():
         print("\n")
         
         # Extract State for Validation
-        state = await runner.session_service.get_session(user_id, session_id, "my_travel_aigent")
+        state = await runner.session_service.get_session(
+            app_name="my_travel_aigent",
+            user_id=user_id, 
+            session_id=session_id
+        )
         itinerary = state.state.get("final_itinerary")
         user_prefs = state.state.get("user_profile_data")
 

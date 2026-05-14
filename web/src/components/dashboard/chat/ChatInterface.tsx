@@ -97,7 +97,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isHovered]);
 
-  const sendMessage = useCallback(async (userMessage: string) => {
+  const sendMessage = useCallback(async (userMessage: string, overrideItinerary?: any) => {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
 
@@ -110,7 +110,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           session_id: sessionId,
           user_id: userId,
           user_profile: profile,
-          itinerary: itinerary,
+          itinerary: overrideItinerary || itinerary,
         }),
       });
 
@@ -153,13 +153,28 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       const destination = customEvent.detail;
       
       if (destination && !isLoading) {
-        setIsOpen(true);
-        sendMessage(`I'd like to plan a trip to ${destination}.`);
+        sendMessage(`I'd like to plan a trip to ${destination}.`, { ...itinerary, destination });
       }
     };
 
     window.addEventListener('travel_aigent_set_destination', handleSetDestination);
     return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
+  }, [sendMessage, isLoading, itinerary]);
+
+  // Listen for accommodation selection events from the map
+  useEffect(() => {
+    const handleSelectAccommodation = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      const place = customEvent.detail;
+      
+      if (place && !isLoading) {
+        const placeName = place.details?.name || 'that accommodation';
+        sendMessage(`Great, please select "${placeName}" as my accommodation and continue planning.`);
+      }
+    };
+
+    window.addEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
+    return () => window.removeEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
   }, [sendMessage, isLoading]);
 
   return (
