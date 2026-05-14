@@ -4,6 +4,7 @@ import React from 'react';
 import { AlertCircle, ArrowLeftRight, Banknote } from 'lucide-react';
 import { BUDGET_CONFIG } from '@/config/constants';
 import { useItineraryData } from '@/context/ItineraryContext';
+import { calculateBudgetMetrics } from '@/utils/budgetUtils';
 
 export default function BudgetPanel() {
   const { viewMode, setViewMode, segments, budget, partySize, profile } = useItineraryData();
@@ -13,23 +14,14 @@ export default function BudgetPanel() {
     setViewMode((v) => (v === 'total' ? 'per_person' : 'total'));
   };
 
-  const totalCost = segments.reduce((acc, s) => acc + (s.details?.price?.amount || 0), 0);
-  const rawLimit = budget?.total_limit || 0;
-  const currency = budget?.currency || BUDGET_CONFIG.DEFAULT_CURRENCY;
-
-  // Determine if the profile's budget limit was entered as a per-person limit
-  const isPerPersonProfile = profile?.preferences?.group_planning_per_person || false;
-  const actualPartySize = Math.max(BUDGET_CONFIG.MIN_PARTY_SIZE, partySize);
-
-  // Calculate the absolute total and per person limits based on the profile's intent
-  const absoluteTotalLimit = isPerPersonProfile ? rawLimit * actualPartySize : rawLimit;
-  const absolutePerPersonLimit = isPerPersonProfile ? rawLimit : rawLimit / actualPartySize;
-
-  const displayTotal = viewMode === 'total' ? totalCost : totalCost / actualPartySize;
-  const displayLimit = viewMode === 'total' ? absoluteTotalLimit : absolutePerPersonLimit;
-
-  const percentage = absoluteTotalLimit > 0 ? (totalCost / absoluteTotalLimit) * 100 : 0;
-  const isOverThreshold = percentage >= BUDGET_CONFIG.WARNING_THRESHOLD;
+  const {
+    rawLimit,
+    currency,
+    displayTotal,
+    displayLimit,
+    percentage,
+    isOverThreshold
+  } = calculateBudgetMetrics({ segments, budget, partySize, profile, viewMode });
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -50,12 +42,7 @@ export default function BudgetPanel() {
             )}
           </div>
           {rawLimit > 0 && (
-            <div className="w-full bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
-              <div 
-                className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-destructive' : 'bg-primary'}`}
-                style={{ width: `${Math.min(100, percentage)}%` }}
-              />
-            </div>
+            <BudgetProgressBar percentage={percentage} isOverThreshold={isOverThreshold} />
           )}
         </div>
 
@@ -70,11 +57,28 @@ export default function BudgetPanel() {
       </div>
 
       {isOverThreshold && (
-        <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-destructive border border-destructive/20">
-          <AlertCircle className="w-3.5 h-3.5" />
-          <span className="text-xs font-semibold italic">{BUDGET_CONFIG.WARNING_THRESHOLD}% Budget Warning: Limit Approaching</span>
-        </div>
+        <BudgetWarningAlert />
       )}
+    </div>
+  );
+}
+
+function BudgetProgressBar({ percentage, isOverThreshold }: { percentage: number, isOverThreshold: boolean }) {
+  return (
+    <div className="w-full bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
+      <div 
+        className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-destructive' : 'bg-primary'}`}
+        style={{ width: `${Math.min(100, percentage)}%` }}
+      />
+    </div>
+  );
+}
+
+function BudgetWarningAlert() {
+  return (
+    <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-destructive border border-destructive/20">
+      <AlertCircle className="w-3.5 h-3.5" />
+      <span className="text-xs font-semibold italic">{BUDGET_CONFIG.WARNING_THRESHOLD}% Budget Warning: Limit Approaching</span>
     </div>
   );
 }

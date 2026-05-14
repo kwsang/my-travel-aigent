@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TimelineView from '@/components/dashboard/timeline/TimelineView';
 import MapHub from '@/components/dashboard/map/MapHub';
 import BudgetPanel from '@/components/dashboard/budget/BudgetPanel';
@@ -13,12 +13,16 @@ import { API_CONFIG } from '@/config/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { ItineraryContext } from '@/context/ItineraryContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { useSidebarResize } from '@/hooks/useSidebarResize';
 import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/budget/BudgetSkeleton';
 import TripSelector from '@/components/dashboard/TripSelector';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
-import { Trash2, AlertTriangle, UserCircle } from 'lucide-react';
+import { UserCircle } from 'lucide-react';
+import DeleteTripModal from '@/components/dashboard/DeleteTripModal';
+import RenameAlertModal from '@/components/dashboard/RenameAlertModal';
 
 /**
  * The Visual Planning Dashboard
@@ -54,51 +58,28 @@ export default function DashboardPage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
-  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [tripToDelete, setTripToDelete] = useState<string | null>(null);
   const [showBlankNameAlert, setShowBlankNameAlert] = useState(false);
-  const [profile, setProfile] = useState<TravelerProfile | null>(null);
-  const [itinerary, setItinerary] = useState<Partial<Itinerary>>({
-    events: [],
-    is_conflict: false,
-    validation_errors: [],
-  });
-  const [isLoadingItinerary, setIsLoadingItinerary] = useState(true);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState<number | null>(null);
 
+  // Extracted Data Fetching Hook
+  const {
+    itineraries,
+    itinerary,
+    profile,
+    isLoading,
+    toast,
+    setItinerary,
+    setProfile,
+    setToast,
+    triggerToast,
+    refreshDashboard,
+    fetchList
+  } = useDashboardData(visitorId, currentSessionId);
+
   // Sidebar Resizing State
-  const [sidebarWidth, setSidebarWidth] = useLocalStorage<number>('travel_aigent_sidebar_width', 400);
-  const [isDragging, setIsDragging] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      // Clamp the sidebar width between 300px and 800px
-      const newWidth = Math.max(300, Math.min(e.clientX, 800));
-      if (sidebarRef.current) {
-        sidebarRef.current.style.width = `${newWidth}px`;
-      }
-    };
-    const handleMouseUp = (e: MouseEvent) => {
-      if (!isDragging) return;
-      setIsDragging(false);
-      const finalWidth = Math.max(300, Math.min(e.clientX, 800));
-      setSidebarWidth(finalWidth);
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, setSidebarWidth]);
+  const { sidebarWidth, isDragging, setIsDragging, sidebarRef } = useSidebarResize();
 
   // Sync editable name when the itinerary data loads
   useEffect(() => {
@@ -112,72 +93,10 @@ export default function DashboardPage() {
     }
   }, [profile, setViewMode]);
 
-  const fetchList = useCallback(async () => {
-    if (!visitorId) return;
-    try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary?user_id=${visitorId}`);
-      if (response.ok) {
-        setItineraries(await response.json());
-      } else {
-        setToast({ show: true, message: 'Failed to load trip history from server.' });
-      }
-    } catch (e) {
-      console.error("Could not fetch trip list.", e);
-      setToast({ show: true, message: 'Network error: Failed to load trip history.' });
-    }
-  }, [visitorId]);
-
-  const fetchProfile = useCallback(async () => {
-    if (!visitorId) return;
-    setIsLoadingProfile(true);
-    try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/profile/${visitorId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-      } else if (response.status !== 404) {
-        setToast({ show: true, message: 'Failed to load traveler profile.' });
-      }
-    } catch (e) {
-      console.error("Could not fetch user profile.", e);
-      setToast({ show: true, message: 'Network error: Failed to load traveler profile.' });
-    } finally {
-      setIsLoadingProfile(false);
-    }
-  }, [visitorId]);
-
-  const fetchItinerary = useCallback(async () => {
-    if (!currentSessionId || !visitorId) return;
-    setIsLoadingItinerary(true);
-    setActiveSegmentIndex(null); // Reset active map highlight when switching trips
-    try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setItinerary(data);
-      } else if (response.status !== 404) {
-        setToast({ show: true, message: 'Failed to load trip details from server.' });
-      }
-    } catch (error) {
-      console.error("Dashboard Sync: Failed to fetch itinerary.", error);
-      setToast({ show: true, message: 'Network error: Failed to load trip details.' });
-    } finally {
-      setIsLoadingItinerary(false);
-    }
-  }, [currentSessionId, visitorId]);
-
-  // Centralized dashboard update logic to ensure single points of refresh
-  const refreshDashboard = useCallback(() => {
-    fetchProfile();
-    fetchItinerary();
-    fetchList();
-  }, [fetchItinerary, fetchList, fetchProfile]);
-
+  // Reset map highlights when changing trips
   useEffect(() => {
-    if (visitorId) {
-      refreshDashboard();
-    }
-  }, [refreshDashboard, visitorId]);
+    setActiveSegmentIndex(null);
+  }, [currentSessionId]);
 
   const handleRename = async () => {
     const newName = editedName.trim();
@@ -243,10 +162,6 @@ export default function DashboardPage() {
     }
   };
 
-  const triggerToast = (message: string) => {
-    setToast({ show: true, message });
-  };
-
   const handleNewTrip = () => {
     setCurrentSessionId(uuidv4());
     setIsEditingName(false);
@@ -275,8 +190,6 @@ export default function DashboardPage() {
       onRename={handleRename}
     />
   );
-
-  const isLoading = isLoadingItinerary || isLoadingProfile;
 
   // Memoize the context value to prevent unnecessary re-renders of all consumer components
   const contextValue = useMemo(() => ({
@@ -368,63 +281,21 @@ export default function DashboardPage() {
       )}
 
       {tripToDelete && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm p-6 relative ring-1 ring-white/5 flex flex-col items-center text-center">
-            <div className="bg-destructive/20 p-3 rounded-full mb-4">
-              <Trash2 className="w-6 h-6 text-destructive" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">Delete Trip?</h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              Are you sure you want to delete this trip and its history? This action cannot be undone.
-            </p>
-            <div className="flex gap-3 w-full">
-              <button 
-                onClick={() => setTripToDelete(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmDeleteTrip}
-                className="flex-1 bg-destructive text-destructive-foreground px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-destructive/20 hover:brightness-110 active:scale-95 transition-all"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteTripModal 
+          onClose={() => setTripToDelete(null)}
+          onConfirm={confirmDeleteTrip}
+        />
       )}
 
       {showBlankNameAlert && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm p-6 relative ring-1 ring-white/5 flex flex-col items-center text-center">
-            <div className="bg-amber-500/20 p-3 rounded-full mb-4">
-              <AlertTriangle className="w-6 h-6 text-amber-500" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">Blank Trip Name</h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              A trip name cannot be empty. Please enter a valid name or discard changes.
-            </p>
-            <div className="flex gap-3 w-full">
-              <button 
-                onClick={() => {
-                  setEditedName(itinerary.trip_name || 'New Trip');
-                  setShowBlankNameAlert(false);
-                  setIsEditingName(false);
-                }}
-                className="flex-1 px-4 py-2.5 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all"
-              >
-                Discard
-              </button>
-              <button 
-                onClick={() => setShowBlankNameAlert(false)}
-                className="flex-1 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-              >
-                Keep Editing
-              </button>
-            </div>
-          </div>
-        </div>
+        <RenameAlertModal 
+          onDiscard={() => {
+            setEditedName(itinerary.trip_name || 'New Trip');
+            setShowBlankNameAlert(false);
+            setIsEditingName(false);
+          }}
+          onKeepEditing={() => setShowBlankNameAlert(false)}
+        />
       )}
 
       {toast.show && (

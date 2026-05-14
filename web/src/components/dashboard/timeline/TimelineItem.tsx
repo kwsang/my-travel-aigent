@@ -3,6 +3,7 @@ import { useItineraryData } from '@/context/ItineraryContext';
 import { Sparkles, GripVertical } from 'lucide-react';
 import { Event } from '@/types';
 import { SegmentType, SegmentIcons, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
+import { formatTime } from '@/utils/dateUtils';
 
 const DefaultIcon = Sparkles; // Fallback icon
 
@@ -37,24 +38,6 @@ export default function TimelineItem({
 }: TimelineItemProps) {
   const itineraryData = useItineraryData();
   const { viewMode, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex, hoveredSegmentIndex, setHoveredSegmentIndex } = itineraryData;
-
-  // Formats raw ISO strings into a clean "8:30 AM" format
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr) return '';
-    
-    // Manually extract time to avoid browser timezone shifts and 
-    // handle malformed ISO strings (e.g., missing leading zeros)
-    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      let hours = parseInt(timeMatch[1], 10);
-      const minutes = timeMatch[2];
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12; // the hour '0' should be '12'
-      return `${hours}:${minutes} ${ampm}`;
-    }
-    return timeStr;
-  };
 
   return (
     <div

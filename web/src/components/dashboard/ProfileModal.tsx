@@ -6,6 +6,7 @@ import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
 import { TravelerProfile } from '@/types';
+import { parseProfileData } from '@/utils/profileUtils';
 
 interface ProfileModalProps {
   sessionId: string;
@@ -17,21 +18,6 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ sessionId, userId, initialData, onClose, onSave }: ProfileModalProps) {
   const [page, setPage] = useState(1);
-
-  const parseProfileData = (data?: TravelerProfile): ProfileFormData => ({
-    party_size: data?.party_size || 1,
-    room_sharing: data?.room_sharing || false,
-    people_per_room: data?.people_per_room || 2,
-    budget: data?.budget || { total_limit: 0, currency: 'USD' },
-    preferences: {
-      risk_tolerance: data?.preferences?.risk_tolerance || 'relaxed',
-      circadian_preference: data?.preferences?.circadian_preference || 'night_owl',
-      group_planning_per_person: data?.preferences?.group_planning_per_person || false,
-      transport_preference: data?.preferences?.transport_preference || 'rental',
-      personal_transport_available: data?.preferences?.personal_transport_available || false
-    },
-    interests: data?.interests || []
-  });
 
   const [formData, setFormData] = useState<ProfileFormData>(parseProfileData(initialData));
   const [isFetching, setIsFetching] = useState(!initialData);
@@ -93,35 +79,7 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
                 {page === 1 ? "Step 1: Group & Budget" : "Step 2: Style & Transit"}
               </p>
             </div>
-            {/* Progress Ring */}
-            <div className="relative w-12 h-12">
-              <svg className="w-full h-full" viewBox="0 0 100 100">
-                {/* Background circle */}
-                <circle
-                  className="text-white/10 stroke-current"
-                  strokeWidth="8"
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                ></circle>
-                {/* Progress circle */}
-                <circle
-                  className="text-primary progress-ring-circle stroke-current"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                  strokeDasharray={`${page === 1 ? 50 * 2.51 : 100 * 2.51}, 251.2`} /* 2 * PI * R = 251.2 */
-                  strokeDashoffset="0"
-                ></circle>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-sm font-bold text-primary">{page * 50}%</span>
-              </div>
-            </div>
+            <ProfileProgressRing page={page} />
           </div>
         </div>
 
@@ -133,124 +91,9 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
         ) : (
           <div className="space-y-6 min-h-[340px]">
           {page === 1 ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              {/* Party & Accommodation */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <Users size={14} /> Party Size
-              </label>
-              <input 
-                type="number"
-                value={formData.party_size}
-                onChange={(e) => setFormData({...formData, party_size: parseInt(e.target.value) || 0})}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                placeholder="Total travelers"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <Bed size={14} /> Per Room
-              </label>
-              <input 
-                type="number"
-                disabled={!formData.room_sharing}
-                value={formData.people_per_room}
-                onChange={(e) => setFormData({...formData, people_per_room: parseInt(e.target.value) || 0})}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-30"
-                placeholder="2"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-              <Sparkles size={14} /> Interests
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {PROFILE_OPTIONS.TRAVEL_INTERESTS.map(interest => (
-                <button
-                  key={interest}
-                  onClick={() => toggleInterest(interest)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                    formData.interests.includes(interest)
-                      ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20'
-                      : 'border-white/10 bg-white/5 text-muted-foreground hover:border-primary/50'
-                  }`}
-                >
-                  {interest}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
-            <input 
-              type="checkbox"
-              id="room_sharing"
-              checked={formData.room_sharing}
-              onChange={(e) => setFormData({...formData, room_sharing: e.target.checked})}
-              className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
-            />
-            <label htmlFor="room_sharing" className="text-sm font-medium text-white cursor-pointer select-none">
-              Group members share rooms?
-            </label>
-          </div>
-            </div>
+            <ProfilePageOne formData={formData} setFormData={setFormData} toggleInterest={toggleInterest} />
           ) : (
-            <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-              {/* Style & Preferences */}
-              <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
-                <input 
-                  type="checkbox"
-                  id="group_planning"
-                  checked={formData.preferences.group_planning_per_person}
-                  onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, group_planning_per_person: e.target.checked}})}
-                  className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
-                />
-                <label htmlFor="group_planning" className="text-sm font-medium text-white cursor-pointer select-none">
-                  Plan budget on a per-person basis?
-                </label>
-              </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <ThemedSelect
-              label="Buffer"
-              icon={Shield}
-              value={formData.preferences.risk_tolerance}
-              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, risk_tolerance: val as 'relaxed' | 'strict'}})}
-              options={PROFILE_OPTIONS.RISK_TOLERANCES}
-            />
-            <ThemedSelect
-              label="Vibe"
-              icon={SunMoon}
-              value={formData.preferences.circadian_preference}
-              onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: val as 'early_bird' | 'night_owl'}})}
-              options={PROFILE_OPTIONS.CIRCADIAN_PREFERENCES}
-            />
-          </div>
-
-          <ThemedSelect
-            label="Transport"
-            icon={Bus}
-            value={formData.preferences.transport_preference}
-            onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, transport_preference: val as 'public' | 'rideshare' | 'rental'}})}
-            options={PROFILE_OPTIONS.TRANSPORT_OPTIONS}
-          />
-
-          <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
-            <input 
-              type="checkbox"
-              id="personal_transport"
-              checked={formData.preferences.personal_transport_available}
-              onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, personal_transport_available: e.target.checked}})}
-              className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
-            />
-            <label htmlFor="personal_transport" className="text-sm font-medium text-white cursor-pointer select-none flex items-center gap-2">
-              Own vehicle available? <Zap size={14} className="text-amber-400" />
-            </label>
-          </div>
-            </div>
+            <ProfilePageTwo formData={formData} setFormData={setFormData} />
           )}
           </div>
         )}
@@ -268,6 +111,168 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface ProfilePageProps {
+  formData: ProfileFormData;
+  setFormData: React.Dispatch<React.SetStateAction<ProfileFormData>>;
+  toggleInterest?: (interest: string) => void;
+}
+
+function ProfileProgressRing({ page }: { page: number }) {
+  return (
+    <div className="relative w-12 h-12">
+      <svg className="w-full h-full" viewBox="0 0 100 100">
+        <circle
+          className="text-white/10 stroke-current"
+          strokeWidth="8"
+          cx="50"
+          cy="50"
+          r="40"
+          fill="transparent"
+        />
+        <circle
+          className="text-primary progress-ring-circle stroke-current"
+          strokeWidth="8"
+          strokeLinecap="round"
+          cx="50"
+          cy="50"
+          r="40"
+          fill="transparent"
+          strokeDasharray={`${page === 1 ? 50 * 2.51 : 100 * 2.51}, 251.2`}
+          strokeDashoffset="0"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-sm font-bold text-primary">{page * 50}%</span>
+      </div>
+    </div>
+  );
+}
+
+function ProfilePageOne({ formData, setFormData, toggleInterest }: ProfilePageProps) {
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Users size={14} /> Party Size
+          </label>
+          <input 
+            type="number"
+            value={formData.party_size}
+            onChange={(e) => setFormData({...formData, party_size: parseInt(e.target.value) || 0})}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+            placeholder="Total travelers"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Bed size={14} /> Per Room
+          </label>
+          <input 
+            type="number"
+            disabled={!formData.room_sharing}
+            value={formData.people_per_room}
+            onChange={(e) => setFormData({...formData, people_per_room: parseInt(e.target.value) || 0})}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-30"
+            placeholder="2"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+          <Sparkles size={14} /> Interests
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {PROFILE_OPTIONS.TRAVEL_INTERESTS.map(interest => (
+            <button
+              key={interest}
+              onClick={() => toggleInterest?.(interest)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                formData.interests.includes(interest)
+                  ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20'
+                  : 'border-white/10 bg-white/5 text-muted-foreground hover:border-primary/50'
+              }`}
+            >
+              {interest}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 bg-white/5 p-4 rounded-xl border border-white/10">
+        <input 
+          type="checkbox"
+          id="room_sharing"
+          checked={formData.room_sharing}
+          onChange={(e) => setFormData({...formData, room_sharing: e.target.checked})}
+          className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
+        />
+        <label htmlFor="room_sharing" className="text-sm font-medium text-white cursor-pointer select-none">
+          Group members share rooms?
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+      <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+        <input 
+          type="checkbox"
+          id="group_planning"
+          checked={formData.preferences.group_planning_per_person}
+          onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, group_planning_per_person: e.target.checked}})}
+          className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
+        />
+        <label htmlFor="group_planning" className="text-sm font-medium text-white cursor-pointer select-none">
+          Plan budget on a per-person basis?
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mt-2">
+        <ThemedSelect
+          label="Buffer"
+          icon={Shield}
+          value={formData.preferences.risk_tolerance}
+          onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, risk_tolerance: val as 'relaxed' | 'strict'}})}
+          options={PROFILE_OPTIONS.RISK_TOLERANCES}
+        />
+        <ThemedSelect
+          label="Vibe"
+          icon={SunMoon}
+          value={formData.preferences.circadian_preference}
+          onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: val as 'early_bird' | 'night_owl'}})}
+          options={PROFILE_OPTIONS.CIRCADIAN_PREFERENCES}
+        />
+      </div>
+
+      <ThemedSelect
+        label="Transport"
+        icon={Bus}
+        value={formData.preferences.transport_preference}
+        onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, transport_preference: val as 'public' | 'rideshare' | 'rental'}})}
+        options={PROFILE_OPTIONS.TRANSPORT_OPTIONS}
+      />
+
+      <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
+        <input 
+          type="checkbox"
+          id="personal_transport"
+          checked={formData.preferences.personal_transport_available}
+          onChange={(e) => setFormData({...formData, preferences: {...formData.preferences, personal_transport_available: e.target.checked}})}
+          className="w-5 h-5 rounded border-white/10 bg-card text-primary focus:ring-primary/50"
+        />
+        <label htmlFor="personal_transport" className="text-sm font-medium text-white cursor-pointer select-none flex items-center gap-2">
+          Own vehicle available? <Zap size={14} className="text-amber-400" />
+        </label>
       </div>
     </div>
   );

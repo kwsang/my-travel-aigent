@@ -5,91 +5,11 @@ import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react'
 import { useItineraryData } from '@/context/ItineraryContext';
 import { APIProvider, Map, useMap, useApiIsLoaded } from '@vis.gl/react-google-maps';
 import AdvancedSegmentMarker from './AdvancedSegmentMarker';
+import RoutePolyline from './RoutePolyline';
+import { marineSunsetMapStyle } from '@/config/mapStyles';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
-
-// Custom Google Maps theme matching the "Marine & Sunset" dark UI
-const marineSunsetMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#0a1118" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0a1118" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#ffd07b" }] },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#fdb833" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#ffd07b" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#0d1b2a" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#296eb4" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#111f33" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#1a2c45" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#b1740f" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#1789fc" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#296eb4" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#fdb833" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [{ color: "#b1740f" }],
-  },
-  {
-    featureType: "transit.station",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#fdb833" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#060d14" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#296eb4" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#0a1118" }],
-  },
-];
 
 /**
  * MapHub Component
@@ -343,29 +263,4 @@ function MapInner() {
       )}
     </>
   );
-}
-
-// Custom Polyline wrapper since @vis.gl/react-google-maps doesn't provide a <Polyline> natively
-function RoutePolyline({ path, options }: { path: { lat: number; lng: number }[], options: any }) {
-  const map = useMap();
-  const polylineRef = React.useRef<any>(null);
-
-  React.useEffect(() => {
-    if (!map) return;
-    if (!polylineRef.current) {
-      polylineRef.current = new (window as any).google.maps.Polyline({ ...options, path });
-      polylineRef.current.setMap(map);
-    } else {
-      polylineRef.current.setOptions(options);
-      polylineRef.current.setPath(path);
-    }
-  }, [map, path, options]);
-
-  React.useEffect(() => {
-    return () => {
-      if (polylineRef.current) polylineRef.current.setMap(null);
-    };
-  }, []);
-
-  return null;
 }
