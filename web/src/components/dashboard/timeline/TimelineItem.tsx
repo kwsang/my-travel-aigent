@@ -108,7 +108,7 @@ export default function TimelineItem({
       </div>
       {/* Indication for the Retreat Rule (from ARCHITECT_PROMPT logic) */}
       {riskTolerance === 'relaxed' && event.details?.name?.toLowerCase().includes('retreat') && (
-        <div className="mt-3 rounded-md bg-amber-50 px-2 py-1 text-xs font-bold uppercase text-amber-600 border border-amber-100">
+        <div className="mt-3 rounded-md bg-destructive/10 px-2 py-1 text-xs font-bold uppercase text-destructive border border-destructive/20">
           Mandatory Retreat Block (16:00 - 18:30)
         </div>
       )}

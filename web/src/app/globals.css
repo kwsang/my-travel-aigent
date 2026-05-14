@@ -47,73 +47,58 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  --background: oklch(18% 0.03 260); /* Deep Twilight Blue */
-  --foreground: oklch(96% 0.01 260); /* Starry White */
-  --card: oklch(22% 0.03 260); /* Midnight Navy */
-  --card-foreground: oklch(96% 0.01 260);
-  --popover: oklch(22% 0.03 260);
-  --popover-foreground: oklch(96% 0.01 260);
-  --primary: oklch(75% 0.15 50); /* Sunset Gold */
-  --primary-foreground: oklch(15% 0.02 50); /* Dark Earth */
-  --secondary: oklch(45% 0.12 160); /* Deep Jungle Green */
-  --secondary-foreground: oklch(96% 0.01 160);
-  --muted: oklch(28% 0.03 260); /* Shadow Blue */
-  --muted-foreground: oklch(70% 0.03 260);
-  --accent: oklch(60% 0.14 200); /* Lagoon Teal */
-  --accent-foreground: oklch(98% 0.01 200);
-  --destructive: oklch(55% 0.18 25); /* Mars Red */
-  --border: oklch(32% 0.03 260); /* Horizon Line */
-  --input: oklch(32% 0.03 260);
-  --ring: oklch(75% 0.15 50);
-  --chart-1: oklch(75% 0.15 50); /* Sunset */
-  --chart-2: oklch(60% 0.14 200); /* Lagoon */
-  --chart-3: oklch(45% 0.12 160); /* Jungle */
-  --chart-4: oklch(85% 0.12 90);  /* Sand */
-  --chart-5: oklch(65% 0.12 300); /* Orchid */
+:root, .dark {
+  /* Backgrounds: Deep oceanic dark blues */
+  --background: #060d14; 
+  --foreground: #eef4f8; 
+  --card: #0a1118; 
+  --card-foreground: #eef4f8;
+  --popover: #0a1118;
+  --popover-foreground: #eef4f8;
+  
+  /* Primary: Blue Energy */
+  --primary: #1789fc; 
+  --primary-foreground: #ffffff; 
+  
+  /* Secondary: Bright Marine */
+  --secondary: #296eb4; 
+  --secondary-foreground: #ffffff;
+  
+  /* Muted / Neutral tones */
+  --muted: #111f33; 
+  --muted-foreground: #8aa3c0;
+  
+  /* Accent: Sunflower Gold */
+  --accent: #fdb833; 
+  --accent-foreground: #060d14;
+  
+  /* Destructive / Warning: Copperwood */
+  --destructive: #b1740f; 
+  --destructive-foreground: #ffffff;
+  
+  /* Borders & Inputs */
+  --border: #1a2c45; 
+  --input: #1a2c45;
+  --ring: #1789fc;
+  
+  /* Theme Data Charts */
+  --chart-1: #1789fc; /* Blue Energy */
+  --chart-2: #296eb4; /* Bright Marine */
+  --chart-3: #fdb833; /* Sunflower Gold */
+  --chart-4: #ffd07b; /* Jasmine */
+  --chart-5: #b1740f; /* Copperwood */
+  
   --radius: 0.625rem;
-  --sidebar: oklch(16% 0.03 260); /* Deep Twilight */
-  --sidebar-foreground: oklch(90% 0.02 260);
-  --sidebar-primary: oklch(75% 0.15 50);
-  --sidebar-primary-foreground: oklch(15% 0.02 50);
-  --sidebar-accent: oklch(24% 0.04 260);
-  --sidebar-accent-foreground: oklch(96% 0.01 260);
-  --sidebar-border: oklch(28% 0.03 260);
-  --sidebar-ring: oklch(75% 0.15 50);
-}
-
-.dark {
-  --background: oklch(15% 0.02 270); /* Dark muted purple */
-  --foreground: oklch(95% 0.01 270); /* Light pastel lavender */
-  --card: oklch(20% 0.03 270); /* Darker muted purple */
-  --card-foreground: oklch(95% 0.01 270); /* Light pastel lavender */
-  --popover: oklch(20% 0.03 270); /* Darker muted purple */
-  --popover-foreground: oklch(95% 0.01 270); /* Light pastel lavender */
-  --primary: oklch(80% 0.05 270); /* Lighter pastel purple */
-  --primary-foreground: oklch(15% 0.02 270); /* Dark muted purple */
-  --secondary: oklch(30% 0.05 270); /* Medium muted purple */
-  --secondary-foreground: oklch(90% 0.05 270); /* Light pastel purple */
-  --muted: oklch(30% 0.05 270); /* Medium muted purple */
-  --muted-foreground: oklch(70% 0.05 270); /* Medium pastel purple */
-  --accent: oklch(30% 0.05 270); /* Medium muted purple */
-  --accent-foreground: oklch(90% 0.05 270); /* Light pastel purple */
-  --destructive: oklch(80% 0.15 10); /* Soft red */
-  --border: oklch(25% 0.03 270); /* Slightly darker muted purple */
-  --input: oklch(25% 0.03 270); /* Slightly darker muted purple */
-  --ring: oklch(45% 0.07 270); /* Deeper pastel purple */
-  --chart-1: oklch(85% 0.05 270);
-  --chart-2: oklch(75% 0.07 270);
-  --chart-3: oklch(65% 0.09 270);
-  --chart-4: oklch(55% 0.11 270);
-  --chart-5: oklch(45% 0.13 270);
-  --sidebar: oklch(20% 0.03 270); /* Darker muted purple */
-  --sidebar-foreground: oklch(95% 0.01 270); /* Light pastel lavender */
-  --sidebar-primary: oklch(80% 0.05 270); /* Lighter pastel purple */
-  --sidebar-primary-foreground: oklch(15% 0.02 270); /* Dark muted purple */
-  --sidebar-accent: oklch(30% 0.05 270); /* Medium muted purple */
-  --sidebar-accent-foreground: oklch(90% 0.05 270); /* Light pastel purple */
-  --sidebar-border: oklch(25% 0.03 270); /* Slightly darker muted purple */
-  --sidebar-ring: oklch(45% 0.07 270); /* Deeper pastel purple */
+  
+  /* Sidebar */
+  --sidebar: #0a1118; 
+  --sidebar-foreground: #eef4f8;
+  --sidebar-primary: #1789fc;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #111f33;
+  --sidebar-accent-foreground: #ffd07b; /* Jasmine */
+  --sidebar-border: #1a2c45;
+  --sidebar-ring: #1789fc;
 }
 
 @layer base {
@@ -146,4 +131,30 @@
      1px -1px 0 #000,
     -1px  1px 0 #000,
      1px  1px 0 #000;
+}
+
+/* Custom Marine Theme Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  border-radius: 20px;
+  border: 2px solid var(--background);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--primary);
 }

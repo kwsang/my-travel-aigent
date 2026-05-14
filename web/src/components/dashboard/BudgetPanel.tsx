@@ -36,8 +36,8 @@ export default function BudgetPanel() {
       <div className="flex items-center gap-3">
         <div className="text-right">
           <div className="flex items-center justify-end gap-1 font-mono text-lg font-bold">
-            <Banknote className={`w-5 h-5 mr-1 ${isOverThreshold ? 'text-amber-600' : 'text-slate-400'}`} />
-            <span className={`${isOverThreshold ? 'text-amber-600' : 'text-white'} text-stroke-1`}>
+            <Banknote className={`w-5 h-5 mr-1 ${isOverThreshold ? 'text-destructive' : 'text-muted-foreground'}`} />
+            <span className={`${isOverThreshold ? 'text-destructive' : 'text-foreground'} text-stroke-1`}>
               {currency} {displayTotal.toLocaleString()}
             </span>
             {rawLimit > 0 && (
@@ -52,7 +52,7 @@ export default function BudgetPanel() {
           {rawLimit > 0 && (
             <div className="w-full bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
               <div 
-                className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-destructive' : 'bg-primary'}`}
                 style={{ width: `${Math.min(100, percentage)}%` }}
               />
             </div>
@@ -70,7 +70,7 @@ export default function BudgetPanel() {
       </div>
 
       {isOverThreshold && (
-        <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-amber-700 border border-amber-100">
+        <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-destructive border border-destructive/20">
           <AlertCircle className="w-3.5 h-3.5" />
           <span className="text-xs font-semibold italic">{BUDGET_CONFIG.WARNING_THRESHOLD}% Budget Warning: Limit Approaching</span>
         </div>

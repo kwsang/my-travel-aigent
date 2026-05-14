@@ -9,85 +9,85 @@ import AdvancedSegmentMarker from './map/AdvancedSegmentMarker';
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
 
-// Custom Google Maps theme matching the "Deep Twilight" dark UI
-const twilightMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#13111c" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#13111c" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8b8698" }] },
+// Custom Google Maps theme matching the "Marine & Sunset" dark UI
+const marineSunsetMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#0a1118" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#0a1118" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#ffd07b" }] },
   {
     featureType: "administrative.locality",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#c4b5fd" }],
+    stylers: [{ color: "#fdb833" }],
   },
   {
     featureType: "poi",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#8b8698" }],
+    stylers: [{ color: "#ffd07b" }],
   },
   {
     featureType: "poi.park",
     elementType: "geometry",
-    stylers: [{ color: "#1b1829" }],
+    stylers: [{ color: "#0d1b2a" }],
   },
   {
     featureType: "poi.park",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#6b6580" }],
+    stylers: [{ color: "#296eb4" }],
   },
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [{ color: "#252138" }],
+    stylers: [{ color: "#111f33" }],
   },
   {
     featureType: "road",
     elementType: "geometry.stroke",
-    stylers: [{ color: "#2f2a47" }],
+    stylers: [{ color: "#1a2c45" }],
   },
   {
     featureType: "road",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#8b8698" }],
+    stylers: [{ color: "#b1740f" }],
   },
   {
     featureType: "road.highway",
     elementType: "geometry",
-    stylers: [{ color: "#363052" }],
+    stylers: [{ color: "#1789fc" }],
   },
   {
     featureType: "road.highway",
     elementType: "geometry.stroke",
-    stylers: [{ color: "#463f68" }],
+    stylers: [{ color: "#296eb4" }],
   },
   {
     featureType: "road.highway",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#c4b5fd" }],
+    stylers: [{ color: "#fdb833" }],
   },
   {
     featureType: "transit",
     elementType: "geometry",
-    stylers: [{ color: "#252138" }],
+    stylers: [{ color: "#b1740f" }],
   },
   {
     featureType: "transit.station",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#c4b5fd" }],
+    stylers: [{ color: "#fdb833" }],
   },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [{ color: "#0b0914" }],
+    stylers: [{ color: "#060d14" }],
   },
   {
     featureType: "water",
     elementType: "labels.text.fill",
-    stylers: [{ color: "#463f68" }],
+    stylers: [{ color: "#296eb4" }],
   },
   {
     featureType: "water",
     elementType: "labels.text.stroke",
-    stylers: [{ color: "#13111c" }],
+    stylers: [{ color: "#0a1118" }],
   },
 ];
 
@@ -137,8 +137,7 @@ function MapInner() {
   const targetSegments = nonTransitSegments.length > 0 ? nonTransitSegments : segments;
   const cities = Array.from(new Set(targetSegments.map((s) => s.details?.city).filter(Boolean)));
   const destinationCities = cities.filter(city => city !== startingLocation);
-  const tripName = itinerary?.trip_name && itinerary.trip_name !== 'New Trip' ? itinerary.trip_name : null;
-  const primaryDestination = destinationCities.length > 0 ? destinationCities[0] : (cities.length > 0 ? cities[0] : (tripName || 'Destination TBD'));
+  const primaryDestination = destinationCities.length > 0 ? destinationCities[0] : (cities.length > 0 ? cities[0] : (itinerary.destination || 'Destination TBD'));
 
   // Memoize the map center so it doesn't cause the map to re-pan on every context render
   const mapCenter = React.useMemo(() => {
@@ -156,12 +155,12 @@ function MapInner() {
         if (!geo) return null;
         return { lat: geo.latitude, lng: geo.longitude };
       })
-      .filter(Boolean) as google.maps.LatLngLiteral[];
+      .filter(Boolean) as { lat: number; lng: number }[];
   }, [segments]);
 
   // Generate individual edges for the polyline to style flights differently
   const routeEdges = React.useMemo(() => {
-    const edges: { path: google.maps.LatLngLiteral[], options: any }[] = [];
+    const edges: { path: { lat: number; lng: number }[], options: any }[] = [];
     const validSegments = segments.filter((s) => s.geo || s.details?.geo);
     
     for (let i = 1; i < validSegments.length; i++) {
@@ -177,12 +176,12 @@ function MapInner() {
             { lat: currGeo.latitude, lng: currGeo.longitude }
           ],
           options: {
-            strokeColor: curr.segment === 'FLIGHT' ? '#0ea5e9' : '#6366f1',
+            strokeColor: curr.segment === 'FLIGHT' ? '#296eb4' : '#fdb833',
             strokeOpacity: curr.segment === 'FLIGHT' ? 0 : 0.8,
             strokeWeight: 4,
             geodesic: true,
             icons: curr.segment === 'FLIGHT' ? [{
-              icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 3 },
+              icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 3 },
               offset: '0',
               repeat: '15px'
             }] : undefined,
@@ -233,7 +232,7 @@ function MapInner() {
       }
 
       if (isTransport && prevGeo && nextGeo) {
-        const bounds = new window.google.maps.LatLngBounds();
+        const bounds = new (window as any).google.maps.LatLngBounds();
         bounds.extend({ lat: prevGeo!.latitude, lng: prevGeo!.longitude });
         bounds.extend({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.panToBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 });
@@ -247,7 +246,7 @@ function MapInner() {
         map.panTo(routePath[0]);
         map.setZoom(14); // Sensible default zoom for a single marker
       } else {
-        const bounds = new window.google.maps.LatLngBounds();
+        const bounds = new (window as any).google.maps.LatLngBounds();
         routePath.forEach((pos) => bounds.extend(pos));
         map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
@@ -264,7 +263,7 @@ function MapInner() {
           disableDefaultUI={true}
           zoomControl={true}
           mapId="DEMO_MAP_ID"
-          styles={twilightMapStyle}
+          styles={marineSunsetMapStyle}
           colorScheme={"DARK" as any}
         >
           {segments.map((segment, index: number) => {
@@ -344,14 +343,14 @@ function MapInner() {
 }
 
 // Custom Polyline wrapper since @vis.gl/react-google-maps doesn't provide a <Polyline> natively
-function RoutePolyline({ path, options }: { path: google.maps.LatLngLiteral[], options: any }) {
+function RoutePolyline({ path, options }: { path: { lat: number; lng: number }[], options: any }) {
   const map = useMap();
-  const polylineRef = React.useRef<google.maps.Polyline | null>(null);
+  const polylineRef = React.useRef<any>(null);
 
   React.useEffect(() => {
     if (!map) return;
     if (!polylineRef.current) {
-      polylineRef.current = new window.google.maps.Polyline({ ...options, path });
+      polylineRef.current = new (window as any).google.maps.Polyline({ ...options, path });
       polylineRef.current.setMap(map);
     } else {
       polylineRef.current.setOptions(options);

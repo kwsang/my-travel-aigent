@@ -14,18 +14,18 @@ const SegmentIcons: Record<string, LucideIcon> = {
   FLIGHT: Plane,
 };
 
-// Restored original map segment colors!
+// Updated map segment colors matching the new theme
 const SegmentColors: Record<string, { bg: string }> = {
-  ACCOMMODATION: { bg: '#8b5cf6' },
-  DINING: { bg: '#f43f5e' },
-  EXPERIENCE: { bg: '#f59e0b' },
-  FLIGHT: { bg: '#0ea5e9' },
-  TRANSPORT: { bg: '#0ea5e9' },
-  LOGISTICS: { bg: '#64748b' },
+  ACCOMMODATION: { bg: '#ffd07b' }, // Jasmine
+  DINING: { bg: '#b1740f' }, // Copperwood
+  EXPERIENCE: { bg: '#fdb833' }, // Sunflower Gold
+  FLIGHT: { bg: '#296eb4' }, // Bright Marine
+  TRANSPORT: { bg: '#1789fc' }, // Blue Energy
+  LOGISTICS: { bg: '#b1740f' }, // Copperwood
 };
 
 interface AdvancedSegmentMarkerProps {
-  position: google.maps.LatLngLiteral;
+  position: { lat: number; lng: number };
   title?: string;
   segmentType: string;
   isActive: boolean;

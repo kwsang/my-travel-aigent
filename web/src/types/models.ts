@@ -61,6 +61,7 @@ export interface Itinerary {
   events: Event[];
   budget?: Budget;
   status?: 'draft' | 'final';
+  destination?: string; // Add this line!
   updated_at: string;
   is_conflict: boolean;
   validation_errors: string[];
