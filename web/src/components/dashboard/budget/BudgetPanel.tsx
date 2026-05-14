@@ -7,7 +7,7 @@ import { useItineraryData } from '@/context/ItineraryContext';
 import { calculateBudgetMetrics } from '@/utils/budgetUtils';
 
 export default function BudgetPanel() {
-  const { viewMode, setViewMode, segments, budget, partySize, profile } = useItineraryData();
+  const { viewMode, setViewMode, segments, budget, partySize, profile, itinerary } = useItineraryData();
 
   const onToggleMode = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -20,8 +20,9 @@ export default function BudgetPanel() {
     displayTotal,
     displayLimit,
     percentage,
-    isOverThreshold
-  } = calculateBudgetMetrics({ segments, budget, partySize, profile, viewMode });
+    isOverThreshold,
+    isUnrealisticBudget
+  } = calculateBudgetMetrics({ segments, budget, partySize, profile, viewMode, durationDays: itinerary?.duration_days });
 
   return (
     <div className="flex flex-col items-end gap-2">
@@ -56,9 +57,11 @@ export default function BudgetPanel() {
         </button>
       </div>
 
-      {isOverThreshold && (
+      {isOverThreshold ? (
         <BudgetWarningAlert />
-      )}
+      ) : (isUnrealisticBudget && segments.length === 0) ? (
+        <UnrealisticBudgetAlert />
+      ) : null}
     </div>
   );
 }
@@ -70,6 +73,15 @@ function BudgetProgressBar({ percentage, isOverThreshold }: { percentage: number
         className={`h-full transition-all duration-500 ${isOverThreshold ? 'bg-destructive' : 'bg-primary'}`}
         style={{ width: `${Math.min(100, percentage)}%` }}
       />
+    </div>
+  );
+}
+
+function UnrealisticBudgetAlert() {
+  return (
+    <div className="flex animate-in fade-in slide-in-from-top-1 duration-300 items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-1.5 text-amber-500 border border-amber-500/20">
+      <AlertCircle className="w-3.5 h-3.5" />
+      <span className="text-xs font-semibold italic">Target budget may be too low for this duration.</span>
     </div>
   );
 }

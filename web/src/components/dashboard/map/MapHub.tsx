@@ -222,7 +222,7 @@ function MapInner() {
           styles={marineSunsetMapStyle}
           colorScheme={"DARK" as any}
         >
-          {segments.length === 0 && popularDestinations.map((dest, idx) => (
+          {segments.length === 0 && !itinerary.destination && popularDestinations.map((dest, idx) => (
             <AdvancedMarker
               key={`popular-${idx}`}
               position={{ lat: dest.lat, lng: dest.lng }}
@@ -303,7 +303,7 @@ function MapInner() {
         )}
       </div>
 
-      {segments.length === 0 && (
+      {segments.length === 0 && !itinerary.destination && (
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 bg-background/80 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full shadow-lg text-sm font-medium text-foreground/80 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
           Click a popular destination to get started
         </div>

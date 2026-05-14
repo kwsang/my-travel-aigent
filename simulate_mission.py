@@ -3,6 +3,7 @@ import json
 import datetime
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
+import logging
 
 # New ADK Imports
 from google.genai import types
@@ -17,6 +18,10 @@ from gemini_agent.test.test_maps_integration import get_real_traffic_duration
 from gemini_agent.test.test_places_integration import find_place_id, validate_venue_availability
 
 load_dotenv()
+
+# Enable ADK Debug logging to see Agent Delegation and Tool Calls
+logging.basicConfig(level=logging.INFO, format='%(name)s - %(message)s')
+logging.getLogger('google.adk').setLevel(logging.DEBUG)
 
 def get_schedule(date_str, time_str, duration_mins=None, tz_name="America/New_York"):
     """Helper to generate local and UTC timestamps for an event."""
@@ -52,7 +57,7 @@ async def simulate_adk_agent_run(user_input: str):
     print("\n--- Starting ADK Agent Runner Simulation ---")
     # This assumes an 'architect' agent is defined in your package
     my_app = agent_definition.create_travel_agent()
-    runner = Runner(app=my_app, session_service=InMemorySessionService())
+    runner = Runner(app=my_app, session_service=InMemorySessionService(), auto_create_session=True)
     
     # Simulate the start of a session
     session_id = f"sim_{datetime.datetime.now().timestamp()}"
@@ -82,7 +87,7 @@ async def run_full_agent_test():
     # 1. Setup the App and Runner
     my_app = agent_definition.create_travel_agent()
     # Runner requires a session service
-    runner = Runner(app=my_app, session_service=InMemorySessionService())
+    runner = Runner(app=my_app, session_service=InMemorySessionService(), auto_create_session=True)
     
     user_id = "test_user_savannah"
     session_id = f"test_session_{int(datetime.datetime.now().timestamp())}"
@@ -120,7 +125,6 @@ async def run_full_agent_test():
             validate_itinerary_budget(itinerary, user_prefs)
         else:
             print("FAIL: Agent did not produce a final_itinerary in the session state.")
-            print(f"Response: {response.text}")
 
 if __name__ == "__main__":
     import asyncio

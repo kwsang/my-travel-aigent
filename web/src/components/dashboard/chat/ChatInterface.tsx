@@ -20,7 +20,7 @@ interface ChatInterfaceProps {
  * Receives a session ID from the parent dashboard to sync data.
  */
 export default function ChatInterface({ sessionId, userId, onMessageReceived }: ChatInterfaceProps) {
-  const { profile, itinerary } = useItineraryData();
+  const { profile, itinerary, setItinerary, setProfile } = useItineraryData() as any;
   const [messages, setMessages] = useState<ChatMessage[]>([
     { 
       role: 'agent', 
@@ -118,6 +118,14 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
 
       const data = await response.json();
       setMessages(prev => [...prev, { role: 'agent', content: data.response }]);
+
+      // Immediately update the dashboard with the agent's latest state
+      if (data.itinerary && setItinerary) {
+        setItinerary(data.itinerary);
+      }
+      if (data.user_profile && setProfile) {
+        setProfile(data.user_profile);
+      }
 
       // Trigger refresh of the itinerary in the parent dashboard
       if (onMessageReceived) {

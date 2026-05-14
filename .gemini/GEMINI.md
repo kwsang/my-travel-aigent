@@ -20,7 +20,7 @@ As a user, I want to plan trips for large parties, like bachelors parties in ano
 
 As a user, I usually want to plan trips for my significant other and myself, traveling as a party of 2 but accommodated by 1 bed. In this case, we prefer seeing the total price, not per person.
 
-As a user, I want to interact with the travel AI agent through a responsive and visual website, not through a chat.
+As a user, I want to interact with the travel AI agent through a responsive and visual website, not through a chat. Messages, especially alerts, from the agent should reflect in, appear in, and update the dashboard.
 
 As a user, I want to view different potential trip ideas, making modifications and changes to the drafts to improve the trips towards my liking before deciding on any given trip.
 

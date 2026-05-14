@@ -64,6 +64,12 @@ def create_travel_agent():
     with open(os.path.join(prompts_dir, "ARCHITECT_PROMPT.md"), "r") as f:
         architect_goal = f.read()
 
+    with open(os.path.join(prompts_dir, "PIONEER_PROMPT.md"), "r") as f:
+        pioneer_goal = f.read()
+
+    with open(os.path.join(prompts_dir, "ACTIVITY_PLANNER_PROMPT.md"), "r") as f:
+        activity_planner_goal = f.read()
+
     # 4. Define specialized Agents
     
     # 4.1 Concierge: Focused on user profiling and data gathering
@@ -103,18 +109,31 @@ def create_travel_agent():
         
         return prompt
 
+    pioneer_agent = Agent(
+        name="travel_pioneer",
+        model="gemini-2.5-flash",
+        static_instruction=system_instructions,
+        instruction=pioneer_goal,
+        tools=[search_tool, discovery_tool, places_search_tool, traffic_tool, details_tool],
+        description="Specializes in geographic anchoring, transportation, and finding the perfect destination and accommodation."
+    )
+
+    activity_planner_agent = Agent(
+        name="activity_planner",
+        model="gemini-2.5-flash",
+        static_instruction=system_instructions,
+        instruction=activity_planner_goal,
+        tools=[places_search_tool, events_tool, traffic_tool, details_tool],
+        description="Fills the itinerary with incredible EXPERIENCE and DINING segments that match the user's interests, vibe, and circadian rhythm."
+    )
+
     architect_agent = Agent(
         name="architect",
         model="gemini-2.5-flash", # gemini-1.5-flash is a hallucination
         static_instruction=system_instructions,
         instruction=get_architect_instructions,
         tools=[
-            search_tool, 
-            discovery_tool, 
-            places_search_tool, 
             persist_tool, 
-            traffic_tool, 
-            details_tool,
             retrieve_itinerary_tool,
             list_versions_tool,
             delete_itinerary_tool,
@@ -122,6 +141,7 @@ def create_travel_agent():
             finalize_tool,
             clone_tool
         ],
+        sub_agents=[pioneer_agent, activity_planner_agent],
         output_key="final_itinerary",
         description="Expert travel planner. Researches destinations, venues, and travel times to build high-fidelity itineraries."
     )
@@ -131,27 +151,30 @@ def create_travel_agent():
         # Defensive state retrieval
         state = getattr(ctx, "state", getattr(ctx.session, "state", {}))
 
+        # The chat route injects the itinerary into 'final_itinerary'
+        itinerary_data = state.get("final_itinerary", {})
+        if isinstance(itinerary_data, str):
+            try: itinerary_data = json.loads(itinerary_data)
+            except: itinerary_data = {}
+            
+        destination = itinerary_data.get("destination")
+        map_context = f" The user has explicitly selected '{destination}' as their destination from the map." if destination else ""
+
         # Decide which specialist should handle the turn based on the existence of profile data
-        if "user_profile_data" not in state:
+        if "user_profile_data" not in state or not state.get("user_profile_data"):
             return (
-                "You are the Travel Supervisor. We do not have the user's travel preferences yet. "
-                "Transfer the user to the 'concierge' to begin the intake process."
+                f"You are the Travel Supervisor.{map_context} We do not have the user's full travel preferences yet. "
+                "Transfer the user to the 'concierge' to begin the intake process. If a destination is selected, instruct the concierge to accept it and move to the next question."
             )
         
         # Contextual Handoff: Mention if we are resuming a draft
         handoff_context = "The user's preferences are recorded."
-        if "active_itinerary" in state:
-            # Defensive parsing for state variables that might be strings
+        if itinerary_data:
             profile_data = state.get("user_profile_data", {})
             if isinstance(profile_data, str):
                 try: profile_data = json.loads(profile_data)
                 except: profile_data = {}
                 
-            itinerary_data = state.get("active_itinerary", {})
-            if isinstance(itinerary_data, str):
-                try: itinerary_data = json.loads(itinerary_data)
-                except: itinerary_data = {}
-
             # Conflict Detection: Check for Starting Location mismatch
             profile_start = profile_data.get("preferences", {}).get("starting_location")
             itinerary_start = itinerary_data.get("metadata", {}).get("starting_location")
@@ -159,11 +182,11 @@ def create_travel_agent():
             if profile_start and itinerary_start and profile_start != itinerary_start:
                 handoff_context += f" [CONFLICT ALERT] The user profile starting location is '{profile_start}', but this draft itinerary starts from '{itinerary_start}'."
 
-            handoff_context += " A draft itinerary exists in 'active_itinerary'. Instruct the 'architect' to resume from this version."
+            handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
 
         return (
             f"You are the Travel Supervisor. {handoff_context} "
-            "Transfer the user to the 'architect' to handle research and itinerary building. "
+            "Transfer the user to the 'architect' (which will delegate to its sub-agents) to handle research and itinerary building. "
             "Once an itinerary is built, ensure the user is satisfied."
         )
 

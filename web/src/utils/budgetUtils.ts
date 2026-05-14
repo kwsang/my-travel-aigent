@@ -7,6 +7,7 @@ interface BudgetMetricsParams {
   partySize: number;
   profile?: any; // Type as TravelerProfile if available in your types
   viewMode: 'total' | 'per_person';
+  durationDays?: number;
 }
 
 export function calculateBudgetMetrics({
@@ -14,7 +15,8 @@ export function calculateBudgetMetrics({
   budget,
   partySize,
   profile,
-  viewMode
+  viewMode,
+  durationDays = 0
 }: BudgetMetricsParams) {
   const totalCost = segments.reduce((acc, s) => acc + (s.details?.price?.amount || 0), 0);
   const rawLimit = budget?.total_limit || 0;
@@ -34,5 +36,7 @@ export function calculateBudgetMetrics({
   const percentage = absoluteTotalLimit > 0 ? (totalCost / absoluteTotalLimit) * 100 : 0;
   const isOverThreshold = percentage >= BUDGET_CONFIG.WARNING_THRESHOLD;
 
-  return { rawLimit, currency, displayTotal, displayLimit, percentage, isOverThreshold };
+  const isUnrealisticBudget = absoluteTotalLimit > 0 && durationDays > 0 && (absoluteTotalLimit / (actualPartySize * durationDays) < 50);
+
+  return { rawLimit, currency, displayTotal, displayLimit, percentage, isOverThreshold, isUnrealisticBudget };
 }

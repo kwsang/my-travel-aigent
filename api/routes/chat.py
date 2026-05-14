@@ -40,8 +40,10 @@ async def chat(
                 role="user",
                 parts=[types.Part(text=request.message)]
             ),
-            user_profile_data=request.user_profile,
-            final_itinerary=request.itinerary
+            state={
+                "user_profile_data": request.user_profile,
+                "final_itinerary": request.itinerary
+            }
         ):
             if event.content and event.content.parts:
                 for part in event.content.parts:
@@ -102,7 +104,11 @@ async def chat(
                     upsert=True
                 )
 
-        if isinstance(itinerary, dict) and isinstance(user_profile, dict) and itinerary.get("events"):
+        if isinstance(itinerary, dict):
+            itinerary["is_conflict"] = False
+            itinerary["validation_errors"] = []
+            
+            if isinstance(user_profile, dict) and itinerary.get("events"):
                 prefs = user_profile.get("preferences", {})
                 if isinstance(prefs, str):
                     try: prefs = json.loads(prefs)
@@ -118,8 +124,15 @@ async def chat(
                 if struct_errors or budget_errors:
                     logger.warning(f"Conflicts detected: {len(struct_errors)} structural, {len(budget_errors)} budget")
                     is_conflict = True
+                    itinerary["is_conflict"] = True
+                    itinerary["validation_errors"] = struct_errors + budget_errors
 
-        return ChatResponse(response=agent_text, is_conflict=is_conflict)
+        return ChatResponse(
+            response=agent_text, 
+            is_conflict=is_conflict,
+            itinerary=itinerary if isinstance(itinerary, dict) else None,
+            user_profile=user_profile if isinstance(user_profile, dict) else None
+        )
 
     except Exception as e:
         logger.exception("CRITICAL: Error in /chat endpoint")

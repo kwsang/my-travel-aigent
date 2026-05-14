@@ -6,6 +6,7 @@ from gemini_agent.logic.tools import search_places, google_places_details, googl
 from gemini_agent.tools.itinerary_tools import save_itinerary, get_itinerary, list_trip_versions, delete_itinerary, update_itinerary_status, clone_itinerary, finalize_itinerary
 from gemini_agent.tools.user_management import record_user_profile, query_user_profile
 from gemini_agent.tools.discovery import search_destinations, discover_new_destination
+from gemini_agent.tools.tools import search_local_events
 
 def create_agent_runner() -> Runner:
     """Factory to create and configure the ADK Runner and its dependencies."""
@@ -34,6 +35,7 @@ def create_agent_runner() -> Runner:
         query_user_profile,
         search_destinations,
         discover_new_destination,
+        search_local_events,
     ]
     
     return Runner(

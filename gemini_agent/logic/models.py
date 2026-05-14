@@ -137,6 +137,8 @@ class ValidationResponse(BaseModel):
 class ChatResponse(BaseModel):
     response: str = Field(..., description="The agent's text response.")
     is_conflict: bool = Field(default=False, description="True if the current itinerary has validation errors.")
+    itinerary: Optional[Dict[str, Any]] = Field(None, description="The latest itinerary state from the agent.")
+    user_profile: Optional[Dict[str, Any]] = Field(None, description="The latest traveler profile state from the agent.")
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="The user's chat input.")

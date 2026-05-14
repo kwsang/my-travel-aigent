@@ -2,7 +2,7 @@ import os
 import googlemaps
 from datetime import datetime
 from dotenv import load_dotenv
-from validate_buffers import calculate_buffer
+from gemini_agent.logic.validate_buffers import calculate_buffer
 
 # Load environment variables
 load_dotenv()
