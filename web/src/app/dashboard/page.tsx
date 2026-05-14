@@ -17,6 +17,7 @@ import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/budget/BudgetSkeleton';
 import TripSelector from '@/components/dashboard/TripSelector';
+import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
 import { Trash2, AlertTriangle, UserCircle } from 'lucide-react';
 
 /**
@@ -25,16 +26,29 @@ import { Trash2, AlertTriangle, UserCircle } from 'lucide-react';
  */
 export default function DashboardPage() {
   const [viewMode, setViewMode] = useLocalStorage<'total' | 'per_person'>('travel_aigent_view_mode', 'total');
-  const [currentSessionId, setCurrentSessionId] = useState<string>(() => uuidv4());
-  
-  // Persistent Visitor Identity. If not found, we use the first session ID.
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [visitorId, setVisitorId] = useState<string>('');
 
+  // Initialize and persist Visitor and Session IDs safely on the client
   useEffect(() => {
-    const stored = localStorage.getItem('travel_aigent_visitor_id');
-    const id = stored || currentSessionId;
-    if (!stored) localStorage.setItem('travel_aigent_visitor_id', id);
-    setVisitorId(id);
+    const storedVisitor = localStorage.getItem('travel_aigent_visitor_id');
+    const storedSession = localStorage.getItem('travel_aigent_last_session_id');
+    
+    const initialSession = storedSession || uuidv4();
+    const initialVisitor = storedVisitor || initialSession;
+
+    if (!storedVisitor) localStorage.setItem('travel_aigent_visitor_id', initialVisitor);
+    if (!storedSession) localStorage.setItem('travel_aigent_last_session_id', initialSession);
+
+    setCurrentSessionId(initialSession);
+    setVisitorId(initialVisitor);
+  }, []);
+
+  // Keep localStorage in sync when the user switches or creates sessions
+  useEffect(() => {
+    if (currentSessionId) {
+      localStorage.setItem('travel_aigent_last_session_id', currentSessionId);
+    }
   }, [currentSessionId]);
 
   const [isEditingName, setIsEditingName] = useState(false);
@@ -102,9 +116,14 @@ export default function DashboardPage() {
     if (!visitorId) return;
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary?user_id=${visitorId}`);
-      if (response.ok) setItineraries(await response.json());
+      if (response.ok) {
+        setItineraries(await response.json());
+      } else {
+        setToast({ show: true, message: 'Failed to load trip history from server.' });
+      }
     } catch (e) {
-      console.warn("Could not fetch trip list.");
+      console.error("Could not fetch trip list.", e);
+      setToast({ show: true, message: 'Network error: Failed to load trip history.' });
     }
   }, [visitorId]);
 
@@ -116,9 +135,12 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
+      } else if (response.status !== 404) {
+        setToast({ show: true, message: 'Failed to load traveler profile.' });
       }
     } catch (e) {
-      console.warn("Could not fetch user profile.");
+      console.error("Could not fetch user profile.", e);
+      setToast({ show: true, message: 'Network error: Failed to load traveler profile.' });
     } finally {
       setIsLoadingProfile(false);
     }
@@ -133,9 +155,12 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         setItinerary(data);
+      } else if (response.status !== 404) {
+        setToast({ show: true, message: 'Failed to load trip details from server.' });
       }
     } catch (error) {
-      console.warn("Dashboard Sync: Session not active yet.");
+      console.error("Dashboard Sync: Failed to fetch itinerary.", error);
+      setToast({ show: true, message: 'Network error: Failed to load trip details.' });
     } finally {
       setIsLoadingItinerary(false);
     }
@@ -290,13 +315,17 @@ export default function DashboardPage() {
                 <UserCircle size={12} /> Traveler Profile
               </button>
             </div>
-            <SkeletonWrapper isLoading={isLoading} fallback={<BudgetSkeleton />}>
-              <BudgetPanel />
-            </SkeletonWrapper>
+            <ErrorBoundary fallbackMessage="Failed to load budget panel.">
+              <SkeletonWrapper isLoading={isLoading} fallback={<BudgetSkeleton />}>
+                <BudgetPanel />
+              </SkeletonWrapper>
+            </ErrorBoundary>
           </div>
-          <SkeletonWrapper isLoading={isLoading} fallback={<TimelineSkeleton />}>
-            <TimelineView />
-          </SkeletonWrapper>
+          <ErrorBoundary fallbackMessage="Failed to load timeline.">
+            <SkeletonWrapper isLoading={isLoading} fallback={<TimelineSkeleton />}>
+              <TimelineView />
+            </SkeletonWrapper>
+          </ErrorBoundary>
         </div>
 
         {/* Resizable Drag Handle */}
@@ -310,13 +339,17 @@ export default function DashboardPage() {
         {/* Main Content: Map and Budget */}
         <div className={`relative flex-1 bg-background overflow-hidden ${isDragging ? 'pointer-events-none' : ''}`}>
           
-          <MapHub />
+          <ErrorBoundary fallbackMessage="Failed to load map workspace.">
+            <MapHub />
+          </ErrorBoundary>
 
-          <ChatInterface 
-            sessionId={currentSessionId}
-            userId={visitorId}
-            onMessageReceived={refreshDashboard} 
-          />
+          <ErrorBoundary fallbackMessage="Failed to load chat interface.">
+            <ChatInterface 
+              sessionId={currentSessionId}
+              userId={visitorId}
+              onMessageReceived={refreshDashboard} 
+            />
+          </ErrorBoundary>
         </div>
       </main>
 
