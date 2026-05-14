@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, User, Bot, Loader2, MessageSquare, X, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
@@ -95,11 +95,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isHovered]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
-    setInput('');
+  const sendMessage = useCallback(async (userMessage: string) => {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
 
@@ -129,7 +125,30 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     } finally {
       setIsLoading(false);
     }
+  }, [sessionId, userId, onMessageReceived]);
+
+  const handleSend = () => {
+    if (!input.trim() || isLoading) return;
+    const msg = input.trim();
+    setInput('');
+    sendMessage(msg);
   };
+
+  // Listen for custom destination events from the map
+  useEffect(() => {
+    const handleSetDestination = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const destination = customEvent.detail;
+      
+      if (destination && !isLoading) {
+        setIsOpen(true);
+        sendMessage(`I'd like to plan a trip to ${destination}.`);
+      }
+    };
+
+    window.addEventListener('travel_aigent_set_destination', handleSetDestination);
+    return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
+  }, [sendMessage, isLoading]);
 
   return (
     <>

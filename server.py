@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from api import config
 from api.services.runner_factory import create_agent_runner
-from api.routes import chat, itinerary, profile
+from api.routes import chat, itinerary, profile, destinations
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -88,6 +88,7 @@ app.add_middleware(
 app.include_router(chat.router)
 app.include_router(itinerary.router)
 app.include_router(profile.router)
+app.include_router(destinations.router)
 
 @app.get("/", tags=["system"])
 async def root(): #

@@ -3,10 +3,12 @@
 import React from 'react';
 import { Map as MapIcon, MapPin, Navigation, AlertTriangle } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { APIProvider, Map, useMap, useApiIsLoaded } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, useMap, useApiIsLoaded, AdvancedMarker } from '@vis.gl/react-google-maps';
 import AdvancedSegmentMarker from './AdvancedSegmentMarker';
 import RoutePolyline from './RoutePolyline';
 import { marineSunsetMapStyle } from '@/config/mapStyles';
+import { Event } from '@/types';
+import { API_CONFIG } from '@/config/constants';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
@@ -45,32 +47,46 @@ export default function MapHub() {
 }
 
 function MapInner() {
-  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary, hoveredSegmentIndex, setHoveredSegmentIndex } = useItineraryData();
+  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary, setItinerary, hoveredSegmentIndex, setHoveredSegmentIndex } = useItineraryData();
   const map = useMap();
   const isLoaded = useApiIsLoaded();
+
+  const [popularDestinations, setPopularDestinations] = React.useState<{name: string; lat: number; lng: number; emoji: string}[]>([]);
+
+  React.useEffect(() => {
+    if (segments.length === 0 && popularDestinations.length === 0) {
+      fetch(`${API_CONFIG.BASE_URL}/destinations/popular`)
+        .then(res => res.json())
+        .then(data => setPopularDestinations(data))
+        .catch(err => console.error("Failed to load popular destinations", err));
+    }
+  }, [segments.length, popularDestinations.length]);
 
   // Extract starting location from profile preferences (populated by the Concierge agent)
   const startingLocation = profile?.preferences?.starting_location;
 
   // Extract destination from the events (prioritizing non-transit segments to avoid origin airports)
-  const nonTransitSegments = segments.filter((s) => !['FLIGHT', 'TRANSPORT'].includes(s.segment));
+  const nonTransitSegments = segments.filter((s: Event) => !['FLIGHT', 'TRANSPORT'].includes(s.segment));
   const targetSegments = nonTransitSegments.length > 0 ? nonTransitSegments : segments;
-  const cities = Array.from(new Set(targetSegments.map((s) => s.details?.city).filter(Boolean)));
-  const destinationCities = cities.filter(city => city !== startingLocation);
+  const cities = Array.from(new Set(targetSegments.map((s: Event) => s.details?.city).filter(Boolean)));
+  const destinationCities = cities.filter((city: any) => city !== startingLocation);
   const primaryDestination = destinationCities.length > 0 ? destinationCities[0] : (cities.length > 0 ? cities[0] : (itinerary.destination || 'Destination TBD'));
 
   // Memoize the map center so it doesn't cause the map to re-pan on every context render
   const mapCenter = React.useMemo(() => {
-    const defaultCenter = { lat: 39.8283, lng: -98.5795 };
-    const centerSegment = segments.find((s) => s.geo || s.details?.geo);
-    const raw: any = centerSegment?.geo || centerSegment?.details?.geo || defaultCenter;
-    return { lat: raw.latitude || raw.lat, lng: raw.longitude || raw.lng };
+    const defaultCenter = { lat: 25, lng: 0 }; // Adjusted for a global view
+    const centerSegment = segments.find((s: Event) => s.geo || s.details?.geo);
+    const geo = centerSegment?.geo || centerSegment?.details?.geo;
+    if (geo) {
+      return { lat: geo.latitude, lng: geo.longitude };
+    }
+    return defaultCenter;
   }, [segments]);
 
   // Generate the sequential path for the polyline
   const routePath = React.useMemo(() => {
     return segments
-      .map((segment) => {
+      .map((segment: Event) => {
         const geo = segment.geo || segment.details?.geo;
         if (!geo) return null;
         return { lat: geo.latitude, lng: geo.longitude };
@@ -81,7 +97,7 @@ function MapInner() {
   // Generate individual edges for the polyline to style flights differently
   const routeEdges = React.useMemo(() => {
     const edges: { path: { lat: number; lng: number }[], options: any }[] = [];
-    const validSegments = segments.filter((s) => s.geo || s.details?.geo);
+    const validSegments = segments.filter((s: Event) => s.geo || s.details?.geo);
     
     for (let i = 1; i < validSegments.length; i++) {
       const prev = validSegments[i - 1];
@@ -116,6 +132,13 @@ function MapInner() {
   const handleMarkerClick = React.useCallback((index: number) => {
     setActiveSegmentIndex(index);
   }, [setActiveSegmentIndex]);
+
+  const handleDestinationClick = React.useCallback((destName: string) => {
+    if (setItinerary) {
+      setItinerary((prev: any) => ({ ...prev, destination: destName }));
+    }
+    window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: destName }));
+  }, [setItinerary]);
 
   // Automatically fit bounds or pan to active segment
   React.useEffect(() => {
@@ -170,6 +193,9 @@ function MapInner() {
         routePath.forEach((pos) => bounds.extend(pos));
         map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
+    } else if (segments.length === 0) {
+      map.setZoom(2);
+      map.panTo({ lat: 25, lng: 0 });
     }
   }, [map, activeSegmentIndex, routePath, segments]);
 
@@ -179,14 +205,33 @@ function MapInner() {
         <Map
           className="w-full h-full"
           defaultCenter={mapCenter}
-          defaultZoom={segments.length === 0 ? 4 : 11}
+          defaultZoom={segments.length === 0 ? 2 : 11}
           disableDefaultUI={true}
           zoomControl={true}
           mapId="DEMO_MAP_ID"
           styles={marineSunsetMapStyle}
           colorScheme={"DARK" as any}
         >
-          {segments.map((segment, index: number) => {
+          {segments.length === 0 && popularDestinations.map((dest, idx) => (
+            <AdvancedMarker
+              key={`popular-${idx}`}
+              position={{ lat: dest.lat, lng: dest.lng }}
+              title={dest.name}
+              onClick={() => handleDestinationClick(dest.name)}
+              className="cursor-pointer"
+            >
+              <div className="flex flex-col items-center group transition-transform hover:scale-110 animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                <div className="bg-card border border-white/20 shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-primary group-hover:shadow-primary/20 transition-colors">
+                  {dest.emoji}
+                </div>
+                <div className="bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase text-foreground/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  {dest.name}
+                </div>
+              </div>
+            </AdvancedMarker>
+          ))}
+
+          {segments.map((segment: Event, index: number) => {
             const geo = segment.geo || segment.details?.geo;
             if (geo) {
               return (
@@ -247,6 +292,12 @@ function MapInner() {
           </div>
         )}
       </div>
+
+      {segments.length === 0 && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 bg-background/80 backdrop-blur-md border border-white/10 px-6 py-3 rounded-full shadow-lg text-sm font-medium text-foreground/80 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+          Click a popular destination to get started
+        </div>
+      )}
 
       {/* Loading State / Fallback UI */}
       {!isLoaded && (
