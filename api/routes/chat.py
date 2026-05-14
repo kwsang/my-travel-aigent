@@ -39,7 +39,9 @@ async def chat(
             new_message=types.Content(
                 role="user",
                 parts=[types.Part(text=request.message)]
-            )
+            ),
+            user_profile_data=request.user_profile,
+            final_itinerary=request.itinerary
         ):
             if event.content and event.content.parts:
                 for part in event.content.parts:

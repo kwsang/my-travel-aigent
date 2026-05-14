@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import { API_CONFIG } from '@/config/constants';
 import { ChatMessage } from '@/types'; // Import ChatMessage from shared types
+import { useItineraryData } from '@/context/ItineraryContext';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -19,6 +20,7 @@ interface ChatInterfaceProps {
  * Receives a session ID from the parent dashboard to sync data.
  */
 export default function ChatInterface({ sessionId, userId, onMessageReceived }: ChatInterfaceProps) {
+  const { profile, itinerary } = useItineraryData();
   const [messages, setMessages] = useState<ChatMessage[]>([
     { 
       role: 'agent', 
@@ -107,6 +109,8 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           message: userMessage,
           session_id: sessionId,
           user_id: userId,
+          user_profile: profile,
+          itinerary: itinerary,
         }),
       });
 
@@ -125,7 +129,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     } finally {
       setIsLoading(false);
     }
-  }, [sessionId, userId, onMessageReceived]);
+  }, [sessionId, userId, profile, itinerary, onMessageReceived]);
 
   const handleSend = () => {
     if (!input.trim() || isLoading) return;

@@ -21,7 +21,7 @@ VIBE_EMOJI_MAP = {
     "tropical": "🌴",
     "winter": "❄️"
 }
-DEFAULT_EMOJIS = ["📍", "📸", "✈️", "🗺️"]
+DEFAULT_EMOJIS = ["📍", "📸", "🗺️"]
 
 @router.get("/popular")
 async def get_popular_destinations(limit: int = 8, db: AsyncIOMotorDatabase = Depends(get_db)):

@@ -74,7 +74,7 @@ function MapInner() {
 
   // Memoize the map center so it doesn't cause the map to re-pan on every context render
   const mapCenter = React.useMemo(() => {
-    const defaultCenter = { lat: 25, lng: 0 }; // Adjusted for a global view
+    const defaultCenter = { lat: 39.8283, lng: -98.5795 }; // Center on continental US
     const centerSegment = segments.find((s: Event) => s.geo || s.details?.geo);
     const geo = centerSegment?.geo || centerSegment?.details?.geo;
     if (geo) {
@@ -194,8 +194,8 @@ function MapInner() {
         map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
     } else if (segments.length === 0) {
-      map.setZoom(2);
-      map.panTo({ lat: 25, lng: 0 });
+      map.setZoom(4);
+      map.panTo({ lat: 39.8283, lng: -98.5795 });
     }
   }, [map, activeSegmentIndex, routePath, segments]);
 
@@ -205,7 +205,7 @@ function MapInner() {
         <Map
           className="w-full h-full"
           defaultCenter={mapCenter}
-          defaultZoom={segments.length === 0 ? 2 : 11}
+          defaultZoom={segments.length === 0 ? 4 : 11}
           disableDefaultUI={true}
           zoomControl={true}
           mapId="DEMO_MAP_ID"
@@ -224,7 +224,7 @@ function MapInner() {
                 <div className="bg-card border border-white/20 shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-primary group-hover:shadow-primary/20 transition-colors">
                   {dest.emoji}
                 </div>
-                <div className="bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase text-foreground/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                <div className="bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase text-foreground/80 border border-white/10 whitespace-nowrap pointer-events-none">
                   {dest.name}
                 </div>
               </div>
