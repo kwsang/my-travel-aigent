@@ -36,9 +36,9 @@ async def chat(
         if request.user_profile is not None or request.itinerary is not None:
             update_state = {}
             if request.user_profile is not None:
-                update_state["state.data.user_profile_data"] = request.user_profile
+                update_state["data.state.user_profile_data"] = request.user_profile
             if request.itinerary is not None:
-                update_state["state.data.final_itinerary"] = request.itinerary
+                update_state["data.state.final_itinerary"] = request.itinerary
                 
             await session_db.sessions.update_one(
                 {"session_id": request.session_id, "user_id": user_id, "app_name": "my_travel_aigent"},

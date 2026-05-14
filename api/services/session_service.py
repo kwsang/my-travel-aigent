@@ -24,7 +24,8 @@ class MongoDBSessionService(BaseSessionService):
             return None
         
         # Ensure state is a dictionary even if persisted as a JSON string
-        state = doc["data"].get("state", {})
+        data_dict = doc.get("data", {})
+        state = data_dict.get("state", {})
         if isinstance(state, str):
             try:
                 state = json.loads(state)
@@ -33,7 +34,7 @@ class MongoDBSessionService(BaseSessionService):
                 state = {}
         
         # Reconstruct Event objects for conversation history
-        raw_history = doc["data"].get("history", [])
+        raw_history = data_dict.get("history", [])
         history = []
         for e_dict in raw_history:
             history.append(Event.model_validate(e_dict))
@@ -91,7 +92,7 @@ class MongoDBSessionService(BaseSessionService):
         cursor = self.collection.find(query, {"session_id": 1, "user_id": 1, "data": 1, "_id": 0})
         sessions = []
         async for doc in cursor:
-            state = doc["data"].get("state", {})
+            state = doc.get("data", {}).get("state", {})
             if isinstance(state, str):
                 try: state = json.loads(state)
                 except: state = {}
