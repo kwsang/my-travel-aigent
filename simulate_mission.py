@@ -76,6 +76,82 @@ async def simulate_adk_agent_run(user_input: str):
     print(f"Agent Response: {full_text}")
     return full_text
 
+async def test_destination_selection_flow():
+    """
+    Simulates the frontend map-click flow.
+    Validates that the Architect delegates to the Pioneer and that
+    accommodations are successfully returned and saved in the state.
+    """
+    print("=== Test: Destination Selection & Accommodation Suggestion ===\n")
+    
+    my_app = agent_definition.create_travel_agent()
+    session_service = InMemorySessionService()
+    runner = Runner(app=my_app, session_service=session_service, auto_create_session=True)
+    
+    user_id = "test_map_user"
+    session_id = f"test_map_session_{int(datetime.datetime.now().timestamp())}"
+    destination = "Tokyo, Japan"
+    
+    # 1. Pre-inject the state (mimicking chat.py's UI sync)
+    initial_state = {
+        "user_profile_data": {
+            "party_size": 2,
+            "budget": {"total_limit": 3000, "currency": "USD"},
+            "preferences": {
+                "risk_tolerance": "relaxed",
+                "circadian_preference": "night_owl",
+                "transport_preference": "public",
+                "personal_transport_available": False,
+                "group_planning_per_person": False
+            }
+        },
+        "final_itinerary": {
+            "destination": destination,
+            "trip_name": "Japan Adventure",
+            "duration_days": 4,
+            "party_size_total": 2,
+            "events": [],
+            "status": "draft"
+        }
+    }
+    
+    await session_service.create_session(
+        app_name="my_travel_aigent", user_id=user_id, session_id=session_id, state=initial_state
+    )
+    
+    user_input = f"I'd like to plan a trip to {destination}."
+    print(f"Simulating Map Click Event: {user_input}\n")
+    
+    # 2. Run the Agent
+    async with runner:
+        async for event in runner.run_async(
+            user_id=user_id, session_id=session_id,
+            new_message=types.Content(role="user", parts=[types.Part(text=user_input)])
+        ):
+            if event.content and event.content.parts:
+                for part in event.content.parts:
+                    if part.text:
+                        print(part.text, end="", flush=True)
+        print("\n")
+        
+        # 3. Retrieve and Validate State
+        session = await session_service.get_session(app_name="my_travel_aigent", user_id=user_id, session_id=session_id)
+        itinerary = session.state.get("final_itinerary", {})
+        if isinstance(itinerary, str):
+            itinerary = json.loads(itinerary)
+            
+        accommodations = itinerary.get("suggested_accommodations", [])
+        
+        print("\n--- Validating Delegation State ---")
+        if accommodations and len(accommodations) > 0:
+            print(f"✅ SUCCESS: Found {len(accommodations)} suggested accommodations!")
+            for idx, acc in enumerate(accommodations):
+                name = acc.get("details", {}).get("name", "Unknown")
+                price = acc.get("details", {}).get("price", {}).get("amount", "N/A")
+                print(f"  {idx+1}. {name} (${price})")
+        else:
+            print("❌ FAIL: No suggested accommodations were found in the state.")
+
 async def run_full_agent_test():
     """
     End-to-End ADK Integration Test.
@@ -134,8 +210,19 @@ async def run_full_agent_test():
 
 if __name__ == "__main__":
     import asyncio
+    import sys
+
     # Ensure API keys are present
     if not os.environ.get("GOOGLE_MAPS_API_KEY") or not os.environ.get("VOYAGE_API_KEY"):
         print("Please ensure GOOGLE_MAPS_API_KEY and VOYAGE_API_KEY are set in .env")
     else:
-        asyncio.run(run_full_agent_test())
+        mode = sys.argv[1].lower() if len(sys.argv) > 1 else "all"
+        
+        if mode in ["destination", "all"]:
+            asyncio.run(test_destination_selection_flow())
+        if mode == "all":
+            print("\n" + "="*60 + "\n")
+        if mode in ["full", "all"]:
+            asyncio.run(run_full_agent_test())
+        if mode not in ["destination", "full", "all"]:
+            print("Usage: python simulate_mission.py [destination|full|all]")
