@@ -125,6 +125,8 @@ async def run_full_agent_test():
 
         if itinerary and user_prefs:
             print("\n--- Running Automated Validations on Agent Output ---")
+            print("\n[DEBUG] Suggested Accommodations from State:")
+            print(json.dumps(itinerary.get("suggested_accommodations", []), indent=2))
             validate_itinerary_structure(itinerary, "relaxed", "night_owl", user_prefs)
             validate_itinerary_budget(itinerary, user_prefs)
         else:

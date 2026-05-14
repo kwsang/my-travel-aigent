@@ -84,6 +84,11 @@ async def chat(
             if isinstance(user_profile, str):
                 try: user_profile = json.loads(user_profile)
                 except: pass
+                
+             # Debugging: Log the suggested accommodations found in the state
+            if isinstance(itinerary, dict):
+                logger.info(f"DEBUG - Suggested Accommodations from Agent: {json.dumps(itinerary.get('suggested_accommodations', []), indent=2)}")
+
              # Sync the extracted state to the materialized collections
             # This ensures the visual dashboard can find the latest plans
             if isinstance(itinerary, dict):

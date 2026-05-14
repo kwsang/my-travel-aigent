@@ -114,7 +114,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=pioneer_goal,
-        tools=[search_tool, discovery_tool, places_search_tool, traffic_tool, details_tool],
+        tools=[search_tool, discovery_tool, places_search_tool, traffic_tool, details_tool, persist_tool],
         description="Specializes in geographic anchoring, transportation, and finding the perfect destination and accommodation."
     )
 
