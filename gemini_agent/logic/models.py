@@ -103,6 +103,7 @@ class Itinerary(BaseModel):
     user_id: str = ""
     session_id: str = ""
     trip_name: str
+    destination: Optional[str] = None
     duration_days: int
     party_size_total: int
     status: Literal["draft", "final"] = Field(default="draft")
@@ -123,6 +124,7 @@ class Itinerary(BaseModel):
 class ItineraryPatchRequest(BaseModel):
     events: Optional[List[Event]] = Field(None, description="Updated events from the UI.")
     budget: Optional[TripBudget] = Field(None, description="Updated budget from the UI.")
+    destination: Optional[str] = Field(None, description="Manual override for the primary destination.")
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
     status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
     traveler_profile: Optional[TravelerProfile] = Field(None, description="Updated traveler profile.")

@@ -76,7 +76,7 @@ async def get_itinerary(
         is_conflict = False
         all_errors = []
 
-        if user_profile:
+        if user_profile and itinerary_doc.get("events"):
             prefs = user_profile.get("preferences", {})
             risk = prefs.get("risk_tolerance", "relaxed")
             vibe = prefs.get("circadian_preference", "night_owl")
@@ -156,13 +156,17 @@ async def update_itinerary(
         risk = prefs.get("risk_tolerance", "relaxed")
         vibe = prefs.get("circadian_preference", "night_owl")
 
-        logger.info(f"Running structural validation for {session_id} (Risk: {risk})")
-        struct_errors = validate_itinerary_structure(itinerary, risk, vibe, profile_for_val)
-        _, budget_errors = validate_itinerary_budget(itinerary, profile_for_val)
+        all_errors = []
+        is_conflict = False
 
-        all_errors = struct_errors + budget_errors
-        is_conflict = len(all_errors) > 0
-        logger.debug(f"Validation complete. Conflicts: {is_conflict}, Errors: {len(all_errors)}")
+        if itinerary.get("events"):
+            logger.info(f"Running structural validation for {session_id} (Risk: {risk})")
+            struct_errors = validate_itinerary_structure(itinerary, risk, vibe, profile_for_val)
+            _, budget_errors = validate_itinerary_budget(itinerary, profile_for_val)
+
+            all_errors = struct_errors + budget_errors
+            is_conflict = len(all_errors) > 0
+            logger.debug(f"Validation complete. Conflicts: {is_conflict}, Errors: {len(all_errors)}")
 
         await db.itineraries.update_one(
             {"session_id": session_id, "user_id": identity},

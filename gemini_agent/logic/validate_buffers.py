@@ -89,12 +89,12 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     Validates the high-level structure of an itinerary based on Scenario 5 requirements:
     Clustering, Night Owl hours, and the Retreat Rule.
     """
-    print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Vibe: {circadian_pref})...")
-    errors = []
-    
     events = itinerary.get("events", [])
     if not events:
         return []
+
+    print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Vibe: {circadian_pref})...")
+    errors = []
 
     # Establish the trip's start date to verify the 'day' property increments correctly
     valid_start_times = [
@@ -302,6 +302,10 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     """
     Validates budget adherence based on group size, per-person toggle, and room sharing.
     """
+    events = itinerary.get("events", [])
+    if not events:
+        return True, []
+
     # Extract party size: support both new flat int and legacy dict structure
     party_raw = user_prefs.get('party_size', 1)
     if isinstance(party_raw, dict):

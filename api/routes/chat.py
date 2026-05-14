@@ -100,7 +100,7 @@ async def chat(
                     upsert=True
                 )
 
-            if isinstance(itinerary, dict) and isinstance(user_profile, dict):
+        if isinstance(itinerary, dict) and isinstance(user_profile, dict) and itinerary.get("events"):
                 prefs = user_profile.get("preferences", {})
                 if isinstance(prefs, str):
                     try: prefs = json.loads(prefs)
