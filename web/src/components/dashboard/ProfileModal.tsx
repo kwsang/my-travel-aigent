@@ -184,6 +184,24 @@ function ProfilePageOne({ formData, setFormData, toggleInterest }: ProfilePagePr
         </div>
       </div>
 
+      <div className="space-y-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+          <Wallet size={14} /> Target Budget
+        </label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">
+            {formData.budget?.currency === 'USD' ? '$' : formData.budget?.currency || '$'}
+          </span>
+          <input 
+            type="number"
+            value={formData.budget?.total_limit || ''}
+            onChange={(e) => setFormData({...formData, budget: { total_limit: parseFloat(e.target.value) || 0, currency: formData.budget?.currency || 'USD' }})}
+            className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+            placeholder="Total trip budget"
+          />
+        </div>
+      </div>
+
       <div className="space-y-3">
         <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
           <Sparkles size={14} /> Interests

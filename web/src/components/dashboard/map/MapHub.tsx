@@ -80,8 +80,12 @@ function MapInner() {
     if (geo) {
       return { lat: geo.latitude, lng: geo.longitude };
     }
+    const dest = popularDestinations.find(d => d.name === itinerary.destination);
+    if (dest) {
+      return { lat: dest.lat, lng: dest.lng };
+    }
     return defaultCenter;
-  }, [segments]);
+  }, [segments, itinerary.destination, popularDestinations]);
 
   // Generate the sequential path for the polyline
   const routePath = React.useMemo(() => {
@@ -194,10 +198,16 @@ function MapInner() {
         map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
     } else if (segments.length === 0) {
-      map.setZoom(4);
-      map.panTo({ lat: 39.8283, lng: -98.5795 });
+      const dest = popularDestinations.find(d => d.name === itinerary.destination);
+      if (dest) {
+        map.panTo({ lat: dest.lat, lng: dest.lng });
+        map.setZoom(11);
+      } else {
+        map.setZoom(4);
+        map.panTo({ lat: 39.8283, lng: -98.5795 });
+      }
     }
-  }, [map, activeSegmentIndex, routePath, segments]);
+  }, [map, activeSegmentIndex, routePath, segments, itinerary.destination, popularDestinations]);
 
   return (
     <>
@@ -205,7 +215,7 @@ function MapInner() {
         <Map
           className="w-full h-full"
           defaultCenter={mapCenter}
-          defaultZoom={segments.length === 0 ? 4 : 11}
+          defaultZoom={segments.length === 0 && !itinerary.destination ? 4 : 11}
           disableDefaultUI={true}
           zoomControl={true}
           mapId="DEMO_MAP_ID"
