@@ -70,14 +70,33 @@ def create_travel_agent():
     with open(os.path.join(prompts_dir, "ACTIVITY_PLANNER_PROMPT.md"), "r") as f:
         activity_planner_goal = f.read()
 
+    # Helper to safely parse stringified JSON states for prompt injection
+    def _get_safe_state(ctx: Context):
+        state = getattr(ctx, "state", getattr(ctx.session, "state", {}))
+        itinerary = state.get("final_itinerary", {})
+        if isinstance(itinerary, str):
+            try: itinerary = json.loads(itinerary)
+            except: itinerary = {}
+            
+        profile = state.get("user_profile_data", {})
+        if isinstance(profile, str):
+            try: profile = json.loads(profile)
+            except: profile = {}
+            
+        return profile, itinerary
+
     # 4. Define specialized Agents
     
     # 4.1 Concierge: Focused on user profiling and data gathering
+    def get_concierge_instructions(ctx: Context) -> str:
+        profile, itinerary = _get_safe_state(ctx)
+        return f"{concierge_goal}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+
     concierge_agent = Agent(
         name="concierge",
         model="gemini-2.5-flash", # gemini-1.5-flash is a hallucination
         static_instruction=system_instructions,
-        instruction=concierge_goal,
+        instruction=get_concierge_instructions,
         tools=[
             record_profile_tool, 
             get_profile_tool, 
@@ -96,8 +115,8 @@ def create_travel_agent():
     def get_architect_instructions(ctx: Context) -> str:
         prompt = architect_goal
         
-        # Defensive state retrieval: Context > Session > Empty
-        state = getattr(ctx, "state", getattr(ctx.session, "state", {}))
+        profile, itinerary = _get_safe_state(ctx)
+        state = getattr(ctx, "state", getattr(ctx.session, "state", {})) # Keep for violations
         
         # Dynamic Injection: Check for Proximity Violations in State
         violations = state.get("proximity_violations")
@@ -107,13 +126,22 @@ def create_travel_agent():
         # Add explicit formatting rules to ensure reliable UI splitting
         prompt += "\n\nFORMATTING RULE: Use Markdown H3 headers ('### Section Name') for all major itinerary components (e.g., '### Accommodation', '### Transport', '### Dining', '### Day 1'). Do not use these headers for regular text."
         
+        prompt += f"\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
         return prompt
+
+    def get_pioneer_instructions(ctx: Context) -> str:
+        profile, itinerary = _get_safe_state(ctx)
+        return f"{pioneer_goal}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+
+    def get_activity_planner_instructions(ctx: Context) -> str:
+        profile, itinerary = _get_safe_state(ctx)
+        return f"{activity_planner_goal}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
 
     pioneer_agent = Agent(
         name="travel_pioneer",
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
-        instruction=pioneer_goal,
+        instruction=get_pioneer_instructions,
         tools=[search_tool, discovery_tool, places_search_tool, traffic_tool, details_tool, persist_tool],
         description="Specializes in geographic anchoring, transportation, and finding the perfect destination and accommodation."
     )
@@ -122,7 +150,7 @@ def create_travel_agent():
         name="activity_planner",
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
-        instruction=activity_planner_goal,
+        instruction=get_activity_planner_instructions,
         tools=[places_search_tool, events_tool, traffic_tool, details_tool, persist_tool],
         description="Fills the itinerary with incredible EXPERIENCE and DINING segments that match the user's interests, vibe, and circadian rhythm."
     )

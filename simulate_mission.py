@@ -102,7 +102,8 @@ async def test_destination_selection_flow():
                 "circadian_preference": "night_owl",
                 "transport_preference": "public",
                 "personal_transport_available": False,
-                "group_planning_per_person": False
+                "group_planning_per_person": False,
+                "starting_location": "New York, USA"
             }
         },
         "final_itinerary": {
@@ -119,7 +120,7 @@ async def test_destination_selection_flow():
         app_name="my_travel_aigent", user_id=user_id, session_id=session_id, state=initial_state
     )
     
-    user_input = f"I'd like to plan a trip to {destination}."
+    user_input = f"I'd like to plan a trip to {destination}. We are traveling from New York for 4 days in October 2026."
     print(f"Simulating Map Click Event: {user_input}\n")
     
     # 2. Run the Agent
