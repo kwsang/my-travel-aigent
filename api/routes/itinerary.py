@@ -33,6 +33,7 @@ async def list_itineraries(
         doc["duration_days"] = doc.get("duration_days") or 0
         doc["party_size_total"] = doc.get("party_size_total") or 1
         doc["status"] = doc.get("status", "draft")
+        doc["destination"] = doc.get("destination")
         doc.setdefault("is_conflict", False)
         doc.setdefault("validation_errors", [])
     return docs
@@ -60,6 +61,7 @@ async def get_itinerary(
                 "user_id": identity,
                 "events": [],
                 "trip_name": "New Trip",
+                "destination": None,
                 "duration_days": 0,
                 "party_size_total": 1,
                 "status": "draft",
@@ -91,6 +93,7 @@ async def get_itinerary(
 
         itinerary_doc.setdefault("duration_days", 0)
         itinerary_doc.setdefault("party_size_total", user_profile.get("party_size", 1) if user_profile else 1)
+        itinerary_doc.setdefault("destination", None)
         itinerary_doc["_id"] = str(itinerary_doc["_id"])
         itinerary_doc["is_conflict"] = is_conflict
         itinerary_doc["validation_errors"] = all_errors
@@ -125,6 +128,7 @@ async def update_itinerary(
                 "user_id": identity,
                 "events": [],
                 "trip_name": "New Trip",
+                "destination": None,
                 "duration_days": 0,
                 "party_size_total": 1,
                 "status": "draft",
@@ -175,6 +179,7 @@ async def update_itinerary(
         # Explicit assignment to ensure these fields exist and are valid for Itinerary
         itinerary_doc["duration_days"] = itinerary_doc.get("duration_days") or 0
         itinerary_doc["party_size_total"] = itinerary_doc.get("party_size_total") or profile_for_val.get("party_size", 1)
+        itinerary_doc["destination"] = itinerary_doc.get("destination")
         itinerary_doc["status"] = itinerary_doc.get("status", "draft")
         itinerary_doc["is_conflict"] = bool(is_conflict)
         itinerary_doc["validation_errors"] = all_errors or []
