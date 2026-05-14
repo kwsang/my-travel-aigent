@@ -2,7 +2,7 @@ import React from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { Sparkles, GripVertical } from 'lucide-react';
 import { Event } from '@/types';
-import { SegmentIcons } from '@/components/dashboard/utils/segmentMapping';
+import { SegmentType, SegmentIcons, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
 
 const DefaultIcon = Sparkles; // Fallback icon
 
@@ -80,8 +80,11 @@ export default function TimelineItem({
       </div>
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
-          <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {React.createElement(SegmentIcons[event.segment] || DefaultIcon, { className: 'w-3 h-3' })}
+          <span 
+            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+            style={{ color: SegmentColors[event.segment as SegmentType]?.bg }}
+          >
+            {React.createElement(SegmentIcons[event.segment as SegmentType] || DefaultIcon, { className: 'w-3 h-3' })}
             {event.segment.replace('_', ' ')}
           </span>
           <h4 className="font-semibold text-foreground">{event.details?.name || 'Unnamed Event'}</h4>
