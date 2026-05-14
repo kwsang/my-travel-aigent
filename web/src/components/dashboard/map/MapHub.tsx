@@ -125,7 +125,7 @@ export default function MapHub() {
 }
 
 function MapInner() {
-  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary } = useItineraryData();
+  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary, hoveredSegmentIndex, setHoveredSegmentIndex } = useItineraryData();
   const map = useMap();
   const isLoaded = useApiIsLoaded();
 
@@ -278,6 +278,9 @@ function MapInner() {
                   isActive={activeSegmentIndex === index}
                   index={index}
                   onClick={handleMarkerClick}
+                  isHovered={hoveredSegmentIndex === index}
+                  onMouseEnter={() => setHoveredSegmentIndex?.(index)}
+                  onMouseLeave={() => setHoveredSegmentIndex?.(null)}
                 />
               );
             }

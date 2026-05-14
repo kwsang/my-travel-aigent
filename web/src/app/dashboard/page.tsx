@@ -53,6 +53,7 @@ export default function DashboardPage() {
   const [isLoadingItinerary, setIsLoadingItinerary] = useState(true);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
+  const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState<number | null>(null);
 
   // Sidebar Resizing State
   const [sidebarWidth, setSidebarWidth] = useLocalStorage<number>('travel_aigent_sidebar_width', 400);
@@ -264,8 +265,10 @@ export default function DashboardPage() {
     userId: visitorId,
     isLoading,
     activeSegmentIndex,
-    setActiveSegmentIndex
-  }), [itinerary, profile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex]);
+    setActiveSegmentIndex,
+    hoveredSegmentIndex,
+    setHoveredSegmentIndex
+  }), [itinerary, profile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex, hoveredSegmentIndex]);
 
   return (
     <ItineraryContext.Provider value={contextValue}>

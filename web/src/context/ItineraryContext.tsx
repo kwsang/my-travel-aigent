@@ -12,6 +12,8 @@ export interface ItineraryContextType {
   isLoading?: boolean;
   activeSegmentIndex: number | null;
   setActiveSegmentIndex: React.Dispatch<React.SetStateAction<number | null>>;
+  hoveredSegmentIndex: number | null;
+  setHoveredSegmentIndex: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 export const ItineraryContext = createContext<ItineraryContextType | undefined>(undefined);

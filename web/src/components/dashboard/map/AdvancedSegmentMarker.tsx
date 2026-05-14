@@ -12,6 +12,9 @@ interface AdvancedSegmentMarkerProps {
   isActive: boolean;
   index: number;
   onClick: (index: number) => void;
+  isHovered?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 const AdvancedSegmentMarker = memo(function AdvancedSegmentMarker({
@@ -20,7 +23,10 @@ const AdvancedSegmentMarker = memo(function AdvancedSegmentMarker({
   segmentType,
   isActive,
   index,
-  onClick
+  onClick,
+  isHovered,
+  onMouseEnter,
+  onMouseLeave
 }: AdvancedSegmentMarkerProps) {
   const Icon = SegmentIcons[segmentType] || Sparkles;
   const colors = SegmentColors[segmentType] || { bg: '#6366f1' };
@@ -30,15 +36,17 @@ const AdvancedSegmentMarker = memo(function AdvancedSegmentMarker({
       position={position}
       title={title}
       onClick={() => onClick(index)}
-      zIndex={isActive ? 100 : 1}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      zIndex={isActive ? 100 : (isHovered ? 50 : 1)}
     >
       <Pin 
         background={colors.bg} 
-        borderColor={isActive ? '#020617' : '#ffffff'}
-        scale={isActive ? 1.4 : 1.1}
+        borderColor={isActive ? '#020617' : (isHovered ? '#6366f1' : '#ffffff')}
+        scale={isActive ? 1.4 : (isHovered ? 1.25 : 1.1)}
       >
         <Icon 
-          size={isActive ? 16 : 14} 
+          size={isActive ? 16 : (isHovered ? 15 : 14)} 
           style={{ color: '#ffffff' }} 
         />
       </Pin>

@@ -35,7 +35,8 @@ export default function TimelineItem({
   onDragOver,
   onDrop,
 }: TimelineItemProps) {
-  const { viewMode, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex } = useItineraryData();
+  const itineraryData = useItineraryData();
+  const { viewMode, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex, hoveredSegmentIndex, setHoveredSegmentIndex } = itineraryData;
 
   // Formats raw ISO strings into a clean "8:30 AM" format
   const formatTime = (timeStr?: string) => {
@@ -69,11 +70,17 @@ export default function TimelineItem({
         onDrop(e, absoluteIndex, day);
       }}
       onClick={() => setActiveSegmentIndex(absoluteIndex)}
-      className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-card cursor-pointer active:cursor-grab group ${
+      onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
+      onMouseLeave={() => setHoveredSegmentIndex?.(null)}
+      className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all cursor-pointer active:cursor-grab group ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
       } ${
         dragOverIndex === absoluteIndex && draggedIndex !== absoluteIndex ? 'mt-20 before:content-["Drop_Here"] before:flex before:items-center before:justify-center before:text-[11px] before:font-bold before:text-primary before:uppercase before:tracking-widest before:absolute before:-top-16 before:left-0 before:right-0 before:h-12 before:border-2 before:border-dashed before:border-primary/60 before:rounded-xl before:bg-primary/10' : ''
-      } ${activeSegmentIndex === absoluteIndex ? 'ring-2 ring-primary shadow-md bg-card' : ''}`}
+      } ${
+        activeSegmentIndex === absoluteIndex 
+          ? 'ring-2 ring-primary shadow-md bg-card' 
+          : (hoveredSegmentIndex === absoluteIndex ? 'ring-1 ring-primary/50 shadow-md bg-card' : 'hover:shadow-md hover:bg-card')
+      }`}
     >
       <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
         <GripVertical size={14} />
