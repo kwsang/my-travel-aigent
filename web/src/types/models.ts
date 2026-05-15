@@ -26,6 +26,8 @@ export interface EventDetails {
   travel_zone?: string;
   geo?: GeoCoordinates;
   price?: Price;
+  rating?: number;
+  user_rating_count?: number;
   is_rental: boolean;
   vehicle_count: number;
 }

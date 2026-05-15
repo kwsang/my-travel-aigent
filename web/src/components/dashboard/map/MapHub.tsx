@@ -317,6 +317,7 @@ function MapInner() {
             const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Place';
             const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
             const rating = place.details?.rating || place.rating;
+            const ratingCount = place.details?.user_rating_count || place.userRatingCount || place.user_rating_count;
 
             return (
                 <AdvancedMarker
@@ -336,7 +337,11 @@ function MapInner() {
                                     )}
                                     {price && rating && <span className="opacity-70">•</span>}
                                     {rating && (
-                                        <span className="flex items-center gap-0.5"><Star size={9} className="fill-white" /> {rating}</span>
+                                        <span className="flex items-center gap-0.5">
+                                            <Star size={9} className="fill-white" /> 
+                                            {rating}
+                                            {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
+                                        </span>
                                     )}
                                 </div>
                             )}
@@ -356,6 +361,7 @@ function MapInner() {
             const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Activity';
             const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
             const rating = place.details?.rating || place.rating;
+            const ratingCount = place.details?.user_rating_count || place.userRatingCount || place.user_rating_count;
 
             return (
                 <AdvancedMarker
@@ -375,7 +381,11 @@ function MapInner() {
                                     )}
                                     {price && rating && <span className="opacity-70">•</span>}
                                     {rating && (
-                                        <span className="flex items-center gap-0.5"><Star size={9} className="fill-white" /> {rating}</span>
+                                        <span className="flex items-center gap-0.5">
+                                            <Star size={9} className="fill-white" /> 
+                                            {rating}
+                                            {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
+                                        </span>
                                     )}
                                 </div>
                             )}

@@ -31,6 +31,8 @@ class EventDetails(BaseModel):
     travel_zone: Optional[str] = Field(None, description="Micro-location zone within a city.")
     geo: Optional[GeoCoordinates] = Field(None, description="Geographic coordinates of the venue or location.")
     price: Optional[Price] = None
+    rating: Optional[float] = Field(None, description="User rating (1.0 to 5.0).")
+    user_rating_count: Optional[int] = Field(None, description="Number of user reviews.")
     is_rental: bool = Field(default=False, description="True if this is a rental car segment.")
     vehicle_count: int = Field(default=1, description="Number of vehicles for large groups.")
 
