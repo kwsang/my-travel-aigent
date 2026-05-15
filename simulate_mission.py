@@ -94,8 +94,8 @@ async def test_destination_selection_flow():
     
     # 1. Pre-inject the state (mimicking chat.py's UI sync)
     initial_state = {
-        "user_profile_data": {
-            "party_size": 2,
+        "traveler_profile": {
+           "party_size": 2,
             "budget": {"total_limit": 3000, "currency": "USD"},
             "preferences": {
                 "risk_tolerance": "relaxed",
@@ -198,8 +198,7 @@ async def run_full_agent_test():
             session_id=session_id
         )
         itinerary = state.state.get("final_itinerary")
-        user_prefs = state.state.get("user_profile_data")
-
+        user_prefs = state.state.get("traveler_profile") or state.state.get("user_profile_data")
         if itinerary and user_prefs:
             print("\n--- Running Automated Validations on Agent Output ---")
             print("\n[DEBUG] Suggested Accommodations from State:")

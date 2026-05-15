@@ -23,8 +23,19 @@ async def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
         session_id = tool_context.session.id
         user_id = tool_context.session.user_id
         
+        # Merge with existing state to prevent data loss if the LLM omits optional fields
+        existing_state = tool_context.state.get("final_itinerary")
+        if isinstance(existing_state, str):
+            try: existing_state = json.loads(existing_state)
+            except: existing_state = {}
+        if not existing_state:
+            existing_state = {}
+
         # Prepare document data with session linkage for UI synchronization
-        itinerary_data = itinerary.model_dump()
+        # Exclude unset fields so we don't overwrite existing valid data with None
+        new_data = itinerary.model_dump(exclude_unset=True)
+        itinerary_data = {**existing_state, **new_data}
+        
         itinerary_data["session_id"] = session_id
         itinerary_data["user_id"] = user_id # Enforce consistency with session identity
         itinerary_data["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -37,6 +48,9 @@ async def save_itinerary(itinerary: Itinerary, tool_context: Any) -> str:
             upsert=True
         )
         
+        # CRITICAL: Update the agent's memory state so subsequent agents see the saved events!
+        tool_context.state.update({"final_itinerary": itinerary_data, "active_itinerary": itinerary_data})
+
         if result.upserted_id:
             return f"SUCCESS: New draft itinerary created for session {session_id}."
         return f"SUCCESS: Draft itinerary updated for session {session_id}."

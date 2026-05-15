@@ -115,7 +115,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           message: userMessage,
           session_id: sessionId,
           user_id: userId,
-          user_profile: overrideProfile || profile,
+          traveler_profile: overrideProfile || profile,
           itinerary: overrideItinerary || itinerary,
         }),
       });
@@ -136,8 +136,8 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           events: data.itinerary.events || [],
         });
       }
-      if (data.user_profile && setProfile) {
-        setProfile(data.user_profile);
+      if (data.traveler_profile && setProfile) {
+        setProfile(data.traveler_profile);
       }
 
       // Trigger refresh of the itinerary in the parent dashboard

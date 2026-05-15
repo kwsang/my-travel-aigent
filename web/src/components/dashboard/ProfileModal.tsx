@@ -1,12 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles, Calendar } from 'lucide-react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles, Calendar, AlertCircle } from 'lucide-react';
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
 import { TravelerProfile } from '@/types';
 import { parseProfileData } from '@/utils/profileUtils';
+
+const getTodayString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 interface ProfileModalProps {
   sessionId: string;
@@ -22,13 +27,22 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
   const [formData, setFormData] = useState<ProfileFormData>(parseProfileData(initialData));
   const [isFetching, setIsFetching] = useState(!initialData);
   const [isSaving, setIsLoading] = useState(false);
-  const [startDate, setStartDate] = useState(initialData?.preferences?.start_date || '');
+  const [startDate, setStartDate] = useState(initialData?.preferences?.start_date || getTodayString());
   const [endDate, setEndDate] = useState(initialData?.preferences?.end_date || '');
+
+  // YYYY-MM-DD strings can be safely compared lexicographically
+  const isDateError = Boolean(startDate && endDate && startDate > endDate);
 
   useEffect(() => {
     if (initialData) {
-      setFormData(parseProfileData(initialData));
-      setStartDate(initialData.preferences?.start_date || '');
+      const parsed = parseProfileData(initialData);
+      // Ensure newly added fields aren't stripped by older parseProfileData utility
+      parsed.preferences.start_date = initialData.preferences?.start_date || getTodayString();
+      parsed.preferences.end_date = initialData.preferences?.end_date;
+      parsed.preferences.target_duration_days = initialData.preferences?.target_duration_days;
+      
+      setFormData(parsed);
+      setStartDate(initialData.preferences?.start_date || getTodayString());
       setEndDate(initialData.preferences?.end_date || '');
       setIsFetching(false);
     } else {
@@ -47,11 +61,22 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
 
   const handleSave = async () => {
     setIsLoading(true);
+
+    // Ensure dates are perfectly synced before saving to bypass any local state desyncs
+    const dataToSave = {
+      ...formData,
+      preferences: {
+        ...formData.preferences,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+      }
+    };
+
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/profile/${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSave),
       });
       if (response.ok) {
         const updatedProfile = await response.json();
@@ -108,6 +133,7 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
               setFormData={setFormData} 
               startDate={startDate} setStartDate={setStartDate}
               endDate={endDate} setEndDate={setEndDate}
+              isDateError={isDateError}
             />
           )}
           </div>
@@ -127,7 +153,7 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
           ) : (
             <>
               <button onClick={() => setPage(2)} className="px-6 py-3 rounded-xl font-bold text-muted-foreground hover:bg-white/5 transition-all flex items-center gap-2"><ArrowLeft size={18} /> Back</button>
-              <button onClick={handleSave} disabled={isSaving} className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">{isSaving ? "Saving..." : <><Save size={18} /> Save Profile</>}</button>
+              <button onClick={handleSave} disabled={isSaving || isDateError} className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none">{isSaving ? "Saving..." : <><Save size={18} /> Save Profile</>}</button>
             </>
           )}
         </div>
@@ -183,8 +209,10 @@ function ProfilePageOne({ formData, setFormData, toggleInterest }: ProfilePagePr
           </label>
           <input 
             type="number"
+            min="1"
+            onKeyDown={(e) => { if (e.key === '-') e.preventDefault(); }}
             value={formData.party_size}
-            onChange={(e) => setFormData({...formData, party_size: parseInt(e.target.value) || 0})}
+            onChange={(e) => setFormData({...formData, party_size: Math.abs(parseInt(e.target.value) || 0)})}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
             placeholder="Total travelers"
           />
@@ -195,9 +223,11 @@ function ProfilePageOne({ formData, setFormData, toggleInterest }: ProfilePagePr
           </label>
           <input 
             type="number"
+            min="1"
+            onKeyDown={(e) => { if (e.key === '-') e.preventDefault(); }}
             disabled={!formData.room_sharing}
             value={formData.people_per_room}
-            onChange={(e) => setFormData({...formData, people_per_room: parseInt(e.target.value) || 0})}
+            onChange={(e) => setFormData({...formData, people_per_room: Math.abs(parseInt(e.target.value) || 0)})}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-30"
             placeholder="2"
           />
@@ -214,8 +244,10 @@ function ProfilePageOne({ formData, setFormData, toggleInterest }: ProfilePagePr
           </span>
           <input 
             type="number"
+            min="0"
+            onKeyDown={(e) => { if (e.key === '-') e.preventDefault(); }}
             value={formData.budget?.total_limit || ''}
-            onChange={(e) => setFormData({...formData, budget: { total_limit: parseFloat(e.target.value) || 0, currency: formData.budget?.currency || 'USD' }})}
+            onChange={(e) => setFormData({...formData, budget: { total_limit: Math.abs(parseFloat(e.target.value) || 0), currency: formData.budget?.currency || 'USD' }})}
             className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
             placeholder="Total trip budget"
           />
@@ -264,31 +296,40 @@ interface ProfilePageThreeProps extends ProfilePageProps {
   setStartDate: React.Dispatch<React.SetStateAction<string>>;
   endDate: string;
   setEndDate: React.Dispatch<React.SetStateAction<string>>;
+  isDateError: boolean;
 }
 
-function ProfilePageThree({ formData, setFormData, startDate, setStartDate, endDate, setEndDate }: ProfilePageThreeProps) {
+function ProfilePageThree({ formData, setFormData, startDate, setStartDate, endDate, setEndDate, isDateError }: ProfilePageThreeProps) {
   
   const handleDateChange = (newStart: string, newEnd: string) => {
     setStartDate(newStart);
     setEndDate(newEnd);
     
+    let diffDays = formData.preferences.target_duration_days;
+    
     if (newStart && newEnd) {
-      const start = new Date(newStart);
-      const end = new Date(newEnd);
-      if (end >= start) {
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        setFormData(prev => ({
-          ...prev,
-          preferences: {
-            ...prev.preferences,
-            target_duration_days: diffDays,
-            start_date: newStart,
-            end_date: newEnd
-          }
-        }));
+      // Safely parse parts to avoid timezone offset and DST bugs when calculating durations
+      const [startYear, startMonth, startDay] = newStart.split('-').map(Number);
+      const [endYear, endMonth, endDay] = newEnd.split('-').map(Number);
+      
+      const startUtc = Date.UTC(startYear, startMonth - 1, startDay);
+      const endUtc = Date.UTC(endYear, endMonth - 1, endDay);
+
+      if (endUtc >= startUtc) {
+        const diffTime = endUtc - startUtc;
+        diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
       }
     }
+
+    setFormData(prev => ({
+      ...prev,
+      preferences: {
+        ...prev.preferences,
+        target_duration_days: diffDays,
+        start_date: newStart || undefined,
+        end_date: newEnd || undefined
+      }
+    }));
   };
 
   return (
@@ -313,10 +354,18 @@ function ProfilePageThree({ formData, setFormData, startDate, setStartDate, endD
           value={endDate}
           min={startDate}
           onChange={(e) => handleDateChange(startDate, e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all [color-scheme:dark]"
+          className={`w-full bg-white/5 border ${isDateError ? 'border-destructive focus:ring-destructive/50' : 'border-white/10 focus:ring-primary/50'} rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 transition-all [color-scheme:dark]`}
         />
       </div>
-      {!!formData.preferences.target_duration_days && startDate && endDate && (
+
+      {isDateError && (
+        <div className="flex items-center gap-3 rounded-xl bg-destructive/10 px-4 py-3 text-destructive border border-destructive/20 animate-in fade-in slide-in-from-top-2">
+          <AlertCircle size={16} className="shrink-0" />
+          <span className="text-sm font-semibold">End date cannot be before start date.</span>
+        </div>
+      )}
+
+      {!!formData.preferences.target_duration_days && startDate && endDate && !isDateError && (
         <div className="mt-8 flex items-center justify-center gap-3 bg-primary/10 border border-primary/20 p-4 rounded-xl">
           <Sparkles className="text-primary w-5 h-5" />
           <span className="text-sm font-medium text-white">

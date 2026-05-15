@@ -11,8 +11,16 @@ from api.routes import chat, itinerary, profile, destinations
 from dotenv import load_dotenv
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s.%(msecs)03d | %(name)s | %(levelname)s | %(message)s",
+    datefmt="%H:%M:%S"
+)
 logger = logging.getLogger(__name__)
+
+# Enable Debug logging to trace parallel tool execution in the terminal
+logging.getLogger('google.adk').setLevel(logging.DEBUG)
+logging.getLogger('httpx').setLevel(logging.DEBUG)
 
 # Shared Agent Runner
 runner = create_agent_runner()

@@ -10,6 +10,7 @@ from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
 from gemini_agent.plugins.logistics_monitor import LogisticsMonitorPlugin
+from gemini_agent.plugins.timing_plugin import ExecutionTimingPlugin
 from gemini_agent.tools.tools import (
     record_user_profile, 
     search_destinations, 
@@ -76,7 +77,7 @@ def create_travel_agent():
             try: itinerary = json.loads(itinerary)
             except: itinerary = {}
             
-        profile = state.get("user_profile_data", {})
+        profile = state.get("traveler_profile") or state.get("user_profile_data", {})
         if isinstance(profile, str):
             try: profile = json.loads(profile)
             except: profile = {}
@@ -222,7 +223,8 @@ def create_travel_agent():
         map_context = f" The user has explicitly selected '{destination}' as their destination from the map." if destination else ""
 
         # Decide which specialist should handle the turn based on the existence of profile data
-        if "user_profile_data" not in state or not state.get("user_profile_data"):
+        profile_data = state.get("traveler_profile") or state.get("user_profile_data")
+        if not profile_data:
             return (
                 f"You are the Travel Supervisor.{map_context} We do not have the user's full travel preferences yet. "
                 "Transfer the user to the 'concierge' to begin the intake process. If a destination is selected, instruct the concierge to accept it and move to the next question."
@@ -231,7 +233,6 @@ def create_travel_agent():
         # Contextual Handoff: Mention if we are resuming a draft
         handoff_context = "The user's preferences are recorded."
         if itinerary_data:
-            profile_data = state.get("user_profile_data", {})
             if isinstance(profile_data, str):
                 try: profile_data = json.loads(profile_data)
                 except: profile_data = {}
@@ -261,7 +262,7 @@ def create_travel_agent():
 
     # 6. Create the App with Context Caching (as seen in samples)
     # This stores the large SYSTEM_PROMPT in cache to reduce latency.
-    plugins = [LogisticsMonitorPlugin()]
+    plugins = [LogisticsMonitorPlugin(), ExecutionTimingPlugin()]
 
     app = App(
         name="my_travel_aigent",

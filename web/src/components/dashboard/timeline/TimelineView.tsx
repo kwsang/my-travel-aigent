@@ -57,18 +57,19 @@ export default function TimelineView() {
     // First check if user explicitly set a start date in their profile
     if (profile?.preferences?.start_date) {
       const [year, month, day] = profile.preferences.start_date.split('-');
-      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      // Use UTC to prevent browser timezone offsets from shifting midnight backwards
+      return new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
     }
 
     const allStartTimes = segments
       .map((s: Event) => new Date(s.schedule?.local_start_time || ''))
       .filter((d: Date) => !isNaN(d.getTime()));
     
-    let d = new Date(2026, 0, 1);
+    let d = new Date(Date.UTC(2026, 0, 1));
     if (allStartTimes.length > 0) {
-      d = new Date(Math.min(...allStartTimes.map(dt => dt.getTime())));
+      const earliest = new Date(Math.min(...allStartTimes.map(dt => dt.getTime())));
+      d = new Date(Date.UTC(earliest.getFullYear(), earliest.getMonth(), earliest.getDate()));
     }
-    d.setHours(0, 0, 0, 0);
     return d;
   }, [segments, profile?.preferences?.start_date]);
 
@@ -88,7 +89,8 @@ export default function TimelineView() {
   const formatDateString = (dateStr: string) => {
     if (!dateStr) return '';
     const [year, month, day] = dateStr.split('-');
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)))
+      .toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const dateHeader = profile?.preferences?.start_date && profile?.preferences?.end_date ? (
@@ -246,8 +248,8 @@ export default function TimelineView() {
       {days.map((day) => {
         const isCollapsed = collapsedDays.has(day);
         const dayDate = new Date(baseTripStartDate);
-        dayDate.setDate(baseTripStartDate.getDate() + day - 1);
-        const dateString = dayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        dayDate.setUTCDate(baseTripStartDate.getUTCDate() + day - 1);
+        const dateString = dayDate.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' });
 
         return (
           <div key={day} className="flex flex-col gap-4">

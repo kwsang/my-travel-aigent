@@ -58,21 +58,21 @@ def check_event_overlap(current_event: dict, next_event: dict):
     current_details = current_event.get("details", {})
 
     if current_event.get("segment") == "ACCOMMODATION" and "Stay" in current_details.get("name", ""):
-        current_start_str = current_schedule.get("start_time_utc") or current_schedule.get("local_start_time")
+        current_start_str = current_schedule.get("local_start_time") or current_schedule.get("start_time_utc")
         if not current_start_str: return False, 0
         current_start = to_utc_aware(current_start_str)
         current_end = current_start + datetime.timedelta(minutes=30)
     else:
-        current_end_str = (current_schedule.get("end_time_utc") or 
-                           current_schedule.get("local_end_time") or 
-                           current_schedule.get("start_time_utc") or 
-                           current_schedule.get("local_start_time"))
+        current_end_str = (current_schedule.get("local_end_time") or 
+                           current_schedule.get("local_start_time") or 
+                           current_schedule.get("end_time_utc") or 
+                           current_schedule.get("start_time_utc"))
         if not current_end_str: return False, 0
         current_end = to_utc_aware(current_end_str)
 
     # 2. Determine Start Time of Next Event
     next_schedule = next_event.get("schedule", {})
-    next_start_str = next_schedule.get("start_time_utc") or next_schedule.get("local_start_time")
+    next_start_str = next_schedule.get("local_start_time") or next_schedule.get("start_time_utc")
     if not next_start_str: return False, 0
     next_start = to_utc_aware(next_start_str)
 
@@ -97,14 +97,24 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     errors = []
 
     # Establish the trip's start date to verify the 'day' property increments correctly
-    valid_start_times = [
-        e.get("schedule", {}).get("local_start_time") 
-        for e in events 
-        if e.get("schedule", {}).get("local_start_time")
-    ]
-    if not valid_start_times:
-        return [] # Cannot validate structure without any valid start times
-    start_date = min(datetime.datetime.fromisoformat(t).date() for t in valid_start_times)
+    start_date = None
+    if user_prefs:
+        start_date_str = user_prefs.get("preferences", {}).get("start_date")
+        if start_date_str:
+            try:
+                start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+                
+    if not start_date:
+        valid_start_times = [
+            e.get("schedule", {}).get("local_start_time") 
+            for e in events 
+            if e.get("schedule", {}).get("local_start_time")
+        ]
+        if not valid_start_times:
+            return [] # Cannot validate structure without any valid start times
+        start_date = min(datetime.datetime.fromisoformat(t).date() for t in valid_start_times)
 
     # Determine if a rental is used at any point for Rule 6.5
     uses_rental = any(e["details"].get("is_rental") is True for e in events)
@@ -137,8 +147,8 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     for day, day_events in events_by_day.items():
         # Ensure chronological order for sequence-based checks
         day_events.sort(key=lambda x: to_utc_aware(
-            x.get("schedule", {}).get("start_time_utc") or 
             x.get("schedule", {}).get("local_start_time") or 
+            x.get("schedule", {}).get("start_time_utc") or 
             "1970-01-01T00:00:00Z" # Fallback for events missing schedule
         ))
 
@@ -198,9 +208,9 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                 # Physical duration gap calculation using UTC aware datetimes
                 dinner_schedule = day_events[dinner_idx].get("schedule", {})
                 prev_schedule = prev_event.get("schedule", {})
-                dinner_start_str = dinner_schedule.get("start_time_utc") or dinner_schedule.get("local_start_time")
-                prev_end_str = (prev_schedule.get("end_time_utc") or prev_schedule.get("local_end_time") or 
-                                prev_schedule.get("start_time_utc") or prev_schedule.get("local_start_time"))
+                dinner_start_str = dinner_schedule.get("local_start_time") or dinner_schedule.get("start_time_utc")
+                prev_end_str = (prev_schedule.get("local_end_time") or prev_schedule.get("local_start_time") or 
+                                prev_schedule.get("end_time_utc") or prev_schedule.get("start_time_utc"))
 
                 if not dinner_start_str or not prev_end_str: continue
                 dinner_start_utc = to_utc_aware(dinner_start_str)
@@ -337,9 +347,9 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     for event in itinerary.get("events", []):
         price_data = event.get("details", {}).get("price") or {}
         if price_data:
-            # Ensure 'is_estimated' flag is correctly set
-            if "is_estimated" not in price_data or not isinstance(price_data["is_estimated"], bool):
-                errors.append(f"FAIL: 'is_estimated' flag missing or invalid in price object for '{event.get('details', {}).get('name', 'Unknown')}'.")
+            # Ensure 'is_estimated' flag is correctly set (defaults to True if omitted by LLM)
+            if not isinstance(price_data.get("is_estimated", True), bool):
+                errors.append(f"FAIL: 'is_estimated' flag invalid in price object for '{event.get('details', {}).get('name', 'Unknown')}'.")
 
         base_amt = price_data.get("amount", 0.0)
         

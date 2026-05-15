@@ -71,33 +71,36 @@ async def get_itinerary(
                 "updated_at": datetime.now(timezone.utc)
             }
 
-        user_profile = await db.user_profiles.find_one({"user_id": itinerary_doc["user_id"]})
+        traveler_profile = itinerary_doc.get("traveler_profile")
+        if not traveler_profile:
+            traveler_profile = await db.user_profiles.find_one({"user_id": itinerary_doc["user_id"]})
         
         is_conflict = False
         all_errors = []
 
-        if user_profile and itinerary_doc.get("events"):
-            prefs = user_profile.get("preferences", {})
+        if traveler_profile and itinerary_doc.get("events"):
+            prefs = traveler_profile.get("preferences", {})
             risk = prefs.get("risk_tolerance", "relaxed")
             vibe = prefs.get("circadian_preference", "night_owl")
             
-            struct_errors = validate_itinerary_structure(itinerary_doc, risk, vibe, user_profile)
-            _, budget_errors = validate_itinerary_budget(itinerary_doc, user_profile)
+            struct_errors = validate_itinerary_structure(itinerary_doc, risk, vibe, traveler_profile)
+            _, budget_errors = validate_itinerary_budget(itinerary_doc, traveler_profile)
             
             all_errors = struct_errors + budget_errors
             is_conflict = len(all_errors) > 0
 
         # Sanitize User Profile for JSON serialization
-        if user_profile:
-            user_profile["_id"] = str(user_profile["_id"])
+        if traveler_profile and "_id" in traveler_profile:
+            traveler_profile["_id"] = str(traveler_profile["_id"])
 
         itinerary_doc.setdefault("duration_days", 0)
-        itinerary_doc.setdefault("party_size_total", user_profile.get("party_size", 1) if user_profile else 1)
+        itinerary_doc.setdefault("party_size_total", traveler_profile.get("party_size", 1) if traveler_profile else 1)
         itinerary_doc.setdefault("destination", None)
         itinerary_doc["_id"] = str(itinerary_doc["_id"])
         itinerary_doc["is_conflict"] = is_conflict
         itinerary_doc["validation_errors"] = all_errors
-        itinerary_doc["user_profile_data"] = user_profile
+        itinerary_doc["traveler_profile"] = traveler_profile
+        itinerary_doc.pop("user_profile_data", None)
         
         return itinerary_doc
 
@@ -134,9 +137,13 @@ async def update_itinerary(
                 "status": "draft",
             }
 
-        user_profile = await db.user_profiles.find_one({"user_id": identity})
-        # Fallback profile for validation if the user hasn't chatted yet
-        profile_for_val = user_profile or {
+        traveler_profile = None
+        if updates.traveler_profile:
+            traveler_profile = updates.traveler_profile.model_dump(exclude_unset=True)
+        if not traveler_profile:
+            traveler_profile = itinerary_doc.get("traveler_profile") or await db.user_profiles.find_one({"user_id": identity})
+
+        profile_for_val = traveler_profile or {
             "preferences": {}, 
             "party_size": 1, 
             "room_sharing": False, 
@@ -175,8 +182,8 @@ async def update_itinerary(
         )
 
         # Sanitize User Profile for JSON serialization
-        if user_profile:
-            user_profile["_id"] = str(user_profile["_id"])
+        if traveler_profile and "_id" in traveler_profile:
+            traveler_profile["_id"] = str(traveler_profile["_id"])
 
         itinerary_doc.update(update_data)
 
@@ -188,7 +195,8 @@ async def update_itinerary(
         itinerary_doc["is_conflict"] = bool(is_conflict)
         itinerary_doc["validation_errors"] = all_errors or []
         itinerary_doc["updated_at"] = update_time
-        itinerary_doc["user_profile_data"] = user_profile
+        itinerary_doc["traveler_profile"] = traveler_profile
+        itinerary_doc.pop("user_profile_data", None)
         itinerary_doc["_id"] = str(itinerary_doc.get("_id", "new"))
 
         return itinerary_doc

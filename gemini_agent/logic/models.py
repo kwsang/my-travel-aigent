@@ -101,6 +101,26 @@ class Event(BaseModel):
                 if len(parts[0]) == 1:
                     parts[0] = f"0{parts[0]}"
                 v[field] = f"{date_part}T{':'.join(parts)}"
+        
+        # Auto-generate local_end_time if the LLM omitted it
+        if v.get('local_start_time') and not v.get('local_end_time'):
+            try:
+                start_dt = datetime.strptime(v['local_start_time'], "%Y-%m-%dT%H:%M:%S")
+                
+                # Dynamically set default duration based on the already-validated segment type
+                segment_type = info.data.get('segment', '')
+                if segment_type == "DINING":
+                    duration_hours = 2
+                elif segment_type == "EXPERIENCE":
+                    duration_hours = 3
+                else:
+                    duration_hours = 1  # Default fallback for TRANSPORT, ACCOMMODATION, etc.
+                    
+                end_dt = start_dt + timedelta(hours=duration_hours)
+                v['local_end_time'] = end_dt.strftime("%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                pass
+                
         return v
 
 class Itinerary(BaseModel):
@@ -147,11 +167,11 @@ class ChatResponse(BaseModel):
     response: str = Field(..., description="The agent's text response.")
     is_conflict: bool = Field(default=False, description="True if the current itinerary has validation errors.")
     itinerary: Optional[Dict[str, Any]] = Field(None, description="The latest itinerary state from the agent.")
-    user_profile: Optional[Dict[str, Any]] = Field(None, description="The latest traveler profile state from the agent.")
+    traveler_profile: Optional[Dict[str, Any]] = Field(None, description="The latest traveler profile state from the agent.")
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="The user's chat input.")
     user_id: Optional[str] = Field(None, description="The user's ID, optional for anonymous sessions.")
     session_id: str
-    user_profile: Optional[Dict[str, Any]] = Field(None, description="The user's traveler profile constraints and preferences.")
+    traveler_profile: Optional[Dict[str, Any]] = Field(None, description="The user's traveler profile constraints and preferences.")
     itinerary: Optional[Dict[str, Any]] = Field(None, description="The current itinerary state from the UI.")

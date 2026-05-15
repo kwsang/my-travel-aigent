@@ -33,11 +33,11 @@ async def chat(
 
     try:
         # Pre-inject UI state directly into the agent's memory collection before running
-        if request.user_profile is not None or request.itinerary is not None:
+        if request.traveler_profile is not None or request.itinerary is not None:
             update_state = {}
-            if request.user_profile is not None:
-                update_state["data.state.user_profile_data"] = request.user_profile
-                prefs = request.user_profile.get("preferences", {})
+            if request.traveler_profile is not None:
+                update_state["data.state.traveler_profile"] = request.traveler_profile
+                prefs = request.traveler_profile.get("preferences", {})
                 logger.info(f"Injected Profile Constraints - Start: {prefs.get('start_date')}, End: {prefs.get('end_date')}, Days: {prefs.get('target_duration_days')}")
 
             if request.itinerary is not None:
@@ -91,7 +91,7 @@ async def chat(
         if session:
             state = getattr(session, "state", {})
             itinerary = state.get("final_itinerary")
-            user_profile = state.get("user_profile_data")
+            user_profile = state.get("traveler_profile") or state.get("user_profile_data")
             
             # Defensive string parsing
             if isinstance(itinerary, str):
@@ -120,6 +120,7 @@ async def chat(
                         "duration_days": itinerary.get("duration_days", 0),
                         "party_size_total": party_size or 1,
                         "status": itinerary.get("status", "draft"),
+                        "traveler_profile": user_profile,
                         "updated_at": datetime.now(timezone.utc)
                     }},
                     upsert=True
@@ -162,7 +163,7 @@ async def chat(
             response=agent_text, 
             is_conflict=is_conflict,
             itinerary=itinerary if isinstance(itinerary, dict) else None,
-            user_profile=user_profile if isinstance(user_profile, dict) else None
+            traveler_profile=user_profile if isinstance(user_profile, dict) else None
         )
 
     except Exception as e:
