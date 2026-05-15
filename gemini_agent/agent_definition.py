@@ -130,8 +130,12 @@ def create_travel_agent():
         prefs = profile.get("preferences", {})
         start_date = prefs.get("start_date")
         end_date = prefs.get("end_date")
+        duration = prefs.get("target_duration_days")
+        
         if start_date and end_date:
-            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested dates from {start_date} to {end_date}. Every generated event MUST be scheduled strictly within this exact window. Day 1 MUST begin on {start_date}."
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested dates from {start_date} to {end_date} (Duration: {duration} Days). Every generated event MUST be scheduled strictly within this exact window. Day 1 MUST begin on {start_date}."
+        elif duration:
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested a trip duration of {duration} Days. Ensure the itinerary covers exactly {duration} days."
 
         prompt += f"\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
         return prompt
@@ -141,8 +145,14 @@ def create_travel_agent():
         prompt = pioneer_goal
         
         prefs = profile.get("preferences", {})
-        if prefs.get("start_date") and prefs.get("end_date"):
-            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST be scheduled strictly between {prefs.get('start_date')} and {prefs.get('end_date')}. Day 1 MUST begin on {prefs.get('start_date')}."
+        start_date = prefs.get("start_date")
+        end_date = prefs.get("end_date")
+        duration = prefs.get("target_duration_days")
+
+        if start_date and end_date:
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST be scheduled strictly between {start_date} and {end_date} (Duration: {duration} Days). Day 1 MUST begin on {start_date}."
+        elif duration:
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST span exactly {duration} Days."
             
         return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
 
@@ -151,8 +161,14 @@ def create_travel_agent():
         prompt = activity_planner_goal
         
         prefs = profile.get("preferences", {})
-        if prefs.get("start_date") and prefs.get("end_date"):
-            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST be scheduled strictly between {prefs.get('start_date')} and {prefs.get('end_date')}."
+        start_date = prefs.get("start_date")
+        end_date = prefs.get("end_date")
+        duration = prefs.get("target_duration_days")
+
+        if start_date and end_date:
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST be scheduled strictly between {start_date} and {end_date} (Duration: {duration} Days)."
+        elif duration:
+            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST span exactly {duration} Days."
             
         return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
 

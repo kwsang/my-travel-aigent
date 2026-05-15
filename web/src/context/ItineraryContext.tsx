@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { Itinerary } from '@/types';
+import { Itinerary, TravelerProfile } from '@/types';
 
 export interface ItineraryContextType {
   itinerary: Partial<Itinerary>;
@@ -14,6 +14,8 @@ export interface ItineraryContextType {
   setActiveSegmentIndex: React.Dispatch<React.SetStateAction<number | null>>;
   hoveredSegmentIndex: number | null;
   setHoveredSegmentIndex: React.Dispatch<React.SetStateAction<number | null>>;
+  profile?: TravelerProfile | null;
+  setProfile?: React.Dispatch<React.SetStateAction<TravelerProfile | null>> | ((profile: any) => void);
 }
 
 export const ItineraryContext = createContext<ItineraryContextType | undefined>(undefined);
@@ -32,7 +34,7 @@ export function useItineraryData() {
   const { itinerary } = context;
 
   const segments = itinerary.events || [];
-  const profile = itinerary.traveler_profile;
+  const profile = context.profile || itinerary.traveler_profile;
   const partySize = profile?.party_size || 1;
   const budget = itinerary.budget;
   const riskTolerance = profile?.preferences?.risk_tolerance;

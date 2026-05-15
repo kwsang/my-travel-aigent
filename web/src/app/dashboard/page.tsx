@@ -196,6 +196,7 @@ export default function DashboardPage() {
     itinerary,
     profile,
     setItinerary,
+    setProfile,
     viewMode,
     setViewMode,
     refreshDashboard,
@@ -206,7 +207,7 @@ export default function DashboardPage() {
     setActiveSegmentIndex,
     hoveredSegmentIndex,
     setHoveredSegmentIndex
-  }), [itinerary, profile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex, hoveredSegmentIndex]);
+  }), [itinerary, profile, setItinerary, setProfile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex, hoveredSegmentIndex]);
 
   return (
     <ItineraryContext.Provider value={contextValue}>

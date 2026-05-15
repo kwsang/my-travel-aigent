@@ -37,6 +37,9 @@ async def chat(
             update_state = {}
             if request.user_profile is not None:
                 update_state["data.state.user_profile_data"] = request.user_profile
+                prefs = request.user_profile.get("preferences", {})
+                logger.info(f"Injected Profile Constraints - Start: {prefs.get('start_date')}, End: {prefs.get('end_date')}, Days: {prefs.get('target_duration_days')}")
+
             if request.itinerary is not None:
                 update_state["data.state.final_itinerary"] = request.itinerary
                 
@@ -50,8 +53,7 @@ async def chat(
             )
 
         # 1. Process Message via Runner
-        agent_text = ""
-        async for event in runner.run_async(
+        async for _ in runner.run_async(
             user_id=user_id,
             session_id=request.session_id,
             new_message=types.Content(
@@ -59,20 +61,32 @@ async def chat(
                 parts=[types.Part(text=request.message)]
             )
         ):
-            if event.content and event.content.parts:
-                for part in event.content.parts:
-                    if part.text and not getattr(part, "thought", False):
-                        agent_text += part.text
+            pass  # Let the ADK Runner handle the execution stream
 
-        logger.info(f"Agent response for session {request.session_id}: {agent_text}")
-
-        # 2. Retrieve the updated session state to check for conflicts
+        # 2. Retrieve the updated session state to extract the final response and check conflicts
         session = await runner.session_service.get_session(
             app_name="my_travel_aigent",
             user_id=user_id, 
             session_id=request.session_id
         )
         
+        # Extract the most recent agent message directly from the persisted session history
+        agent_text = ""
+        if session and getattr(session, "events", []):
+            for event in reversed(session.events):
+                content = getattr(event, "content", None)
+                if content and getattr(content, "role", "") != "user":
+                    texts = [getattr(p, "text", "") for p in getattr(content, "parts", []) if getattr(p, "text", "")]
+                    if texts:
+                        agent_text = "".join(texts)
+                        break
+
+        # Fallback if the agent executed a tool but didn't generate conversational text
+        if not agent_text.strip():
+            agent_text = "I have updated your itinerary based on your request! What would you like to adjust next?"
+
+        logger.info(f"Agent response for session {request.session_id}: {agent_text}")
+
         is_conflict = False
         if session:
             state = getattr(session, "state", {})

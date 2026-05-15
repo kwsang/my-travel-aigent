@@ -1,5 +1,8 @@
 from typing import Any
+import logging
 from gemini_agent.clients import gmaps_client
+
+logger = logging.getLogger(__name__)
 
 def calculate_travel_time(origin: Any, destination: Any) -> tuple[int, float, str]:
     """Helper to calculate travel duration, distance in miles, and mode (walking/driving)."""
@@ -27,6 +30,6 @@ def calculate_travel_time(origin: Any, destination: Any) -> tuple[int, float, st
                 # 3. Default to driving results
                 duration_mins = element['duration_in_traffic']['value'] // 60
                 return duration_mins, distance_miles, "driving"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to calculate travel time from {origin} to {destination}: {e}")
     return 0, 0.0, "unknown"
