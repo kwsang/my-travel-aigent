@@ -1,17 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles, Calendar, AlertCircle } from 'lucide-react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles, Calendar, AlertCircle, Navigation } from 'lucide-react';
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
 import { TravelerProfile } from '@/types';
 import { parseProfileData } from '@/utils/profileUtils';
+import { APIProvider, useMapsLibrary } from '@vis.gl/react-google-maps';
 
 const getTodayString = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+const MAPS_LIBRARIES: ("places")[] = ["places"];
 
 interface ProfileModalProps {
   sessionId: string;
@@ -40,6 +43,7 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
       parsed.preferences.start_date = initialData.preferences?.start_date || getTodayString();
       parsed.preferences.end_date = initialData.preferences?.end_date;
       parsed.preferences.target_duration_days = initialData.preferences?.target_duration_days;
+      parsed.preferences.starting_location = initialData.preferences?.starting_location;
       
       setFormData(parsed);
       setStartDate(initialData.preferences?.start_date || getTodayString());
@@ -380,6 +384,18 @@ function ProfilePageThree({ formData, setFormData, startDate, setStartDate, endD
 function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+      <div className="space-y-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+          <Navigation size={14} /> Starting Location
+        </label>
+        <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || ''} libraries={MAPS_LIBRARIES as any}>
+          <LocationAutocomplete 
+            value={formData.preferences.starting_location || ''}
+            onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, starting_location: val}})}
+          />
+        </APIProvider>
+      </div>
+
       <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
         <input 
           type="checkbox"
@@ -431,5 +447,89 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
         </label>
       </div>
     </div>
+  );
+}
+
+function LocationAutocomplete({ value, onChange }: { value: string, onChange: (val: string) => void }) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const places = useMapsLibrary('places');
+  const onChangeRef = React.useRef(onChange);
+
+  React.useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  React.useEffect(() => {
+    if (!places || !inputRef.current) return;
+
+    const autocomplete = new places.Autocomplete(inputRef.current, {
+      types: ['(cities)'],
+      fields: ['formatted_address', 'name']
+    });
+
+    const listener = autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place.formatted_address) {
+        onChangeRef.current(place.formatted_address);
+      } else if (place.name) {
+        onChangeRef.current(place.name);
+      }
+    });
+
+    return () => {
+      if (listener) listener.remove();
+    };
+  }, [places]);
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .pac-container {
+          background-color: #020617; /* Tailwind Slate 950 */
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 0.75rem;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+          z-index: 9999;
+          font-family: inherit;
+          margin-top: 4px;
+        }
+        .pac-item {
+          padding: 10px 14px;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          color: rgba(255, 255, 255, 0.6);
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+        .pac-item:first-of-type {
+          border-top: none;
+        }
+        .pac-item:hover, .pac-item-selected {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+        .pac-item-query {
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 14px;
+          padding-right: 4px;
+        }
+        .pac-matched {
+          color: #818cf8; /* Tailwind Indigo 400 */
+        }
+        .pac-icon {
+          display: none; /* Hide default dated pin icons */
+        }
+        .pac-logo:after {
+          filter: invert(0.8);
+          opacity: 0.5;
+        }
+      ` }} />
+      <input 
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+        placeholder="e.g. New York, USA"
+      />
+    </>
   );
 }

@@ -43,6 +43,7 @@ class UserProfilePreferences(BaseModel):
     group_planning_per_person: bool = Field(default=False)
     transport_preference: Literal['public', 'rideshare', 'rental'] = Field(default='public')
     personal_transport_available: bool = Field(default=False)
+    starting_location: Optional[str] = Field(default=None, description="The origin location for the trip.")
     start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM-DD")
     end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM-DD")
     target_duration_days: Optional[int] = Field(default=None, description="Target trip duration")

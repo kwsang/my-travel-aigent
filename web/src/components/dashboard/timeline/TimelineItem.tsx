@@ -1,6 +1,6 @@
 import React from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { Sparkles, GripVertical, Star } from 'lucide-react';
+import { Sparkles, GripVertical, Star, Plane } from 'lucide-react';
 import { Event } from '@/types';
 import { SegmentType, SegmentIcons, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
 import { formatTime } from '@/utils/dateUtils';
@@ -65,7 +65,9 @@ export default function TimelineItem({
       onClick={() => setActiveSegmentIndex(absoluteIndex)}
       onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
       onMouseLeave={() => setHoveredSegmentIndex?.(null)}
-      className={`relative rounded-xl border border-border bg-card/50 p-4 shadow-sm transition-all cursor-pointer active:cursor-grab group ${
+      className={`relative rounded-xl border p-4 shadow-sm transition-all cursor-pointer active:cursor-grab group ${
+        event.segment === 'FLIGHT' ? 'border-sky-500/30 bg-sky-500/5' : 'border-border bg-card/50'
+      } ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
       } ${
         dragOverIndex === absoluteIndex && draggedIndex !== absoluteIndex ? 'mt-20 before:content-["Drop_Here"] before:flex before:items-center before:justify-center before:text-[11px] before:font-bold before:text-primary before:uppercase before:tracking-widest before:absolute before:-top-16 before:left-0 before:right-0 before:h-12 before:border-2 before:border-dashed before:border-primary/60 before:rounded-xl before:bg-primary/10' : ''
@@ -73,7 +75,8 @@ export default function TimelineItem({
         activeSegmentIndex === absoluteIndex 
           ? 'ring-2 ring-primary shadow-md bg-card' 
           : (hoveredSegmentIndex === absoluteIndex ? 'ring-1 ring-primary/50 shadow-md bg-card' : 'hover:shadow-md hover:bg-card')
-      }`}
+      } animate-in fade-in slide-in-from-left-8 duration-500`}
+      style={{ animationFillMode: 'backwards', animationDelay: `${(absoluteIndex % 15) * 150}ms` }}
     >
       <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
         <GripVertical size={14} />
@@ -97,9 +100,19 @@ export default function TimelineItem({
                   )}
                 </div>
               )}
-              <h4 className="font-semibold text-foreground leading-tight">{event.details?.name || 'Unnamed Event'}</h4>
+              {event.segment === 'FLIGHT' && (event.details as any)?.from && (event.details as any)?.to ? (
+                <h4 className="font-semibold text-foreground leading-tight flex items-center gap-2">
+                  {(event.details as any).from} <Plane size={14} className="text-muted-foreground" /> {(event.details as any).to}
+                </h4>
+              ) : (
+                <h4 className="font-semibold text-foreground leading-tight">{event.details?.name || (event.segment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')}</h4>
+              )}
             </div>
-          <p className="text-sm text-muted-foreground">{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
+            {event.segment === 'FLIGHT' && (event.details as any)?.airline ? (
+              <p className="text-sm font-medium text-sky-500/80">{(event.details as any).airline}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
+            )}
           </div>
           <div className="text-right flex flex-col items-end gap-1 shrink-0">
             <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule?.local_start_time)}</time>
