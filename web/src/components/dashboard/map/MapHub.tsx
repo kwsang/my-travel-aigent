@@ -68,6 +68,17 @@ function MapInner() {
 
   const [popularDestinations, setPopularDestinations] = React.useState<{name: string; lat: number; lng: number; emoji: string}[]>([]);
 
+  const [destinationInfo, setDestinationInfo] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (itinerary.destination) {
+      fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => setDestinationInfo(data))
+        .catch(err => console.error("Failed to load destination info", err));
+    }
+  }, [itinerary.destination, itinerary.updated_at]);
+
   React.useEffect(() => {
     if (segments.length === 0 && popularDestinations.length === 0) {
       fetch(`${API_CONFIG.BASE_URL}/destinations/popular`)
@@ -91,21 +102,21 @@ function MapInner() {
   const mapCenter = React.useMemo(() => {
     const defaultCenter = { lat: 39.8283, lng: -98.5795 }; // Center on continental US
     const centerSegment = segments.find((s: Event) => s.geo || s.details?.geo);
-    const geo = centerSegment?.geo || centerSegment?.details?.geo;
+    const geo = centerSegment?.geo || centerSegment?.details?.geo || itinerary.accommodation?.geo || itinerary.accommodation?.details?.geo || itinerary.accommodation?.location;
     if (geo) {
       return { lat: geo.latitude, lng: geo.longitude };
     }
     
-    if (itinerary.suggested_accommodations && itinerary.suggested_accommodations.length > 0) {
-      const firstSugg = itinerary.suggested_accommodations[0];
+    if (destinationInfo?.suggested_accommodations && destinationInfo.suggested_accommodations.length > 0) {
+      const firstSugg = destinationInfo.suggested_accommodations[0];
       const suggGeo = firstSugg.geo || firstSugg.details?.geo || firstSugg.location;
       if (suggGeo) {
         return { lat: suggGeo.latitude, lng: suggGeo.longitude };
       }
     }
 
-    if (itinerary.suggested_activities && itinerary.suggested_activities.length > 0) {
-      const firstSugg = itinerary.suggested_activities[0];
+    if (destinationInfo?.suggested_activities && destinationInfo.suggested_activities.length > 0) {
+      const firstSugg = destinationInfo.suggested_activities[0];
       const suggGeo = firstSugg.geo || firstSugg.details?.geo || firstSugg.location;
       if (suggGeo) {
         return { lat: suggGeo.latitude, lng: suggGeo.longitude };
@@ -117,7 +128,7 @@ function MapInner() {
       return { lat: dest.lat, lng: dest.lng };
     }
     return defaultCenter;
-  }, [segments, itinerary.destination, popularDestinations, itinerary.suggested_accommodations, itinerary.suggested_activities]);
+  }, [segments, itinerary.destination, itinerary.accommodation, popularDestinations, destinationInfo?.suggested_accommodations, destinationInfo?.suggested_activities]);
 
   // Generate the sequential path for the polyline
   const routePath = React.useMemo(() => {
@@ -228,7 +239,7 @@ function MapInner() {
         map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.setZoom(15);
       }
-    } else if (routePath.length > 0 || itinerary.suggested_accommodations?.length || itinerary.suggested_activities?.length) {
+    } else if (routePath.length > 0 || itinerary.accommodation || destinationInfo?.suggested_accommodations?.length || destinationInfo?.suggested_activities?.length) {
       // Zoom to fit all segments and suggestions if no active segment is selected
       const bounds = new (window as any).google.maps.LatLngBounds();
       let pointCount = 0;
@@ -240,7 +251,17 @@ function MapInner() {
         lastPoint = pos;
       });
 
-      itinerary.suggested_accommodations?.forEach((place: any) => {
+      if (itinerary.accommodation) {
+        const geo = itinerary.accommodation.geo || itinerary.accommodation.details?.geo || itinerary.accommodation.location;
+        if (geo) {
+          const pos = { lat: geo.latitude, lng: geo.longitude };
+          bounds.extend(pos);
+          pointCount++;
+          lastPoint = pos;
+        }
+      }
+
+      destinationInfo?.suggested_accommodations?.forEach((place: any) => {
         const geo = place.geo || place.details?.geo || place.location;
         if (geo) {
           const pos = { lat: geo.latitude, lng: geo.longitude };
@@ -250,7 +271,7 @@ function MapInner() {
         }
       });
 
-      itinerary.suggested_activities?.forEach((place: any) => {
+      destinationInfo?.suggested_activities?.forEach((place: any) => {
         const geo = place.geo || place.details?.geo || place.location;
         if (geo) {
           const pos = { lat: geo.latitude, lng: geo.longitude };
@@ -266,7 +287,7 @@ function MapInner() {
       } else if (pointCount > 1) {
         map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
-    } else if (segments.length === 0) {
+    } else if (segments.length === 0 && !itinerary.accommodation) {
       const dest = popularDestinations.find(d => d.name === itinerary.destination);
       if (dest) {
         map.panTo({ lat: dest.lat, lng: dest.lng });
@@ -276,7 +297,7 @@ function MapInner() {
         map.panTo({ lat: 39.8283, lng: -98.5795 });
       }
     }
-  }, [map, activeSegmentIndex, routePath, segments, itinerary.destination, popularDestinations, itinerary.suggested_accommodations, itinerary.suggested_activities]);
+  }, [map, activeSegmentIndex, routePath, segments, itinerary.destination, itinerary.accommodation, popularDestinations, destinationInfo?.suggested_accommodations, destinationInfo?.suggested_activities]);
 
   return (
     <>
@@ -310,7 +331,7 @@ function MapInner() {
             </AdvancedMarker>
           ))}
 
-          {itinerary.suggested_accommodations?.map((place: any, idx: number) => {
+          {destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => {
             const geo = place.geo || place.details?.geo || place.location;
             if (!geo) return null;
             
@@ -354,7 +375,7 @@ function MapInner() {
             );
           })}
 
-          {itinerary.suggested_activities?.map((place: any, idx: number) => {
+          {destinationInfo?.suggested_activities?.map((place: any, idx: number) => {
             const geo = place.geo || place.details?.geo || place.location;
             if (!geo) return null;
             
@@ -446,7 +467,7 @@ function MapInner() {
           </div>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none mb-1">Destination</span>
-            <span className="text-base font-black text-foreground tracking-tight leading-none">{primaryDestination as React.ReactNode}</span>
+            <span className="text-base font-black text-foreground tracking-tight leading-none hover:bg-accent hover:text-accent-foreground px-1.5 py-0.5 -ml-1.5 rounded-md transition-colors duration-200 cursor-default pointer-events-auto">{primaryDestination as React.ReactNode}</span>
           </div>
         </div>
         

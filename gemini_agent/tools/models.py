@@ -42,6 +42,8 @@ class Destination(BaseModel):
     description: str
     location: GeoPoint
     vibe_tags: List[str]
+    suggested_accommodations: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    suggested_activities: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
 
 class Itinerary(BaseModel):
     user_id: str = ""  # Default prevents the AI from needing to hallucinate this
@@ -52,3 +54,4 @@ class Itinerary(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     budget: Optional[Budget] = None
     traveler_profile: Optional[TravelerProfile] = None
+    accommodation: Optional[Dict[str, Any]] = None

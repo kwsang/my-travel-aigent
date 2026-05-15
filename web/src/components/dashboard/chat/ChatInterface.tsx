@@ -131,8 +131,6 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
         // Sanitize incoming itinerary to ensure arrays are not null
         setItinerary({
           ...data.itinerary,
-          suggested_accommodations: data.itinerary.suggested_accommodations || [],
-          suggested_activities: data.itinerary.suggested_activities || [],
           events: data.itinerary.events || [],
         });
       }
@@ -183,12 +181,16 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       
       if (place && !isLoading) {
         const placeName = place.details?.name || place.displayName?.text || place.name || 'that accommodation';
+        const placeData = {
+          name: placeName,
+          geo: place.geo || place.details?.geo || place.location,
+          price: place.details?.price || place.priceLevel || place.price_tier || place.price,
+          rating: place.details?.rating || place.rating
+        };
         
-        // Optimistically clear the suggestions from the map
-        const updatedItinerary = { ...itinerary, suggested_accommodations: [] };
-        if (setItinerary) setItinerary(updatedItinerary);
+        const updatedItinerary = { ...itinerary };
         
-        sendMessage(`Great, please select "${placeName}" as my accommodation and build out the rest of my itinerary with activities and dining.`, updatedItinerary);
+        sendMessage(`Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details, and then review the budget and adjust any surrounding activities if necessary.`, updatedItinerary);
       }
     };
 
@@ -204,12 +206,16 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       
       if (place && !isLoading) {
         const placeName = place.details?.name || place.displayName?.text || place.name || 'that option';
+        const placeData = {
+          name: placeName,
+          geo: place.geo || place.details?.geo || place.location,
+          price: place.details?.price || place.priceLevel || place.price_tier || place.price,
+          rating: place.details?.rating || place.rating
+        };
         
-        // Optimistically clear the suggestions from the map
-        const updatedItinerary = { ...itinerary, suggested_activities: [] };
-        if (setItinerary) setItinerary(updatedItinerary);
+        const updatedItinerary = { ...itinerary };
         
-        sendMessage(`Awesome, please add "${placeName}" to my itinerary.`, updatedItinerary);
+        sendMessage(`Please add this specific activity to my itinerary:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nFind a good time slot for it, update the events list, and verify the budget and travel times.`, updatedItinerary);
       }
     };
 

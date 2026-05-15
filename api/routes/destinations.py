@@ -1,5 +1,5 @@
 import random
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from api.dependencies import get_db
 
@@ -50,3 +50,15 @@ async def get_popular_destinations(limit: int = 8, db: AsyncIOMotorDatabase = De
             "emoji": emoji
         })
     return result
+
+@router.get("/{name}")
+async def get_destination(name: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+    """Fetch a specific destination by name."""
+    search_name = name.split(',')[0].strip()
+    dest = await db.destinations.find_one({"name": {"$regex": f"^{search_name}", "$options": "i"}})
+    
+    if not dest:
+        raise HTTPException(status_code=404, detail="Destination not found")
+        
+    dest["_id"] = str(dest["_id"])
+    return dest

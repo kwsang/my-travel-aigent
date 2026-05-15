@@ -5,6 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from api.dependencies import get_current_user, get_db, get_session_db
 from gemini_agent.logic.models import Itinerary, ItineraryPatchRequest
+from gemini_agent.logic.models import TravelerProfile
 from gemini_agent.logic.validate_buffers import (
     validate_itinerary_structure, 
     validate_itinerary_budget
@@ -34,6 +35,7 @@ async def list_itineraries(
         doc["party_size_total"] = doc.get("party_size_total") or 1
         doc["status"] = doc.get("status", "draft")
         doc["destination"] = doc.get("destination")
+        doc["accommodation"] = doc.get("accommodation")
         doc.setdefault("is_conflict", False)
         doc.setdefault("validation_errors", [])
     return docs
@@ -62,6 +64,7 @@ async def get_itinerary(
                 "events": [],
                 "trip_name": "New Trip",
                 "destination": None,
+                "accommodation": None,
                 "duration_days": 0,
                 "party_size_total": 1,
                 "status": "draft",
@@ -79,9 +82,10 @@ async def get_itinerary(
         all_errors = []
 
         if traveler_profile and itinerary_doc.get("events"):
-            prefs = traveler_profile.get("preferences", {})
-            risk = prefs.get("risk_tolerance", "relaxed")
-            vibe = prefs.get("circadian_preference", "night_owl")
+            # Rely on Pydantic to provide default risk and vibe preferences automatically
+            profile_model = TravelerProfile.model_validate(traveler_profile)
+            risk = profile_model.preferences.risk_tolerance
+            vibe = profile_model.preferences.circadian_preference
             
             struct_errors = validate_itinerary_structure(itinerary_doc, risk, vibe, traveler_profile)
             _, budget_errors = validate_itinerary_budget(itinerary_doc, traveler_profile)
@@ -96,6 +100,7 @@ async def get_itinerary(
         itinerary_doc.setdefault("duration_days", 0)
         itinerary_doc.setdefault("party_size_total", traveler_profile.get("party_size", 1) if traveler_profile else 1)
         itinerary_doc.setdefault("destination", None)
+        itinerary_doc.setdefault("accommodation", None)
         itinerary_doc["_id"] = str(itinerary_doc["_id"])
         itinerary_doc["is_conflict"] = is_conflict
         itinerary_doc["validation_errors"] = all_errors
@@ -132,6 +137,7 @@ async def update_itinerary(
                 "events": [],
                 "trip_name": "New Trip",
                 "destination": None,
+                "accommodation": None,
                 "duration_days": 0,
                 "party_size_total": 1,
                 "status": "draft",
@@ -159,9 +165,10 @@ async def update_itinerary(
         # Prepare the full itinerary object for validation
         itinerary = {**itinerary_doc, **update_data}
 
-        prefs = profile_for_val.get("preferences", {})
-        risk = prefs.get("risk_tolerance", "relaxed")
-        vibe = prefs.get("circadian_preference", "night_owl")
+        # Rely on Pydantic to provide default risk and vibe preferences automatically
+        profile_model = TravelerProfile.model_validate(profile_for_val)
+        risk = profile_model.preferences.risk_tolerance
+        vibe = profile_model.preferences.circadian_preference
 
         all_errors = []
         is_conflict = False
@@ -191,6 +198,7 @@ async def update_itinerary(
         itinerary_doc["duration_days"] = itinerary_doc.get("duration_days") or 0
         itinerary_doc["party_size_total"] = itinerary_doc.get("party_size_total") or profile_for_val.get("party_size", 1)
         itinerary_doc["destination"] = itinerary_doc.get("destination")
+        itinerary_doc["accommodation"] = itinerary_doc.get("accommodation")
         itinerary_doc["status"] = itinerary_doc.get("status", "draft")
         itinerary_doc["is_conflict"] = bool(is_conflict)
         itinerary_doc["validation_errors"] = all_errors or []

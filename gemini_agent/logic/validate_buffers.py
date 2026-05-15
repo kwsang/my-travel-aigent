@@ -1,5 +1,6 @@
 import datetime
 import math
+from gemini_agent.logic.models import TravelerProfile
 
 def calculate_buffer(traffic_estimate: int, local_time_str: str, risk_tolerance: str) -> int:
     """
@@ -95,16 +96,18 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
 
     print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Vibe: {circadian_pref})...")
     errors = []
+    
+    # Use Pydantic to ensure all fallback values are populated safely
+    profile = TravelerProfile.model_validate(user_prefs or {})
 
     # Establish the trip's start date to verify the 'day' property increments correctly
     start_date = None
-    if user_prefs:
-        start_date_str = user_prefs.get("preferences", {}).get("start_date")
-        if start_date_str:
-            try:
-                start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            except ValueError:
-                pass
+    start_date_str = profile.preferences.start_date
+    if start_date_str:
+        try:
+            start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
                 
     if not start_date:
         valid_start_times = [
@@ -222,7 +225,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                     errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap:.1f}h gap and no accommodation block.")
 
         # 5. Transport Logic Check (Preference & Necessity)
-        if user_prefs and user_prefs.get("personal_transport_available") is True:
+        if profile.preferences.personal_transport_available:
             rentals = [e for e in day_events if e.get("segment") == "TRANSPORT" and e.get("details", {}).get("is_rental") is True]
             if rentals:
                 errors.append(f"FAIL: Rental car suggested on {day} despite personal transport being available.")
@@ -316,26 +319,16 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
     if not events:
         return True, []
 
-    # Extract party size: support both new flat int and legacy dict structure
-    party_raw = user_prefs.get('party_size', 1)
-    if isinstance(party_raw, dict):
-        adults = party_raw.get('adults', 1)
-        children = party_raw.get('children', 0)
-    else:
-        adults = party_raw
-        children = 0
-
-    total_people = adults + children
-    
-    # Extract per-person toggle from nested preferences
-    prefs = user_prefs.get('preferences', {})
-    per_person_toggle = prefs.get('group_planning_per_person', user_prefs.get('group_planning_per_person', False))
+    # Leverage Pydantic to seamlessly handle dict/int conversions and provide standard defaults
+    profile = TravelerProfile.model_validate(user_prefs or {})
+    total_people = profile.party_size
+    per_person_toggle = profile.preferences.group_planning_per_person
+    room_sharing = profile.room_sharing
+    people_per_room = profile.people_per_room
 
     print(f"Validating Budget (Group Size: {total_people}, Per-Person: {per_person_toggle})...")
     total_cost = 0.0
     limit = itinerary.get('budget', {}).get('total_limit', 0)
-    room_sharing = user_prefs.get('room_sharing', False)
-    people_per_room = user_prefs.get('people_per_room', 2)
 
     errors = []
 
@@ -345,7 +338,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
         return False
 
     for event in itinerary.get("events", []):
-        price_data = event.get("details", {}).get("price") or {}
+        price_data = (event.get("details") or {}).get("price") or {}
         if price_data:
             # Ensure 'is_estimated' flag is correctly set (defaults to True if omitted by LLM)
             if not isinstance(price_data.get("is_estimated", True), bool):
@@ -355,15 +348,14 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
         
         if event["segment"] == "ACCOMMODATION":
             if room_sharing:
-                # Account for specific room density (e.g., 2 people/1 room for couples)
+                # Account for specific room density
                 num_rooms = math.ceil(total_people / people_per_room)
                 total_cost += (base_amt * num_rooms)
             else:
                 # No sharing: one room per person
                 total_cost += (base_amt * total_people)
         elif event["segment"] == "DINING":
-            # Apply 50% child pricing rule (Rule 4 in SYSTEM_PROMPT.md)
-            total_cost += (base_amt * adults) + (base_amt * 0.5 * children)
+            total_cost += (base_amt * total_people)
         elif event["segment"] == "TRANSPORT":
             # Transport is priced per vehicle, not per person
             v_count = event.get("details", {}).get("vehicle_count", 1)
@@ -640,11 +632,13 @@ def run_scenario_5_validation():
 
     user_prefs = {
         "party_size": {"adults": 12, "children": 0},
-        "group_planning_per_person": True,
         "room_sharing": True,
         "people_per_room": 3,
-        "transport_preference": "rideshare",
-        "personal_transport_available": False,
+        "preferences": {
+            "group_planning_per_person": True,
+            "transport_preference": "rideshare",
+            "personal_transport_available": False,
+        }
     }
 
     # Mock adding prices for the validation

@@ -64,11 +64,10 @@ export interface Itinerary {
   budget?: Budget;
   status?: 'draft' | 'final';
   destination?: string; // Add this line!
+  accommodation?: any;
   updated_at: string;
   is_conflict: boolean;
   validation_errors: string[];
-  suggested_accommodations?: any[];
-  suggested_activities?: any[];
   traveler_profile?: TravelerProfile;
 }
 

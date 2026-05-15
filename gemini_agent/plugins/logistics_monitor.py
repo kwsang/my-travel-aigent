@@ -2,6 +2,7 @@ import json
 import logging
 from google.adk.plugins.base_plugin import BasePlugin
 from gemini_agent.tools.utils import calculate_travel_time
+from gemini_agent.logic.models import TravelerProfile
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class LogisticsMonitorPlugin(BasePlugin):
         text = " ".join([p.text for p in user_message.parts if p.text]).lower()
         
         # Defensive state retrieval: Context > Session > Empty
-        state = getattr(invocation_context, "state", getattr(invocation_context.session, "state", {}))
+        state = getattr(invocation_context, "state", None) or getattr(invocation_context.session, "state", None) or {}
         
         # Common confirmation markers
         confirmation_markers = ["looks good", "perfect", "that works", "great", "confirmed", "satisfied"]
@@ -46,10 +47,10 @@ class LogisticsMonitorPlugin(BasePlugin):
 
             top_venue = venues[0]
             # Defensive state retrieval: Context > Session > Empty
-            state = getattr(tool_context, "state", getattr(tool_context.session, "state", {}))
+            state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
             
             # Check if this is a hotel to set the anchor for the session
-            is_lodging = any(t in ["hotel", "lodging"] for t in top_venue.get("types", []))
+            is_lodging = any(t in ["hotel", "lodging"] for t in (top_venue.get("types") or []))
             
             if is_lodging:
                 state["anchor_geo"] = top_venue["geo"]
@@ -60,9 +61,10 @@ class LogisticsMonitorPlugin(BasePlugin):
                 anchor_name = state.get("anchor_name")
                 
                 if anchor_geo:
-                    # Resolve personalized proximity threshold from user preferences
-                    prefs = state.get("user_profile_data", {}).get("preferences", {})
-                    density = prefs.get("activity_density", "medium")
+                    # Resolve personalized proximity threshold using Pydantic defaults
+                    raw_profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
+                    profile = TravelerProfile.model_validate(raw_profile)
+                    density = profile.preferences.activity_density
                     threshold_map = {"high": 15, "medium": 30, "low": 60}
                     threshold = threshold_map.get(density, 30)
 

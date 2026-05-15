@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { API_CONFIG } from '@/config/constants';
 
-import { Loader2, AlertTriangle, ChevronDown, CalendarRange } from 'lucide-react';
+import { Loader2, AlertTriangle, ChevronDown, CalendarRange, Bed } from 'lucide-react';
 import TimelineItem from './TimelineItem';
 import { Event } from '@/types';
 import { recalculateTimelineCascade } from './timelineUtils';
@@ -112,6 +112,25 @@ export default function TimelineView() {
     </div>
   ) : null;
 
+  const accommodationHeader = itinerary.accommodation ? (
+    <div className="flex items-center justify-between bg-card/80 backdrop-blur-md border border-border rounded-xl px-4 py-3 mb-2 shadow-sm animate-in fade-in slide-in-from-top-4">
+      <div className="flex items-center gap-3">
+        <div className="bg-violet-500/20 p-2 rounded-lg text-violet-500">
+          <Bed size={18} />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Accommodation</span>
+          <span className="text-sm font-bold text-foreground truncate max-w-[200px] hover:bg-accent hover:text-accent-foreground px-1.5 py-0.5 -ml-1.5 rounded-md transition-colors duration-200 cursor-default">
+            {itinerary.accommodation.details?.name || itinerary.accommodation.name || 'Selected Accommodation'}
+          </span>
+        </div>
+      </div>
+      <div className="bg-violet-500/10 text-violet-500 text-xs font-bold px-2.5 py-1 rounded-md border border-violet-500/20">
+        Secured
+      </div>
+    </div>
+  ) : null;
+
   // Memoize grouped segments to prevent O(D * S) filtering loops on every render
   const segmentsByDay = React.useMemo(() => {
     const grouped = new Map<number, { event: Event; absoluteIndex: number }[]>();
@@ -126,6 +145,7 @@ export default function TimelineView() {
     return (
       <div className="flex flex-col gap-4 py-4">
         {dateHeader}
+        {accommodationHeader}
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-12 text-muted-foreground">
           <p className="text-lg font-medium">Your timeline is empty.</p>
           <p className="text-sm">Tell the Architect what you want to do!</p>
@@ -217,6 +237,7 @@ export default function TimelineView() {
       )}
       
       {dateHeader}
+      {accommodationHeader}
 
       {/* Validation Errors / Overlap Warnings Banner */}
       {itinerary.is_conflict && itinerary.validation_errors && itinerary.validation_errors.length > 0 && (

@@ -11,10 +11,15 @@ from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import Op
 
 from gemini_agent.plugins.logistics_monitor import LogisticsMonitorPlugin
 from gemini_agent.plugins.timing_plugin import ExecutionTimingPlugin
+from gemini_agent.logic.models import TravelerProfile
 from gemini_agent.tools.tools import (
     record_user_profile, 
     search_destinations, 
     discover_new_destination, 
+    save_destination_accommodations,
+    save_destination_activities,
+    get_cached_accommodations,
+    get_cached_activities,
     search_places,
     query_user_profile,
     get_itinerary,
@@ -37,6 +42,10 @@ def create_travel_agent():
     record_profile_tool = FunctionTool(func=record_user_profile)
     search_tool = FunctionTool(func=search_destinations)
     discovery_tool = FunctionTool(func=discover_new_destination)
+    save_dest_acc_tool = FunctionTool(func=save_destination_accommodations)
+    save_dest_act_tool = FunctionTool(func=save_destination_activities)
+    get_cached_acc_tool = FunctionTool(func=get_cached_accommodations)
+    get_cached_act_tool = FunctionTool(func=get_cached_activities)
     places_search_tool = FunctionTool(func=search_places)
     events_tool = FunctionTool(func=search_local_events)
     retrieve_itinerary_tool = FunctionTool(func=get_itinerary)
@@ -71,13 +80,13 @@ def create_travel_agent():
 
     # Helper to safely parse stringified JSON states for prompt injection
     def _get_safe_state(ctx: Context):
-        state = getattr(ctx, "state", getattr(ctx.session, "state", {}))
-        itinerary = state.get("final_itinerary", {})
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+        itinerary = state.get("final_itinerary") or {}
         if isinstance(itinerary, str):
             try: itinerary = json.loads(itinerary)
             except: itinerary = {}
             
-        profile = state.get("traveler_profile") or state.get("user_profile_data", {})
+        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
         if isinstance(profile, str):
             try: profile = json.loads(profile)
             except: profile = {}
@@ -126,7 +135,7 @@ def create_travel_agent():
         prompt += "\n\nFORMATTING RULE: Use Markdown H3 headers ('### Section Name') for all major itinerary components (e.g., '### Accommodation', '### Transport', '### Dining', '### Day 1'). Do not use these headers for regular text."
         
         # Explicitly enforce exact dates if they exist in the profile
-        prefs = profile.get("preferences", {})
+        prefs = profile.get("preferences") or {}
         start_date = prefs.get("start_date")
         end_date = prefs.get("end_date")
         duration = prefs.get("target_duration_days")
@@ -143,10 +152,10 @@ def create_travel_agent():
         profile, itinerary = _get_safe_state(ctx)
         prompt = pioneer_goal
         
-        prefs = profile.get("preferences", {})
-        start_date = prefs.get("start_date")
-        end_date = prefs.get("end_date")
-        duration = prefs.get("target_duration_days")
+        profile_model = TravelerProfile.model_validate(profile)
+        start_date = profile_model.preferences.start_date
+        end_date = profile_model.preferences.end_date
+        duration = profile_model.preferences.target_duration_days
 
         if start_date and end_date:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST be scheduled strictly between {start_date} and {end_date} (Duration: {duration} Days). Day 1 MUST begin on {start_date}."
@@ -159,10 +168,11 @@ def create_travel_agent():
         profile, itinerary = _get_safe_state(ctx)
         prompt = activity_planner_goal
         
-        prefs = profile.get("preferences", {})
-        start_date = prefs.get("start_date")
-        end_date = prefs.get("end_date")
-        duration = prefs.get("target_duration_days")
+        # Use Pydantic to ensure default constraints are safely populated
+        profile_model = TravelerProfile.model_validate(profile)
+        start_date = profile_model.preferences.start_date
+        end_date = profile_model.preferences.end_date
+        duration = profile_model.preferences.target_duration_days
 
         if start_date and end_date:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST be scheduled strictly between {start_date} and {end_date} (Duration: {duration} Days)."
@@ -176,7 +186,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=get_pioneer_instructions,
-        tools=[search_tool, discovery_tool, places_search_tool, traffic_tool, persist_tool],
+        tools=[search_tool, discovery_tool, get_cached_acc_tool, save_dest_acc_tool, places_search_tool, traffic_tool, persist_tool],
         description="Specializes in geographic anchoring, transportation, and finding the perfect destination and accommodation."
     )
 
@@ -185,7 +195,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=get_activity_planner_instructions,
-        tools=[places_search_tool, events_tool, traffic_tool, persist_tool],
+        tools=[places_search_tool, events_tool, get_cached_act_tool, save_dest_act_tool, traffic_tool, persist_tool],
         description="Fills the itinerary with incredible EXPERIENCE and DINING segments that match the user's interests, vibe, and circadian rhythm."
     )
 
@@ -211,10 +221,10 @@ def create_travel_agent():
     # 4.3 Supervisor: The Root Agent that orchestrates handoffs
     def supervisor_instructions(ctx: Context) -> str:
         # Defensive state retrieval
-        state = getattr(ctx, "state", getattr(ctx.session, "state", {}))
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
 
         # The chat route injects the itinerary into 'final_itinerary'
-        itinerary_data = state.get("final_itinerary", {})
+        itinerary_data = state.get("final_itinerary") or {}
         if isinstance(itinerary_data, str):
             try: itinerary_data = json.loads(itinerary_data)
             except: itinerary_data = {}

@@ -37,7 +37,7 @@ async def chat(
             update_state = {}
             if request.traveler_profile is not None:
                 update_state["data.state.traveler_profile"] = request.traveler_profile
-                prefs = request.traveler_profile.get("preferences", {})
+                prefs = request.traveler_profile.get("preferences") or {}
                 logger.info(f"Injected Profile Constraints - Start: {prefs.get('start_date')}, End: {prefs.get('end_date')}, Days: {prefs.get('target_duration_days')}")
 
             if request.itinerary is not None:
@@ -76,7 +76,8 @@ async def chat(
             for event in reversed(session.events):
                 content = getattr(event, "content", None)
                 if content and getattr(content, "role", "") != "user":
-                    texts = [getattr(p, "text", "") for p in getattr(content, "parts", []) if getattr(p, "text", "")]
+                    parts = getattr(content, "parts", None) or []
+                    texts = [getattr(p, "text", "") for p in parts if getattr(p, "text", "")]
                     if texts:
                         agent_text = "".join(texts)
                         break
@@ -89,7 +90,7 @@ async def chat(
 
         is_conflict = False
         if session:
-            state = getattr(session, "state", {})
+            state = getattr(session, "state", None) or {}
             itinerary = state.get("final_itinerary")
             user_profile = state.get("traveler_profile") or state.get("user_profile_data")
             
@@ -141,7 +142,7 @@ async def chat(
             itinerary["validation_errors"] = []
             
             if isinstance(user_profile, dict) and itinerary.get("events"):
-                prefs = user_profile.get("preferences", {})
+                prefs = user_profile.get("preferences") or {}
                 if isinstance(prefs, str):
                     try: prefs = json.loads(prefs)
                     except: prefs = {}

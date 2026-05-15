@@ -90,3 +90,85 @@ async def discover_new_destination(vibe_or_city: str) -> str:
         return f"SUCCESS: Added '{place.display_name.text}' to the atlas."
     except Exception as e:
         return f"Discovery failed: {str(e)}"
+
+async def save_destination_accommodations(destination_name: str, accommodations: list[dict]) -> str:
+    """
+    Saves a list of suggested accommodations to a specific destination in the atlas.
+    Useful for caching great hotel options for a city so users can browse them later.
+    """
+    try:
+        if destinations_collection is None:
+            return "Error: Destination database connection is currently unavailable."
+            
+        search_name = destination_name.split(',')[0].strip()
+        result = await destinations_collection.update_one(
+            {"name": {"$regex": f"^{search_name}", "$options": "i"}},
+            {"$set": {"suggested_accommodations": accommodations}}
+        )
+        
+        if result.matched_count == 0:
+            return f"Error: Destination '{destination_name}' not found in the atlas. Use discover_new_destination first."
+            
+        return f"SUCCESS: Accommodations saved to destination '{destination_name}'."
+    except Exception as e:
+        return f"Error saving accommodations to destination: {str(e)}"
+
+async def save_destination_activities(destination_name: str, activities: list[dict]) -> str:
+    """
+    Saves a list of suggested activities to a specific destination in the atlas.
+    Useful for caching great experience and dining options for a city so users can browse them later.
+    """
+    try:
+        if destinations_collection is None:
+            return "Error: Destination database connection is currently unavailable."
+            
+        search_name = destination_name.split(',')[0].strip()
+        result = await destinations_collection.update_one(
+            {"name": {"$regex": f"^{search_name}", "$options": "i"}},
+            {"$set": {"suggested_activities": activities}}
+        )
+        
+        if result.matched_count == 0:
+            return f"Error: Destination '{destination_name}' not found in the atlas. Use discover_new_destination first."
+            
+        return f"SUCCESS: Activities saved to destination '{destination_name}'."
+    except Exception as e:
+        return f"Error saving activities to destination: {str(e)}"
+
+async def get_cached_accommodations(destination_name: str) -> str:
+    """
+    Retrieves a list of highly recommended, pre-cached accommodations for a specific destination from the database.
+    Always use this before falling back to search_places.
+    """
+    try:
+        if destinations_collection is None:
+            return "Error: Destination database connection is currently unavailable."
+            
+        search_name = destination_name.split(',')[0].strip()
+        dest = await destinations_collection.find_one({"name": {"$regex": f"^{search_name}", "$options": "i"}})
+        
+        if dest and dest.get("suggested_accommodations"):
+            return json.dumps(dest["suggested_accommodations"], default=str)
+            
+        return "No cached accommodations found. Please use the search_places tool instead."
+    except Exception as e:
+        return f"Error fetching cached accommodations: {str(e)}"
+
+async def get_cached_activities(destination_name: str) -> str:
+    """
+    Retrieves a list of highly recommended, pre-cached activities and dining options for a specific destination from the database.
+    Always use this before falling back to search_places.
+    """
+    try:
+        if destinations_collection is None:
+            return "Error: Destination database connection is currently unavailable."
+            
+        search_name = destination_name.split(',')[0].strip()
+        dest = await destinations_collection.find_one({"name": {"$regex": f"^{search_name}", "$options": "i"}})
+        
+        if dest and dest.get("suggested_activities"):
+            return json.dumps(dest["suggested_activities"], default=str)
+            
+        return "No cached activities found. Please use the search_places tool instead."
+    except Exception as e:
+        return f"Error fetching cached activities: {str(e)}"

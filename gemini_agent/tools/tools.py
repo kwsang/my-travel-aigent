@@ -9,7 +9,11 @@ from .user_management import (
 )
 from .discovery import (
     search_destinations,
-    discover_new_destination
+    discover_new_destination,
+    save_destination_accommodations,
+    save_destination_activities,
+    get_cached_accommodations,
+    get_cached_activities
 )
 
 # Placeholder for itinerary and geo tools (to be implemented similarly)

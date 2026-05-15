@@ -39,6 +39,7 @@ class EventDetails(BaseModel):
 class UserProfilePreferences(BaseModel):
     risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')
     circadian_preference: Literal['early_bird', 'night_owl'] = Field(default='night_owl')
+    activity_density: Literal['low', 'medium', 'high'] = Field(default='medium')
     group_planning_per_person: bool = Field(default=False)
     transport_preference: Literal['public', 'rideshare', 'rental'] = Field(default='public')
     personal_transport_available: bool = Field(default=False)
@@ -53,11 +54,18 @@ class TripBudget(BaseModel):
 class TravelerProfile(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     party_size: int = Field(default=1)
-    budget: Optional[TripBudget] = None
-    preferences: UserProfilePreferences
+    budget: Optional[TripBudget] = Field(default_factory=TripBudget)
+    preferences: UserProfilePreferences = Field(default_factory=UserProfilePreferences)
     room_sharing: bool = Field(default=False)
     people_per_room: int = Field(default=2)
     interests: List[str] = Field(default_factory=list)
+
+    @field_validator('party_size', mode='before')
+    @classmethod
+    def parse_party_size(cls, v):
+        if isinstance(v, dict):
+            return v.get('adults', 1) + v.get('children', 0)
+        return v
 
 class ProfileUpdateRequest(BaseModel):
     party_size: Optional[int] = None
@@ -129,6 +137,7 @@ class Itinerary(BaseModel):
     session_id: str = ""
     trip_name: str
     destination: Optional[str] = None
+    accommodation: Optional[Dict[str, Any]] = Field(None, description="The selected accommodation for the trip.")
     duration_days: int
     party_size_total: int
     status: Literal["draft", "final"] = Field(default="draft")
@@ -137,8 +146,6 @@ class Itinerary(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
-    suggested_accommodations: Optional[List[Dict[str, Any]]] = Field(None, description="A list of accommodation options suggested by the agent.")
-    suggested_activities: Optional[List[Dict[str, Any]]] = Field(None, description="A list of activity/restaurant options suggested by the agent.")
     traveler_profile: Optional[TravelerProfile] = None
 
     @field_validator('updated_at', mode='before')
@@ -152,10 +159,9 @@ class ItineraryPatchRequest(BaseModel):
     events: Optional[List[Event]] = Field(None, description="Updated events from the UI.")
     budget: Optional[TripBudget] = Field(None, description="Updated budget from the UI.")
     destination: Optional[str] = Field(None, description="Manual override for the primary destination.")
+    accommodation: Optional[Dict[str, Any]] = Field(None, description="Manual override for the accommodation.")
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
     status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
-    suggested_accommodations: Optional[List[Dict[str, Any]]] = Field(None, description="A list of accommodation options suggested by the agent.")
-    suggested_activities: Optional[List[Dict[str, Any]]] = Field(None, description="A list of activity/restaurant options suggested by the agent.")
     traveler_profile: Optional[TravelerProfile] = Field(None, description="Updated traveler profile.")
 
 class ValidationResponse(BaseModel):

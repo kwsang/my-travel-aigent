@@ -1,5 +1,7 @@
 import os
+import json
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -9,6 +11,9 @@ from api import config
 from api.services.runner_factory import create_agent_runner
 from api.routes import chat, itinerary, profile, destinations
 from dotenv import load_dotenv
+
+from gemini_agent.tools.geo_tools import search_places
+from gemini_agent.tools.discovery import save_destination_accommodations, save_destination_activities
 
 load_dotenv()
 logging.basicConfig(
@@ -24,6 +29,42 @@ logging.getLogger('httpx').setLevel(logging.DEBUG)
 
 # Shared Agent Runner
 runner = create_agent_runner()
+
+async def precache_destinations_task(app: FastAPI):
+    """Background task to autonomously fetch and cache hotels/activities for destinations."""
+    logger.info("Background pre-caching task started.")
+    while True:
+        try:
+            db = app.state.db
+            if db is not None:
+                # Find a destination missing accommodations or activities
+                dest = await db.destinations.find_one({
+                    "$or": [
+                        {"suggested_accommodations": {"$exists": False}},
+                        {"suggested_accommodations": {"$size": 0}},
+                        {"suggested_activities": {"$exists": False}},
+                        {"suggested_activities": {"$size": 0}}
+                    ]
+                })
+
+                if dest:
+                    city = dest.get("name")
+                    logger.info(f"Autonomously pre-caching missing data for: {city}")
+
+                    if not dest.get("suggested_accommodations"):
+                        hotels_json = await search_places(text_query=f"best hotels and resorts in {city}", location_type="lodging")
+                        if hotels_json:
+                            await save_destination_accommodations(city, json.loads(hotels_json)[:3])
+
+                    if not dest.get("suggested_activities"):
+                        activities_json = await search_places(text_query=f"top things to do and restaurants in {city}")
+                        if activities_json:
+                            await save_destination_activities(city, json.loads(activities_json)[:5])
+        except Exception as e:
+            logger.error(f"Error in pre-caching task: {e}")
+        
+        # Wait 5 minutes between queries to stay well under rate limits and allow background processing
+        await asyncio.sleep(300)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,8 +83,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Could not verify MongoDB TTL index: {e}")
 
+    # Start the background caching task
+    cache_task = asyncio.create_task(precache_destinations_task(app))
+
     async with runner:
         yield
+        
+    cache_task.cancel()
 
 app = FastAPI(
     title=config.APP_TITLE,
