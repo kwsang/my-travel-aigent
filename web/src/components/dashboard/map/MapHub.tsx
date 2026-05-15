@@ -107,7 +107,7 @@ function MapInner() {
       return { lat: geo.latitude, lng: geo.longitude };
     }
     
-    if (destinationInfo?.suggested_accommodations && destinationInfo.suggested_accommodations.length > 0) {
+    if (!itinerary.accommodation && destinationInfo?.suggested_accommodations && destinationInfo.suggested_accommodations.length > 0) {
       const firstSugg = destinationInfo.suggested_accommodations[0];
       const suggGeo = firstSugg.geo || firstSugg.details?.geo || firstSugg.location;
       if (suggGeo) {
@@ -239,7 +239,7 @@ function MapInner() {
         map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.setZoom(15);
       }
-    } else if (routePath.length > 0 || itinerary.accommodation || destinationInfo?.suggested_accommodations?.length || destinationInfo?.suggested_activities?.length) {
+    } else if (routePath.length > 0 || itinerary.accommodation || (!itinerary.accommodation && destinationInfo?.suggested_accommodations?.length) || destinationInfo?.suggested_activities?.length) {
       // Zoom to fit all segments and suggestions if no active segment is selected
       const bounds = new (window as any).google.maps.LatLngBounds();
       let pointCount = 0;
@@ -261,15 +261,17 @@ function MapInner() {
         }
       }
 
-      destinationInfo?.suggested_accommodations?.forEach((place: any) => {
-        const geo = place.geo || place.details?.geo || place.location;
-        if (geo) {
-          const pos = { lat: geo.latitude, lng: geo.longitude };
-          bounds.extend(pos);
-          pointCount++;
-          lastPoint = pos;
-        }
-      });
+      if (!itinerary.accommodation) {
+        destinationInfo?.suggested_accommodations?.forEach((place: any) => {
+          const geo = place.geo || place.details?.geo || place.location;
+          if (geo) {
+            const pos = { lat: geo.latitude, lng: geo.longitude };
+            bounds.extend(pos);
+            pointCount++;
+            lastPoint = pos;
+          }
+        });
+      }
 
       destinationInfo?.suggested_activities?.forEach((place: any) => {
         const geo = place.geo || place.details?.geo || place.location;
@@ -331,7 +333,7 @@ function MapInner() {
             </AdvancedMarker>
           ))}
 
-          {destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => {
+          {!itinerary.accommodation && destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => {
             const geo = place.geo || place.details?.geo || place.location;
             if (!geo) return null;
             

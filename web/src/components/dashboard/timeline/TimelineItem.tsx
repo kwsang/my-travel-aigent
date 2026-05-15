@@ -87,22 +87,21 @@ export default function TimelineItem({
             {React.createElement(SegmentIcons[event.segment as SegmentType] || DefaultIcon, { className: 'w-3 h-3' })}
             {event.segment.replace('_', ' ')}
           </span>
-          <h4 className="font-semibold text-foreground">{event.details?.name || 'Unnamed Event'}</h4>
-          <p className="text-sm text-muted-foreground">{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
-        </div>
-        <div className="text-right flex flex-col items-end gap-1">
-          <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule?.local_start_time)}</time>
-          {event.details?.rating && (
-            <div className="flex items-center gap-1 text-[10px] font-bold bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded border border-amber-500/20 shadow-sm">
-              <Star size={10} className="fill-amber-500" />
-              <span>{event.details.rating}</span>
-              {event.details.user_rating_count && (
-                <span className="opacity-70 font-medium">({event.details.user_rating_count})</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              {event.details?.rating && (
+                <div className="flex items-center gap-1 text-[10px] font-bold bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded border border-amber-500/20 shadow-sm shrink-0">
+                  <Star size={10} className="fill-amber-500" />
+                  <span>{event.details.rating}</span>
+                  {event.details.user_rating_count && (
+                    <span className="opacity-70 font-medium">({event.details.user_rating_count})</span>
+                  )}
+                </div>
               )}
+              <h4 className="font-semibold text-foreground leading-tight">{event.details?.name || 'Unnamed Event'}</h4>
             </div>
-          )}
+          <p className="text-sm text-muted-foreground">{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
           {event.details?.price && (
-            <p className="text-sm font-bold text-emerald-600">
+              <p className="text-sm font-bold text-emerald-600 mt-0.5">
               {typeof event.details.price === 'object' ? (
                 <>
                   {event.details.price.currency}{' '}
@@ -115,6 +114,9 @@ export default function TimelineItem({
               )}
             </p>
           )}
+          </div>
+          <div className="text-right flex flex-col items-end gap-1 shrink-0">
+            <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule?.local_start_time)}</time>
         </div>
       </div>
       {/* Indication for the Retreat Rule (from ARCHITECT_PROMPT logic) */}

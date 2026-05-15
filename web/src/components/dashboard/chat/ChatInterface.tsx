@@ -100,11 +100,15 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isHovered]);
 
-  const sendMessage = useCallback(async (userMessage: string, overrideItinerary?: any, overrideProfile?: any) => {
+  const sendMessage = useCallback(async (userMessage: string, overrideItinerary?: any, overrideProfile?: any, displayMessage?: string) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    // Add user message to UI (using the friendly display message if provided)
+    const contentToShow = displayMessage !== undefined ? displayMessage : userMessage;
+    if (contentToShow) {
+      setMessages(prev => [...prev, { role: 'user', content: contentToShow }]);
+    }
     setIsLoading(true);
 
     try {
@@ -165,7 +169,12 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       const destination = customEvent.detail;
       
       if (destination && !isLoading) {
-        sendMessage(`I'd like to plan a trip to ${destination}. Please build out my entire itinerary including flights, accommodation, activities, and dining.`, { ...itinerary, destination });
+        sendMessage(
+          `I'd like to plan a trip to ${destination}. Please build out my entire itinerary including flights, accommodation, activities, and dining.`, 
+          { ...itinerary, destination },
+          undefined,
+          `I'd like to plan a trip to ${destination}.`
+        );
       }
     };
 
@@ -190,7 +199,35 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
         
         const updatedItinerary = { ...itinerary };
         
-        sendMessage(`Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details, and then review the budget and adjust any surrounding activities if necessary.`, updatedItinerary);
+        // Try to load suggested activities from the destination in MongoDB first
+        fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination || '')}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(destData => {
+            if (destData?.suggested_activities && destData.suggested_activities.length > 0) {
+              sendMessage(
+                `Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details, and then review the budget and adjust any surrounding activities if necessary.`, 
+                updatedItinerary,
+                undefined,
+                `Please change my accommodation to ${placeName}.`
+              );
+            } else {
+              sendMessage(
+                `Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details. We don't have any activities cached for this city yet, so please research and schedule some activities and dining options.`, 
+                updatedItinerary,
+                undefined,
+                `Please change my accommodation to ${placeName} and suggest some activities.`
+              );
+            }
+          })
+          .catch(() => {
+            // Fallback if fetch fails
+            sendMessage(
+              `Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details, and then review the budget and adjust any surrounding activities if necessary.`, 
+              updatedItinerary,
+              undefined,
+              `Please change my accommodation to ${placeName}.`
+            );
+          });
       }
     };
 
@@ -215,7 +252,12 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
         
         const updatedItinerary = { ...itinerary };
         
-        sendMessage(`Please add this specific activity to my itinerary:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nFind a good time slot for it, update the events list, and verify the budget and travel times.`, updatedItinerary);
+        sendMessage(
+          `Please add this specific activity to my itinerary:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nFind a good time slot for it, update the events list, and verify the budget and travel times.`, 
+          updatedItinerary,
+          undefined,
+          `Please add ${placeName} to my itinerary.`
+        );
       }
     };
 
