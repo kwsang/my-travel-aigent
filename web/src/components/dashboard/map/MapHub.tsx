@@ -76,6 +76,8 @@ function MapInner() {
         .then(res => res.ok ? res.json() : null)
         .then(data => setDestinationInfo(data))
         .catch(err => console.error("Failed to load destination info", err));
+    } else {
+      setDestinationInfo(null);
     }
   }, [itinerary.destination, itinerary.updated_at]);
 
@@ -333,7 +335,7 @@ function MapInner() {
             </AdvancedMarker>
           ))}
 
-          {!itinerary.accommodation && destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => {
+          {!!itinerary.destination && !itinerary.accommodation && destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => {
             const geo = place.geo || place.details?.geo || place.location;
             if (!geo) return null;
             
@@ -377,7 +379,7 @@ function MapInner() {
             );
           })}
 
-          {destinationInfo?.suggested_activities?.map((place: any, idx: number) => {
+          {!!itinerary.destination && destinationInfo?.suggested_activities?.map((place: any, idx: number) => {
             const geo = place.geo || place.details?.geo || place.location;
             if (!geo) return null;
             

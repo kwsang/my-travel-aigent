@@ -16,7 +16,7 @@ import { useTimelineSync } from '@/hooks/useTimelineSync';
  * Supports Phase 4 logic for risk tolerance buffers.
  */
 export default function TimelineView() {
-  const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex, profile } = useItineraryData();
+  const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex, profile, viewMode, partySize } = useItineraryData();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | string | null>(null);
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
@@ -272,6 +272,18 @@ export default function TimelineView() {
         dayDate.setUTCDate(baseTripStartDate.getUTCDate() + day - 1);
         const dateString = dayDate.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' });
 
+        const dayEvents = segmentsByDay.get(day) || [];
+        let dailyTotal = 0;
+        let currency = 'USD';
+        dayEvents.forEach(({ event }) => {
+          if (event.details?.price && typeof event.details.price === 'object' && typeof event.details.price.amount === 'number') {
+            dailyTotal += viewMode === 'total' 
+              ? event.details.price.amount 
+              : event.details.price.amount / Math.max(1, partySize);
+            currency = event.details.price.currency || currency;
+          }
+        });
+
         return (
           <div key={day} className="flex flex-col gap-4">
             <div 
@@ -289,7 +301,14 @@ export default function TimelineView() {
                 <h2 className={`text-lg font-bold ${activeDay === day ? 'text-primary' : 'text-foreground'}`}>Day {day}</h2>
                 <span className={`text-sm font-medium ${activeDay === day ? 'text-primary/80' : 'text-muted-foreground'}`}>{dateString}</span>
               </div>
-              <ChevronDown size={18} className={`transition-transform duration-200 ${activeDay === day ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} ${isCollapsed ? '-rotate-90' : ''}`} />
+              <div className="flex items-center gap-3">
+                {dailyTotal > 0 && (
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm">
+                    {currency === 'USD' ? '$' : `${currency} `}{dailyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </span>
+                )}
+                <ChevronDown size={18} className={`transition-transform duration-200 ${activeDay === day ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} ${isCollapsed ? '-rotate-90' : ''}`} />
+              </div>
             </div>
 
             {!isCollapsed && (

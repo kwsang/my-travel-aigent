@@ -126,25 +126,57 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
 
       if (!response.ok) throw new Error('Failed to send message');
 
-      const data = await response.json();
-      const agentMessage = data.response || "I'm sorry, but I didn't generate a response. Please try asking again!";
-      setMessages(prev => [...prev, { role: 'agent', content: agentMessage }]);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Stream not supported');
 
-      // Immediately update the dashboard with the agent's latest state
-      if (data.itinerary && setItinerary) {
-        // Sanitize incoming itinerary to ensure arrays are not null
-        setItinerary({
-          ...data.itinerary,
-          events: data.itinerary.events || [],
-        });
-      }
-      if (data.traveler_profile && setProfile) {
-        setProfile(data.traveler_profile);
-      }
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      // Trigger refresh of the itinerary in the parent dashboard
-      if (onMessageReceived) {
-        onMessageReceived();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+
+            if (data.type === 'update') {
+              if (data.itinerary && setItinerary) {
+                setItinerary((prev: any) => ({
+                  ...prev,
+                  ...data.itinerary,
+                  events: data.itinerary.events || [],
+                }));
+              }
+            } else if (data.type === 'complete') {
+              const agentMessage = data.response || "I'm sorry, but I didn't generate a response. Please try asking again!";
+              setMessages(prev => [...prev, { role: 'agent', content: agentMessage }]);
+
+              if (data.itinerary && setItinerary) {
+                setItinerary((prev: any) => ({
+                  ...prev,
+                  ...data.itinerary,
+                  events: data.itinerary.events || [],
+                }));
+              }
+              if (data.traveler_profile && setProfile) {
+                setProfile(data.traveler_profile);
+              }
+              if (onMessageReceived) {
+                onMessageReceived();
+              }
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            }
+          } catch (err) {
+            console.error('Error parsing stream chunk:', err);
+          }
+        }
       }
     } catch (error) {
       console.error('Chat error:', error);

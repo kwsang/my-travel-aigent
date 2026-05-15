@@ -100,23 +100,23 @@ export default function TimelineItem({
               <h4 className="font-semibold text-foreground leading-tight">{event.details?.name || 'Unnamed Event'}</h4>
             </div>
           <p className="text-sm text-muted-foreground">{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
-          {event.details?.price && (
-              <p className="text-sm font-bold text-emerald-600 mt-0.5">
-              {typeof event.details.price === 'object' ? (
-                <>
-                  {event.details.price.currency}{' '}
-                  {viewMode === 'total' 
-                    ? event.details.price.amount?.toLocaleString() 
-                    : (event.details.price.amount / Math.max(1, partySize))?.toLocaleString()}
-                </>
-              ) : (
-                formatStringPrice(event.details.price)
-              )}
-            </p>
-          )}
           </div>
           <div className="text-right flex flex-col items-end gap-1 shrink-0">
             <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule?.local_start_time)}</time>
+            {event.details?.price && (
+              <p className="text-sm font-bold text-emerald-600 mt-0.5">
+                {typeof event.details.price === 'object' ? (
+                  <>
+                    {event.details.price.currency === 'USD' ? '$' : `${event.details.price.currency} `}
+                    {viewMode === 'total' 
+                      ? event.details.price.amount?.toLocaleString() 
+                      : (event.details.price.amount / Math.max(1, partySize))?.toLocaleString()}
+                  </>
+                ) : (
+                  formatStringPrice(event.details.price)
+                )}
+              </p>
+            )}
         </div>
       </div>
       {/* Indication for the Retreat Rule (from ARCHITECT_PROMPT logic) */}
