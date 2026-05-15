@@ -2,7 +2,7 @@ from google.adk.runners import Runner
 from api.services.session_service import MongoDBSessionService
 from gemini_agent import agent_definition
 from api import config
-from gemini_agent.logic.tools import search_places, google_places_details, google_maps_matrix # These are the Google API tools
+from gemini_agent.logic.tools import search_places, google_maps_matrix # These are the Google API tools
 from gemini_agent.tools.itinerary_tools import save_itinerary, get_itinerary, list_trip_versions, delete_itinerary, update_itinerary_status, clone_itinerary, finalize_itinerary
 from gemini_agent.tools.user_management import record_user_profile, query_user_profile
 from gemini_agent.tools.discovery import search_destinations, discover_new_destination
@@ -22,7 +22,6 @@ def create_agent_runner() -> Runner:
     # We assign them to the root_agent's tools list so the Runner can discover them.
     agent_app.root_agent.tools = [
         search_places,
-        google_places_details,
         google_maps_matrix,
         save_itinerary,
         get_itinerary,

@@ -24,7 +24,6 @@ from gemini_agent.tools.tools import (
     save_itinerary,
     finalize_itinerary,
     google_maps_matrix,
-    google_places_details,
     search_local_events
 )
 
@@ -50,7 +49,6 @@ def create_travel_agent():
     get_profile_tool = FunctionTool(func=query_user_profile)
     persist_tool = FunctionTool(func=save_itinerary)
     traffic_tool = FunctionTool(func=google_maps_matrix)
-    details_tool = FunctionTool(func=google_places_details)
 
     # 3. Load Instruction Prompts
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
@@ -177,7 +175,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=get_pioneer_instructions,
-        tools=[search_tool, discovery_tool, places_search_tool, traffic_tool, details_tool, persist_tool],
+        tools=[search_tool, discovery_tool, places_search_tool, traffic_tool, persist_tool],
         description="Specializes in geographic anchoring, transportation, and finding the perfect destination and accommodation."
     )
 
@@ -186,7 +184,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=get_activity_planner_instructions,
-        tools=[places_search_tool, events_tool, traffic_tool, details_tool, persist_tool],
+        tools=[places_search_tool, events_tool, traffic_tool, persist_tool],
         description="Fills the itinerary with incredible EXPERIENCE and DINING segments that match the user's interests, vibe, and circadian rhythm."
     )
 

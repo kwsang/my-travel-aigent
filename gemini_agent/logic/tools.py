@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 # Simple in-memory cache to prevent duplicate API calls
 _MATRIX_CACHE = LRUTTLCache()
-_DETAILS_CACHE = LRUTTLCache()
 _PLACES_CACHE = LRUTTLCache()
 
 async def search_places(
@@ -59,7 +58,8 @@ async def search_places(
         "X-Goog-FieldMask": (
             "places.id,places.displayName,places.formattedAddress,places.location,"
             "places.rating,places.userRatingCount,places.priceLevel,places.types,"
-            "places.editorialSummary,places.regularOpeningHours"
+            "places.editorialSummary,places.regularOpeningHours,places.businessStatus,"
+            "places.currentOpeningHours,places.utcOffsetMinutes"
         )
     }
 
@@ -74,33 +74,6 @@ async def search_places(
         except Exception as e:
             logger.error(f"Places Search Error: {e}")
             return []
-
-async def google_places_details(place_id: str) -> dict:
-    """
-    Retrieves deep metadata for a specific venue to verify operating hours and status.
-    """
-    cached_data = _DETAILS_CACHE.get(place_id)
-    if cached_data is not None:
-        return cached_data
-
-    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
-    url = f"https://places.googleapis.com/v1/places/{place_id}"
-    
-    headers = {
-        "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "id,businessStatus,currentOpeningHours,utcOffsetMinutes"
-    }
-
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(url, headers=headers, timeout=10.0)
-            response.raise_for_status()
-            data = response.json()
-            _DETAILS_CACHE.set(place_id, data)
-            return data
-        except Exception as e:
-            logger.error(f"Places Details Error: {e}")
-            return {}
 
 async def google_maps_matrix(origins: List[str], destinations: List[str]) -> dict:
     """

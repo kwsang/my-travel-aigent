@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 # Simple in-memory cache to prevent duplicate API calls
 _MATRIX_CACHE = LRUTTLCache()
-_DETAILS_CACHE = LRUTTLCache()
 _PLACES_CACHE = LRUTTLCache()
 
 async def google_maps_matrix(origins: list[str], destinations: list[str]) -> str:
@@ -40,40 +39,6 @@ async def google_maps_matrix(origins: list[str], destinations: list[str]) -> str
     except Exception as e:
         return f"Error calculating distance matrix: {str(e)}"
 
-async def google_places_details(name: str) -> str:
-    """
-    Retrieves detailed information (rating, business status, opening hours) for a specific place.
-    """
-    logger.info(f"Tool invoked: google_places_details for name '{name}'")
-    
-    cached_result = _DETAILS_CACHE.get(name)
-    if cached_result is not None:
-        return cached_result
-
-    try:
-        if places_client is None:
-            return "Error: Google Places service is currently unavailable."
-            
-        mask = "displayName,rating,userRatingCount,regularOpeningHours,businessStatus,currentOpeningHours"
-        result = await asyncio.to_thread(
-            places_client.get_place,
-            request={"name": name},
-            metadata=[("x-goog-fieldmask", mask)]
-        )
-        details = {
-            "name": result.display_name.text,
-            "rating": result.rating,
-            "user_rating_count": result.user_rating_count,
-            "status": result.business_status.name,
-            "regular_opening_hours": str(result.regular_opening_hours) if result.regular_opening_hours else "Not available",
-            "current_opening_hours": str(result.current_opening_hours) if result.current_opening_hours else "Not available"
-        }
-        result_json = json.dumps(details)
-        _DETAILS_CACHE.set(name, result_json)
-        return result_json
-    except Exception as e:
-        return f"Error fetching place details: {str(e)}"
-
 async def search_places(text_query: str, location_bias: str = None, **kwargs) -> str:
     """
     Searches for venues using the Google Places API.
@@ -94,7 +59,8 @@ async def search_places(text_query: str, location_bias: str = None, **kwargs) ->
                 "places.takeout,places.delivery,places.dineIn,places.curbsidePickup,"
                 "places.servesBreakfast,places.servesLunch,places.servesDinner,"
                 "places.servesBeer,places.servesWine,places.servesVegetarianFood,places.currentOpeningHours,"
-                "places.goodForChildren,places.accessibilityOptions")
+                "places.goodForChildren,places.accessibilityOptions,places.businessStatus,"
+                "places.regularOpeningHours,places.utcOffsetMinutes,places.userRatingCount")
         query = f"{text_query} in {location_bias}" if location_bias else text_query
         request = {"text_query": query, "max_result_count": 8}
         if kwargs.get("location_type"): request["included_type"] = kwargs["location_type"]
@@ -111,11 +77,15 @@ async def search_places(text_query: str, location_bias: str = None, **kwargs) ->
                 "name": place.display_name.text,
                 "place_id": place.id,
                 "rating": place.rating,
+                "user_rating_count": place.user_rating_count,
                 "price_tier": place.price_level,
                 "description": place.editorial_summary.text if place.editorial_summary else place.formatted_address,
                 "geo": {"latitude": place.location.latitude, "longitude": place.location.longitude},
                 "types": place.types,
-                "currentOpeningHours": str(place.current_opening_hours) if place.current_opening_hours else None
+                "status": place.business_status.name if hasattr(place, "business_status") else "Unknown",
+                "currentOpeningHours": str(place.current_opening_hours) if place.current_opening_hours else "Not available",
+                "regularOpeningHours": str(place.regular_opening_hours) if place.regular_opening_hours else "Not available",
+                "utcOffsetMinutes": place.utc_offset_minutes
             })
         result_json = json.dumps(venues, default=str)
         _PLACES_CACHE.set(cache_key, result_json)

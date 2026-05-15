@@ -167,7 +167,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       const destination = customEvent.detail;
       
       if (destination && !isLoading) {
-        sendMessage(`I'd like to plan a trip to ${destination}. Please suggest some accommodations.`, { ...itinerary, destination });
+        sendMessage(`I'd like to plan a trip to ${destination}. Please build out my entire itinerary including flights, accommodation, activities, and dining.`, { ...itinerary, destination });
       }
     };
 
@@ -188,7 +188,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
         const updatedItinerary = { ...itinerary, suggested_accommodations: [] };
         if (setItinerary) setItinerary(updatedItinerary);
         
-        sendMessage(`Great, please select "${placeName}" as my accommodation and continue planning. Please suggest some activities.`, updatedItinerary);
+        sendMessage(`Great, please select "${placeName}" as my accommodation and build out the rest of my itinerary with activities and dining.`, updatedItinerary);
       }
     };
 
