@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TimelineView from '@/components/dashboard/timeline/TimelineView';
 import MapHub from '@/components/dashboard/map/MapHub';
 import BudgetPanel from '@/components/dashboard/budget/BudgetPanel';
@@ -20,7 +20,7 @@ import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/budget/BudgetSkeleton';
 import TripSelector from '@/components/dashboard/TripSelector';
 import ErrorBoundary from '@/components/dashboard/ErrorBoundary';
-import { UserCircle } from 'lucide-react';
+import { UserCircle, Loader2, Check } from 'lucide-react';
 import DeleteTripModal from '@/components/dashboard/DeleteTripModal';
 import RenameAlertModal from '@/components/dashboard/RenameAlertModal';
 
@@ -62,6 +62,10 @@ export default function DashboardPage() {
   const [showBlankNameAlert, setShowBlankNameAlert] = useState(false);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState<number | null>(null);
+  const isInitialMount = useRef(true);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [showSavedIndicator, setShowSavedIndicator] = useState(false);
+  const savedIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Extracted Data Fetching Hook
   const {
@@ -97,6 +101,67 @@ export default function DashboardPage() {
   useEffect(() => {
     setActiveSegmentIndex(null);
   }, [currentSessionId]);
+
+  // Debounced auto-save for itinerary and profile changes
+  useEffect(() => {
+    // Skip the very first render and any renders while data is still loading.
+    if (isInitialMount.current) {
+      // Once loading is complete, we can mark the initial mount as done.
+      if (!isLoading) {
+        isInitialMount.current = false;
+      }
+      return;
+    }
+
+    // Don't save if we don't have IDs
+    if (!currentSessionId || !visitorId) {
+      return;
+    }
+
+    const debounceTimer = setTimeout(() => {
+      console.log('Auto-saving draft...');
+      setIsAutoSaving(true);
+      setShowSavedIndicator(false);
+
+      // Construct the payload based on ItineraryPatchRequest
+      const payload = {
+        ...itinerary,
+        traveler_profile: profile,
+      };
+
+      fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      .then(response => {
+        if (response.ok) {
+          console.log('Auto-save successful.');
+          // We don't update state here to prevent re-render loops.
+          // The user's local state is the source of truth during editing.
+          setShowSavedIndicator(true);
+          if (savedIndicatorTimeoutRef.current) {
+            clearTimeout(savedIndicatorTimeoutRef.current);
+          }
+          savedIndicatorTimeoutRef.current = setTimeout(() => {
+            setShowSavedIndicator(false);
+          }, 3000);
+        } else {
+          triggerToast('Could not save changes.');
+          console.error('Auto-save failed:', response);
+        }
+      })
+      .catch(e => {
+        triggerToast('Could not save changes.');
+        console.error("Dashboard: Auto-save failed.", e);
+      })
+      .finally(() => {
+        setIsAutoSaving(false);
+      });
+    }, 2500); // 2.5 second debounce delay
+
+    return () => clearTimeout(debounceTimer);
+  }, [itinerary, profile, currentSessionId, visitorId, isLoading, triggerToast]);
 
   const handleRename = async () => {
     const newName = editedName.trim();
@@ -173,22 +238,35 @@ export default function DashboardPage() {
 
   // Center content for the Navbar
   const navbarCenter = (
-    <TripSelector
-      itineraries={itineraries}
-      currentItinerary={itinerary}
-      currentSessionId={currentSessionId}
-      onSelectTrip={(sessId, item) => {
-        setCurrentSessionId(sessId);
-        setItinerary(item);
-      }}
-      onNewTrip={handleNewTrip}
-      onDeleteTrip={handleDeleteTrip}
-      isEditingName={isEditingName}
-      setIsEditingName={setIsEditingName}
-      editedName={editedName}
-      setEditedName={setEditedName}
-      onRename={handleRename}
-    />
+    <div className="flex items-center gap-4">
+      <TripSelector
+        itineraries={itineraries}
+        currentItinerary={itinerary}
+        currentSessionId={currentSessionId}
+        onSelectTrip={(sessId, item) => {
+          setCurrentSessionId(sessId);
+          setItinerary(item);
+        }}
+        onNewTrip={handleNewTrip}
+        onDeleteTrip={handleDeleteTrip}
+        isEditingName={isEditingName}
+        setIsEditingName={setIsEditingName}
+        editedName={editedName}
+        setEditedName={setEditedName}
+        onRename={handleRename}
+      />
+      {isAutoSaving ? (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
+          <Loader2 size={12} className="animate-spin" />
+          <span>Saving...</span>
+        </div>
+      ) : showSavedIndicator ? (
+        <div className="flex items-center gap-1 text-xs text-green-600/80 animate-in fade-in duration-300">
+          <Check size={12} />
+          <span>Saved</span>
+        </div>
+      ) : null}
+    </div>
   );
 
   // Memoize the context value to prevent unnecessary re-renders of all consumer components

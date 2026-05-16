@@ -156,9 +156,10 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         ))
 
         # 1.5 Overlap Check
-        for i in range(len(day_events) - 1):
-            current_event = day_events[i]
-            next_event = day_events[i+1]
+        overlap_check_events = [e for e in day_events if e.get("segment") != "LOGISTICS"]
+        for i in range(len(overlap_check_events) - 1):
+            current_event = overlap_check_events[i]
+            next_event = overlap_check_events[i+1]
             
             is_overlapping, minutes = check_event_overlap(current_event, next_event)
             if is_overlapping:

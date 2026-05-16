@@ -267,36 +267,6 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
   }, [sendMessage, isLoading, itinerary, setItinerary]);
 
-  // Listen for activity selection events from the map
-  useEffect(() => {
-    const handleSelectActivity = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
-      const place = customEvent.detail;
-      
-      if (place && !isLoading) {
-        const placeName = place.details?.name || place.displayName?.text || place.name || 'that option';
-        const placeData = {
-          name: placeName,
-          geo: place.geo || place.details?.geo || place.location,
-          price: place.details?.price || place.priceLevel || place.price_tier || place.price,
-          rating: place.details?.rating || place.rating
-        };
-        
-        const updatedItinerary = { ...itinerary };
-        
-        sendMessage(
-          `Please add this specific activity to my itinerary:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nFind a good time slot for it, update the events list, and verify the budget and travel times.`, 
-          updatedItinerary,
-          undefined,
-          `Please add ${placeName} to my itinerary.`
-        );
-      }
-    };
-
-    window.addEventListener('travel_aigent_select_activity', handleSelectActivity);
-    return () => window.removeEventListener('travel_aigent_select_activity', handleSelectActivity);
-  }, [sendMessage, isLoading, itinerary, setItinerary]);
-
   // Listen for profile update events from the profile modal
   useEffect(() => {
     const handleProfileUpdated = (e: Event) => {

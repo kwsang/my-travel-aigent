@@ -65,7 +65,7 @@ export default function TimelineItem({
       onClick={() => setActiveSegmentIndex(absoluteIndex)}
       onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
       onMouseLeave={() => setHoveredSegmentIndex?.(null)}
-      className={`relative rounded-xl border p-4 shadow-sm transition-all cursor-pointer active:cursor-grab group ${
+      className={`relative rounded-xl border ${event.segment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer active:cursor-grab group ${
         event.segment === 'FLIGHT' ? 'border-sky-500/30 bg-sky-500/5' : 'border-border bg-card/50'
       } ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
@@ -82,9 +82,9 @@ export default function TimelineItem({
         <GripVertical size={14} />
       </div>
       <div className="flex items-start justify-between">
-        <div className="flex flex-col gap-1">
+      <div className={`flex flex-col ${event.segment === 'LOGISTICS' ? 'gap-0.5' : 'gap-1'}`}>
           <span 
-            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+          className={`flex items-center gap-1 font-bold uppercase tracking-wider text-muted-foreground ${event.segment === 'LOGISTICS' ? 'text-[10px]' : 'text-xs'}`}
             style={{ color: SegmentColors[event.segment as SegmentType]?.bg }}
           >
             {React.createElement(SegmentIcons[event.segment as SegmentType] || DefaultIcon, { className: 'w-3 h-3' })}
@@ -105,18 +105,18 @@ export default function TimelineItem({
                   {(event.details as any).from} <Plane size={14} className="text-muted-foreground" /> {(event.details as any).to}
                 </h4>
               ) : (
-                <h4 className="font-semibold text-foreground leading-tight">{event.details?.name || (event.segment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')}</h4>
+            <h4 className={`font-semibold text-foreground leading-tight ${event.segment === 'LOGISTICS' ? 'text-sm' : ''}`}>{event.details?.name || (event.segment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')}</h4>
               )}
             </div>
             {event.segment === 'FLIGHT' && (event.details as any)?.airline ? (
               <p className="text-sm font-medium text-sky-500/80">{(event.details as any).airline}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
+          <p className={`${event.segment === 'LOGISTICS' ? 'text-xs' : 'text-sm'} text-muted-foreground`}>{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
             )}
           </div>
           <div className="text-right flex flex-col items-end gap-1 shrink-0">
-            <time className="text-sm font-semibold text-foreground/80">{formatTime(event.schedule?.local_start_time)}</time>
-            {event.details?.price && (
+        <time className={`font-semibold text-foreground/80 ${event.segment === 'LOGISTICS' ? 'text-xs' : 'text-sm'}`}>{formatTime(event.schedule?.local_start_time)}</time>
+            {event.details?.price && event.segment !== 'LOGISTICS' && (
               <p className="text-sm font-bold text-emerald-600 mt-0.5">
                 {typeof event.details.price === 'object' ? (
                   <>

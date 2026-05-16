@@ -51,11 +51,34 @@ async def get_popular_destinations(limit: int = 8, db: AsyncIOMotorDatabase = De
         })
     return result
 
+@router.get("/by-vibe/{vibe}")
+async def get_destinations_by_vibe(vibe: str, skip: int = 0, limit: int = 20, db: AsyncIOMotorDatabase = Depends(get_db)):
+    """Fetch destinations that match a specific vibe/tag."""
+    # Case-insensitive search using collation for better index performance
+    cursor = db.destinations.find({"vibe_tags": vibe}).collation(
+        {"locale": "en", "strength": 2}
+    ).skip(skip).limit(limit)
+    
+    destinations = await cursor.to_list(length=limit)
+    
+    if not destinations:
+        return []
+        
+    for dest in destinations:
+        dest["_id"] = str(dest["_id"])
+        
+    return destinations
+
 @router.get("/{name}")
 async def get_destination(name: str, db: AsyncIOMotorDatabase = Depends(get_db)):
     """Fetch a specific destination by name."""
     search_name = name.split(',')[0].strip()
-    dest = await db.destinations.find_one({"name": {"$regex": f"^{search_name}", "$options": "i"}})
+    
+    # Case-insensitive exact match using collation
+    dest = await db.destinations.find_one(
+        {"name": search_name}, 
+        collation={"locale": "en", "strength": 2}
+    )
     
     if not dest:
         raise HTTPException(status_code=404, detail="Destination not found")
