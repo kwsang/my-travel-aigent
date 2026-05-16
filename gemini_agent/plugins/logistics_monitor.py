@@ -1,7 +1,7 @@
 import json
 import logging
 from google.adk.plugins.base_plugin import BasePlugin
-from gemini_agent.tools.utils import calculate_travel_time
+from gemini_agent.logic.utils import calculate_travel_time
 from gemini_agent.logic.models import TravelerProfile
 
 logger = logging.getLogger(__name__)

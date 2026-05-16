@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { API_CONFIG } from '@/config/constants';
 import { Itinerary, TravelerProfile } from '@/types';
 
-export function useDashboardData(visitorId: string, currentSessionId: string) {
+export function useDashboardData(visitorId: string | undefined, currentSessionId: string | undefined) {
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [profile, setProfile] = useState<TravelerProfile | null>(null);
   const [itinerary, setItinerary] = useState<Partial<Itinerary>>({

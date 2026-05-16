@@ -3,6 +3,8 @@ import json
 import asyncio
 import urllib.request
 import urllib.error
+from typing import Optional
+from google.adk.agents.invocation_context import InvocationContext as Context
 
 def _fetch_route_sync(origin: str, destination: str, travel_mode: str) -> str:
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
@@ -45,7 +47,7 @@ def _fetch_route_sync(origin: str, destination: str, travel_mode: str) -> str:
     except Exception as e:
         return f"Exception occurred while calling Routes API: {str(e)}"
 
-async def get_route_directions(origin: str, destination: str, travel_mode: str = "DRIVE") -> str:
+async def get_route_directions(origin: str, destination: str, travel_mode: str = "DRIVE", ctx: Optional[Context] = None) -> str:
     """
     Gets the route duration and distance between two locations using the Google Routes API.
     
@@ -54,4 +56,22 @@ async def get_route_directions(origin: str, destination: str, travel_mode: str =
         destination: The ending location address or place name.
         travel_mode: The mode of transportation. Can be 'DRIVE', 'BICYCLE', 'WALK', or 'TRANSIT'.
     """
+    trip_destination = None
+    if ctx:
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+        itinerary = state.get("final_itinerary") or {}
+        if isinstance(itinerary, str):
+            try: itinerary = json.loads(itinerary)
+            except: itinerary = {}
+        trip_destination = itinerary.get("destination")
+
+    if trip_destination:
+        def anchor_loc(loc: str) -> str:
+            if not any(c.isalpha() for c in str(loc)): return loc # Skip coordinates (e.g. "47.6,-122.3")
+            if trip_destination.lower() in str(loc).lower(): return loc # Skip already anchored strings
+            return f"{loc} in {trip_destination}"
+            
+        origin = anchor_loc(origin)
+        destination = anchor_loc(destination)
+
     return await asyncio.to_thread(_fetch_route_sync, origin, destination, travel_mode)

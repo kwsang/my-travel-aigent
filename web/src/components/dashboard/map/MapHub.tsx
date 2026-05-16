@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Map as MapIcon, MapPin, Navigation, AlertTriangle, Home, Bed, Utensils, Star, Sparkles } from 'lucide-react';
+import { Map as MapIcon, MapPin, Navigation, AlertTriangle, Home, Bed, Utensils, Star, Sparkles, Plus } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { APIProvider, Map, useMap, useApiIsLoaded, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, useMap, useApiIsLoaded, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
 import RoutePolyline from './RoutePolyline';
 import { marineSunsetMapStyle } from '@/config/mapStyles';
 import { Event } from '@/types';
@@ -76,6 +76,8 @@ function MapInner() {
     hoveredPopularIndexRef.current = hoveredPopularIndex;
   }, [hoveredPopularIndex]);
 
+  const [activeSuggestion, setActiveSuggestion] = React.useState<any>(null);
+
   React.useEffect(() => {
     if (itinerary.destination) {
       fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
@@ -98,7 +100,7 @@ function MapInner() {
     if (segments.length === 0 && !itinerary.destination) {
       fetchPopular();
       const intervalId = setInterval(() => {
-        if (hoveredPopularIndexRef.current === null) {
+        if (hoveredPopularIndexRef.current === null && document.visibilityState === 'visible') {
           fetchPopular();
         }
       }, 15000); // Refresh every 15 seconds, pausing if hovered
@@ -523,6 +525,10 @@ function MapInner() {
                     key={`suggestion-acc-${idx}`}
                     position={{ lat: geo.latitude, lng: geo.longitude }}
                     title={placeName}
+                    onClick={() => {
+                        setActiveSuggestion({ ...place, _suggestionType: 'accommodation' });
+                        setActiveSegmentIndex(null as any);
+                    }}
                 >
                     <div className="flex flex-col items-center group animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                         <div className="relative bg-violet-500 border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-violet-300 group-hover:shadow-violet-500/30 transition-all">
@@ -566,6 +572,10 @@ function MapInner() {
                     key={`suggestion-act-${idx}`}
                     position={{ lat: geo.latitude, lng: geo.longitude }}
                     title={placeName}
+                    onClick={() => {
+                        setActiveSuggestion({ ...place, _suggestionType: 'activity' });
+                        setActiveSegmentIndex(null as any);
+                    }}
                 >
                     <div className="flex flex-col items-center group animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                         <div className="relative bg-amber-500 border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-amber-300 group-hover:shadow-amber-500/30 transition-all">
@@ -611,7 +621,10 @@ function MapInner() {
                 key={`${segment.day}-${index}`} 
                 position={{ lat: geo.latitude, lng: geo.longitude }} 
                 title={placeName}
-                onClick={() => setActiveSegmentIndex(index)}
+                onClick={() => {
+                  setActiveSegmentIndex(index);
+                  setActiveSuggestion(null);
+                }}
                 zIndex={isActive || isHovered ? 100 : 10}
               >
                 <div 
@@ -653,6 +666,123 @@ function MapInner() {
               options={edge.options}
             />
           ))}
+
+          {/* Active Segment Info Window */}
+          {activeSegmentIndex !== null && segments[activeSegmentIndex] && (
+            (() => {
+              const activeSegment = segments[activeSegmentIndex];
+              const geo = activeSegment.geo || activeSegment.details?.geo;
+              if (!geo) return null;
+              const placeName = activeSegment.details?.name || 'Unnamed Event';
+              const description = activeSegment.details?.description;
+              const notes = activeSegment.details?.notes;
+              const price = activeSegment.details?.price;
+              const rating = activeSegment.details?.rating;
+              const imageUrl = activeSegment.details?.image_url || (activeSegment as any).image_url || (activeSegment.details as any)?.photo_url;
+              return (
+                <InfoWindow
+                  position={{ lat: geo.latitude, lng: geo.longitude }}
+                  onCloseClick={() => setActiveSegmentIndex(null as any)}
+                >
+                  <div className="flex flex-col gap-1 p-1 max-w-[200px] text-gray-900">
+                    {imageUrl && (
+                      <div className="w-full h-24 mb-1 rounded-sm overflow-hidden bg-muted relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imageUrl as string} alt={placeName as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                    <h3 className="font-bold text-sm leading-tight mb-1">{placeName as React.ReactNode}</h3>
+                    {description && <p className="text-xs opacity-80">{description as React.ReactNode}</p>}
+                    {notes && <p className="text-xs opacity-80 italic mt-1">Note: {notes as React.ReactNode}</p>}
+                    {(price || rating) && (
+                      <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 text-xs font-semibold">
+                        {price && <span>{formatPrice(price)}</span>}
+                        {price && rating && <span className="opacity-50">•</span>}
+                        {rating && <span className="flex items-center gap-0.5"><Star size={10} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
+                      </div>
+                    )}
+                  </div>
+                </InfoWindow>
+              );
+            })()
+          )}
+
+          {/* Active Suggestion Info Window */}
+          {activeSuggestion && (
+            (() => {
+              const place = activeSuggestion;
+              const geo = place.geo || place.details?.geo || place.location;
+              if (!geo) return null;
+              const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Place';
+              const description = place.details?.description;
+              const notes = place.details?.notes;
+              const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
+              const rating = place.details?.rating || place.rating;
+              const imageUrl = place.details?.image_url || place.image_url || place.photo_url || place.photoUri || (place.photos && place.photos.length > 0 ? place.photos[0].photoUri || place.photos[0].name : null);
+              return (
+                <InfoWindow
+                  position={{ lat: geo.latitude, lng: geo.longitude }}
+                  onCloseClick={() => setActiveSuggestion(null)}
+                >
+                  <div className="flex flex-col gap-1 p-1 max-w-[200px] text-gray-900">
+                    {imageUrl && (
+                      <div className="w-full h-24 mb-1 rounded-sm overflow-hidden bg-muted relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imageUrl as string} alt={placeName as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                    <h3 className="font-bold text-sm leading-tight mb-1">{placeName as React.ReactNode}</h3>
+                    {description && <p className="text-xs opacity-80">{description as React.ReactNode}</p>}
+                    {notes && <p className="text-xs opacity-80 italic mt-1">Note: {notes as React.ReactNode}</p>}
+                    {(price || rating) && (
+                      <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 text-xs font-semibold">
+                        {price && <span>{formatPrice(price)}</span>}
+                        {price && rating && <span className="opacity-50">•</span>}
+                        {rating && <span className="flex items-center gap-0.5"><Star size={10} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
+                      </div>
+                    )}
+                    <button
+                      className="mt-2 w-full flex items-center justify-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold py-1.5 px-3 rounded-md hover:bg-primary/90 transition-colors"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (place._suggestionType === 'accommodation') {
+                          setItinerary?.((prev: any) => ({
+                            ...prev,
+                            accommodation: place
+                          }));
+                        } else {
+                          const newEvent = {
+                            segment: 'EXPERIENCE',
+                            day: 1, // Add to Day 1 by default, the user can reorganize it via drag & drop
+                            details: {
+                              ...place.details,
+                              name: placeName,
+                              description: description,
+                              notes: notes,
+                              image_url: imageUrl,
+                              geo: geo,
+                              price: price,
+                              rating: rating,
+                            }
+                          };
+                          setItinerary?.((prev: any) => ({
+                            ...prev,
+                            events: [...(prev.events || []), newEvent]
+                          }));
+                        }
+                        
+                        setActiveSuggestion(null);
+                      }}
+                    >
+                      <Plus size={14} /> Add to Itinerary
+                    </button>
+                  </div>
+                </InfoWindow>
+              );
+            })()
+          )}
         </Map>
       ) : (
         <div

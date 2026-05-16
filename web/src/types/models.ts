@@ -21,6 +21,9 @@ export interface GeoCoordinates {
 
 export interface EventDetails {
   name: string;
+  description?: string;
+  notes?: string;
+  image_url?: string;
   category: string;
   city?: string;
   travel_zone?: string;

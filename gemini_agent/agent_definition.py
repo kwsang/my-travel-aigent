@@ -178,6 +178,10 @@ def create_travel_agent():
         end_date = profile_model.preferences.end_date
         duration = profile_model.preferences.target_duration_days
 
+        destination = itinerary.get("destination")
+        if destination:
+            prompt += f"\n\n[DESTINATION ANCHOR]\nThe user's confirmed destination is '{destination}'. You MUST restrict all activity, event, and dining searches strictly to this city, state, and country. Do not suggest venues from other similarly named cities."
+
         if start_date and end_date:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST be scheduled strictly between {start_date} and {end_date} (Duration: {duration} Days)."
         elif duration:
@@ -235,7 +239,7 @@ def create_travel_agent():
             except: itinerary_data = {}
             
         destination = itinerary_data.get("destination")
-        map_context = f" The user has explicitly selected '{destination}' as their destination from the map." if destination else ""
+        map_context = f" The user has explicitly selected '{destination}' as their destination from the map. Please ensure you explicitly qualify its state and country to avoid ambiguity." if destination else ""
 
         # Decide which specialist should handle the turn based on the existence of profile data
         profile_data = state.get("traveler_profile") or state.get("user_profile_data")
@@ -259,10 +263,14 @@ def create_travel_agent():
             if profile_start and itinerary_start and profile_start != itinerary_start:
                 handoff_context += f" [CONFLICT ALERT] The user profile starting location is '{profile_start}', but this draft itinerary starts from '{itinerary_start}'."
 
-            handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
+            if itinerary_data.get("events") and len(itinerary_data.get("events")) > 0:
+                handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
+            elif destination:
+                handoff_context += f"{map_context} No events have been planned yet. Transfer to the 'travel_pioneer' to plan initial flights and accommodation."
 
         return (
             f"You are the Travel Supervisor. {handoff_context} "
+            "If the user asks to communicate with a specific agent, transfer directly to them. "
             "If the user asks specifically about travel, flights, or accommodation, transfer directly to the 'travel_pioneer'. "
             "If the user asks specifically about activities or dining, transfer directly to the 'activity_planner'. "
             "Otherwise, transfer the user to the 'architect' to handle overall research and itinerary coordination. "

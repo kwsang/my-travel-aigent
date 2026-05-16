@@ -1,7 +1,29 @@
 import json
 from gemini_agent.clients import voyage_client, destinations_collection, places_client, discovery_model
-from .models import Destination
+from gemini_agent.logic.models import Destination
 import asyncio
+from typing import Optional
+from google.adk.agents.invocation_context import InvocationContext as Context
+
+def _get_active_destination(provided_name: str, ctx: Optional[Context]) -> str:
+    if ctx:
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+        itinerary = state.get("final_itinerary") or {}
+        if isinstance(itinerary, str):
+            try: itinerary = json.loads(itinerary)
+            except: itinerary = {}
+        if itinerary.get("destination"):
+            return itinerary.get("destination")
+    return provided_name
+
+def _build_destination_query(dest_str: str) -> dict:
+    parts = [p.strip() for p in dest_str.split(',')]
+    query = {"name": {"$regex": f"^{parts[0]}", "$options": "i"}}
+    if len(parts) > 1:
+        query["state"] = {"$regex": f"^{parts[1][:2]}", "$options": "i"}
+    if len(parts) > 2:
+        query["country"] = {"$regex": f"^{parts[2][:2]}", "$options": "i"}
+    return query
 
 VALID_VIBES = [
     "historic", "coastal", "romantic", "city", "urban", "mountain", 
@@ -38,17 +60,29 @@ async def _generate_item_tags(item: dict, valid_tags: list, item_type: str):
     except Exception:
         item["vibe_tags"] = []
 
-async def search_destinations(query: str) -> str:
+async def search_destinations(query: str, ctx: Optional[Context] = None) -> str:
     """
     Performs a semantic search for travel destinations (strictly cities and towns).
     """
+    enhanced_query = query
+    if ctx:
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
+        if isinstance(profile, str):
+            try: profile = json.loads(profile)
+            except: profile = {}
+            
+        interests = profile.get("interests", [])
+        if interests:
+            enhanced_query += f" matching interests: {', '.join(interests)}"
+
     try:
         if voyage_client is None:
             return "Error: Voyage AI service is currently unavailable."
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
             
-        embed_resp = await asyncio.to_thread(voyage_client.embed, [query], model="voyage-4", input_type="query")
+        embed_resp = await asyncio.to_thread(voyage_client.embed, [enhanced_query], model="voyage-4", input_type="query")
         embedding = embed_resp.embeddings[0]
         pipeline = [
             {
@@ -92,7 +126,7 @@ async def discover_new_destination(vibe_or_city: str) -> str:
         response = await discovery_model.generate_content_async(prompt)
         candidate = response.text.strip()
 
-        if await destinations_collection.find_one({"name": {"$regex": f"^{candidate.split(',')[0]}", "$options": "i"}}):
+        if await destinations_collection.find_one(_build_destination_query(candidate)):
             return f"Destination '{candidate}' is already in the atlas."
 
         mask = "places.displayName,places.location,places.formattedAddress,places.types,places.addressComponents"
@@ -148,11 +182,12 @@ async def discover_new_destination(vibe_or_city: str) -> str:
     except Exception as e:
         return f"Discovery failed: {str(e)}"
 
-async def save_destination_accommodations(destination_name: str, accommodations: list[dict]) -> str:
+async def save_destination_accommodations(destination_name: str, accommodations: list[dict], ctx: Optional[Context] = None) -> str:
     """
     Saves a list of suggested accommodations to a specific destination in the atlas.
     Useful for caching great hotel options for a city so users can browse them later.
     """
+    active_dest = _get_active_destination(destination_name, ctx)
     try:
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
@@ -161,24 +196,24 @@ async def save_destination_accommodations(destination_name: str, accommodations:
         tasks = [_generate_item_tags(acc, VALID_ACCOMMODATION_TAGS, "accommodation") for acc in accommodations]
         await asyncio.gather(*tasks)
             
-        search_name = destination_name.split(',')[0].strip()
         result = await destinations_collection.update_one(
-            {"name": {"$regex": f"^{search_name}", "$options": "i"}},
+            _build_destination_query(active_dest),
             {"$set": {"suggested_accommodations": accommodations}}
         )
         
         if result.matched_count == 0:
-            return f"Error: Destination '{destination_name}' not found in the atlas. Use discover_new_destination first."
+            return f"Error: Destination '{active_dest}' not found in the atlas. Use discover_new_destination first."
             
-        return f"SUCCESS: Accommodations saved to destination '{destination_name}'."
+        return f"SUCCESS: Accommodations saved to destination '{active_dest}'."
     except Exception as e:
         return f"Error saving accommodations to destination: {str(e)}"
 
-async def save_destination_activities(destination_name: str, activities: list[dict]) -> str:
+async def save_destination_activities(destination_name: str, activities: list[dict], ctx: Optional[Context] = None) -> str:
     """
     Saves a list of suggested activities to a specific destination in the atlas.
     Useful for caching great experience and dining options for a city so users can browse them later.
     """
+    active_dest = _get_active_destination(destination_name, ctx)
     try:
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
@@ -187,30 +222,29 @@ async def save_destination_activities(destination_name: str, activities: list[di
         tasks = [_generate_item_tags(act, VALID_ACTIVITY_TAGS, "activity") for act in activities]
         await asyncio.gather(*tasks)
             
-        search_name = destination_name.split(',')[0].strip()
         result = await destinations_collection.update_one(
-            {"name": {"$regex": f"^{search_name}", "$options": "i"}},
+            _build_destination_query(active_dest),
             {"$set": {"suggested_activities": activities}}
         )
         
         if result.matched_count == 0:
-            return f"Error: Destination '{destination_name}' not found in the atlas. Use discover_new_destination first."
+            return f"Error: Destination '{active_dest}' not found in the atlas. Use discover_new_destination first."
             
-        return f"SUCCESS: Activities saved to destination '{destination_name}'."
+        return f"SUCCESS: Activities saved to destination '{active_dest}'."
     except Exception as e:
         return f"Error saving activities to destination: {str(e)}"
 
-async def get_cached_accommodations(destination_name: str) -> str:
+async def get_cached_accommodations(destination_name: str, ctx: Optional[Context] = None) -> str:
     """
     Retrieves a list of highly recommended, pre-cached accommodations for a specific destination from the database.
     Always use this before falling back to search_places.
     """
+    active_dest = _get_active_destination(destination_name, ctx)
     try:
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
             
-        search_name = destination_name.split(',')[0].strip()
-        dest = await destinations_collection.find_one({"name": {"$regex": f"^{search_name}", "$options": "i"}})
+        dest = await destinations_collection.find_one(_build_destination_query(active_dest))
         
         if dest and dest.get("suggested_accommodations"):
             return json.dumps(dest["suggested_accommodations"], default=str)
@@ -219,17 +253,17 @@ async def get_cached_accommodations(destination_name: str) -> str:
     except Exception as e:
         return f"Error fetching cached accommodations: {str(e)}"
 
-async def get_cached_activities(destination_name: str) -> str:
+async def get_cached_activities(destination_name: str, ctx: Optional[Context] = None) -> str:
     """
     Retrieves a list of highly recommended, pre-cached activities and dining options for a specific destination from the database.
     Always use this before falling back to search_places.
     """
+    active_dest = _get_active_destination(destination_name, ctx)
     try:
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
             
-        search_name = destination_name.split(',')[0].strip()
-        dest = await destinations_collection.find_one({"name": {"$regex": f"^{search_name}", "$options": "i"}})
+        dest = await destinations_collection.find_one(_build_destination_query(active_dest))
         
         if dest and dest.get("suggested_activities"):
             return json.dumps(dest["suggested_activities"], default=str)

@@ -52,12 +52,12 @@ async def precache_destinations_task(app: FastAPI):
                     logger.info(f"Autonomously pre-caching missing data for: {city}")
 
                     if not dest.get("suggested_accommodations"):
-                        hotels_json = await search_places(text_query=f"best hotels and resorts in {city}", location_type="lodging")
+                        hotels_json = await search_places(query=f"best hotels and resorts in {city}", location_type="lodging")
                         if hotels_json:
                             await save_destination_accommodations(city, json.loads(hotels_json)[:3])
 
                     if not dest.get("suggested_activities"):
-                        activities_json = await search_places(text_query=f"top things to do and restaurants in {city}")
+                        activities_json = await search_places(query=f"top things to do and restaurants in {city}")
                         if activities_json:
                             await save_destination_activities(city, json.loads(activities_json)[:5])
         except Exception as e:

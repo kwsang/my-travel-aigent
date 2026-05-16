@@ -7,6 +7,20 @@ class GeoCoordinates(BaseModel):
     latitude: float = Field(..., description="The latitude coordinate.")
     longitude: float = Field(..., description="The longitude coordinate.")
 
+class GeoPoint(BaseModel):
+    type: Literal["Point"] = "Point"
+    coordinates: List[float] # [longitude, latitude]
+
+class Destination(BaseModel):
+    name: str
+    state: Optional[str] = None
+    country: str
+    description: str
+    location: GeoPoint
+    vibe_tags: List[str]
+    suggested_accommodations: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    suggested_activities: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+
 class Price(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     amount: float = Field(..., description="The numeric cost of the segment.")

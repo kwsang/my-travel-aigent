@@ -1,8 +1,10 @@
 import json
 import logging
 import asyncio
+from typing import Optional
 from gemini_agent.clients import places_client, gmaps_client
-from gemini_agent.tools.cache import LRUTTLCache
+from gemini_agent.logic.cache import LRUTTLCache
+from google.adk.agents.invocation_context import InvocationContext as Context
 
 logger = logging.getLogger(__name__)
 
@@ -10,10 +12,28 @@ logger = logging.getLogger(__name__)
 _MATRIX_CACHE = LRUTTLCache()
 _PLACES_CACHE = LRUTTLCache()
 
-async def google_maps_matrix(origins: list[str], destinations: list[str]) -> str:
+async def google_maps_matrix(origins: list[str], destinations: list[str], ctx: Optional[Context] = None) -> str:
     """
     Calculates real-time driving time and distance between locations.
     """
+    destination = None
+    if ctx:
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+        itinerary = state.get("final_itinerary") or {}
+        if isinstance(itinerary, str):
+            try: itinerary = json.loads(itinerary)
+            except: itinerary = {}
+        destination = itinerary.get("destination")
+
+    if destination:
+        def anchor_loc(loc: str) -> str:
+            if not any(c.isalpha() for c in str(loc)): return loc # Skip coordinates (e.g. "47.6,-122.3")
+            if destination.lower() in str(loc).lower(): return loc # Skip already anchored strings
+            return f"{loc} in {destination}"
+            
+        origins = [anchor_loc(o) for o in origins]
+        destinations = [anchor_loc(d) for d in destinations]
+
     logger.info(f"Tool invoked: google_maps_matrix with origins {origins} and destinations {destinations}")
     
     # Convert lists to tuples to make them hashable for the cache dictionary
@@ -39,13 +59,27 @@ async def google_maps_matrix(origins: list[str], destinations: list[str]) -> str
     except Exception as e:
         return f"Error calculating distance matrix: {str(e)}"
 
-async def search_places(text_query: str, location_bias: str = None, **kwargs) -> str:
+async def search_places(
+    query: str,
+    location_type: Optional[str] = None,
+    location_bias: Optional[str] = None,
+    interests: Optional[list[str]] = None,
+    ctx: Optional[Context] = None
+) -> str:
     """
-    Searches for venues using the Google Places API.
+    Searches for venues, restaurants, or activities using the Google Places API.
+    Dynamically enriches the query with user interests to improve semantic relevance.
     """
-    logger.info(f"Tool invoked: search_places with query '{text_query}', location_bias '{location_bias}'")
-    
-    cache_key = (text_query, location_bias, frozenset(kwargs.items()))
+    destination = None
+    if ctx:
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+        itinerary = state.get("final_itinerary") or {}
+        if isinstance(itinerary, str):
+            try: itinerary = json.loads(itinerary)
+            except: itinerary = {}
+        destination = itinerary.get("destination")
+
+    cache_key = (query, location_type, location_bias, destination, tuple(interests) if interests else None)
     cached_result = _PLACES_CACHE.get(cache_key)
     if cached_result is not None:
         return cached_result
@@ -54,6 +88,17 @@ async def search_places(text_query: str, location_bias: str = None, **kwargs) ->
         if places_client is None:
             return "Error: Google Places service is currently unavailable."
             
+        enhanced_query = query
+        if interests:
+            interest_context = ", ".join(interests)
+            enhanced_query = f"{query} matching interests: {interest_context}"
+            
+        active_location = destination or location_bias
+        if active_location:
+            enhanced_query += f" in {active_location}"
+            
+        logger.info(f"Tool invoked: search_places with query '{enhanced_query}'")
+
         mask = ("places.displayName,places.id,places.editorialSummary,places.rating,"
                 "places.priceLevel,places.formattedAddress,places.location,places.types,"
                 "places.takeout,places.delivery,places.dineIn,places.curbsidePickup,"
@@ -61,9 +106,8 @@ async def search_places(text_query: str, location_bias: str = None, **kwargs) ->
                 "places.servesBeer,places.servesWine,places.servesVegetarianFood,places.currentOpeningHours,"
                 "places.goodForChildren,places.accessibilityOptions,places.businessStatus,"
                 "places.regularOpeningHours,places.utcOffsetMinutes,places.userRatingCount")
-        query = f"{text_query} in {location_bias}" if location_bias else text_query
-        request = {"text_query": query, "max_result_count": 8}
-        if kwargs.get("location_type"): request["included_type"] = kwargs["location_type"]
+        request = {"text_query": enhanced_query, "max_result_count": 8}
+        if location_type: request["included_type"] = location_type
         
         response = await asyncio.to_thread(
             places_client.search_text,
@@ -93,11 +137,22 @@ async def search_places(text_query: str, location_bias: str = None, **kwargs) ->
     except Exception as e:
         return f"Error searching Google Places: {str(e)}"
 
-async def search_local_events(location: str, query: str = "festivals and events") -> str:
+async def search_local_events(location: str, query: str = "festivals and events", ctx: Optional[Context] = None) -> str:
     """
     Searches for current local events, festivals, and happenings in a specific city.
     Useful for providing real-time value and engagement during the user intake process.
     """
-    logger.info(f"Tool invoked: search_local_events in '{location}' with query '{query}'")
+    destination = None
+    if ctx:
+        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+        itinerary = state.get("final_itinerary") or {}
+        if isinstance(itinerary, str):
+            try: itinerary = json.loads(itinerary)
+            except: itinerary = {}
+        destination = itinerary.get("destination")
+
+    active_location = destination or location
+
+    logger.info(f"Tool invoked: search_local_events in '{active_location}' with query '{query}'")
     # Leverages the robust search_places logic with a specialized event-centric query
-    return await search_places(text_query=f"{query} in {location}")
+    return await search_places(query=query, location_bias=active_location)

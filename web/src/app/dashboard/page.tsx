@@ -15,6 +15,7 @@ import { ItineraryContext } from '@/context/ItineraryContext';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useSidebarResize } from '@/hooks/useSidebarResize';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import SkeletonWrapper from '@/components/dashboard/SkeletonWrapper';
 import TimelineSkeleton from '@/components/dashboard/timeline/TimelineSkeleton';
 import BudgetSkeleton from '@/components/dashboard/budget/BudgetSkeleton';
@@ -62,10 +63,6 @@ export default function DashboardPage() {
   const [showBlankNameAlert, setShowBlankNameAlert] = useState(false);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState<number | null>(null);
-  const isInitialMount = useRef(true);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const [showSavedIndicator, setShowSavedIndicator] = useState(false);
-  const savedIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
 
   // Extracted Data Fetching Hook
@@ -86,6 +83,9 @@ export default function DashboardPage() {
   // Sidebar Resizing State
   const { sidebarWidth, isDragging, setIsDragging, sidebarRef } = useSidebarResize();
 
+  // Extracted Auto-Save Hook
+  const { isAutoSaving, showSavedIndicator } = useAutoSave(itinerary, profile, currentSessionId, visitorId, isLoading, triggerToast);
+
   // Sync editable name when the itinerary data loads
   useEffect(() => {
     setEditedName(itinerary.trip_name || 'New Trip');
@@ -103,67 +103,6 @@ export default function DashboardPage() {
     setActiveSegmentIndex(null);
     setExpandedDays(new Set());
   }, [currentSessionId]);
-
-  // Debounced auto-save for itinerary and profile changes
-  useEffect(() => {
-    // Skip the very first render and any renders while data is still loading.
-    if (isInitialMount.current) {
-      // Once loading is complete, we can mark the initial mount as done.
-      if (!isLoading) {
-        isInitialMount.current = false;
-      }
-      return;
-    }
-
-    // Don't save if we don't have IDs
-    if (!currentSessionId || !visitorId) {
-      return;
-    }
-
-    const debounceTimer = setTimeout(() => {
-      console.log('Auto-saving draft...');
-      setIsAutoSaving(true);
-      setShowSavedIndicator(false);
-
-      // Construct the payload based on ItineraryPatchRequest
-      const payload = {
-        ...itinerary,
-        traveler_profile: profile,
-      };
-
-      fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      .then(response => {
-        if (response.ok) {
-          console.log('Auto-save successful.');
-          // We don't update state here to prevent re-render loops.
-          // The user's local state is the source of truth during editing.
-          setShowSavedIndicator(true);
-          if (savedIndicatorTimeoutRef.current) {
-            clearTimeout(savedIndicatorTimeoutRef.current);
-          }
-          savedIndicatorTimeoutRef.current = setTimeout(() => {
-            setShowSavedIndicator(false);
-          }, 3000);
-        } else {
-          triggerToast('Could not save changes.');
-          console.error('Auto-save failed:', response);
-        }
-      })
-      .catch(e => {
-        triggerToast('Could not save changes.');
-        console.error("Dashboard: Auto-save failed.", e);
-      })
-      .finally(() => {
-        setIsAutoSaving(false);
-      });
-    }, 2500); // 2.5 second debounce delay
-
-    return () => clearTimeout(debounceTimer);
-  }, [itinerary, profile, currentSessionId, visitorId, isLoading, triggerToast]);
 
   const handleRename = async () => {
     const newName = editedName.trim();
@@ -229,12 +168,33 @@ export default function DashboardPage() {
     }
   };
 
-  const handleNewTrip = () => {
-    setCurrentSessionId(uuidv4());
+  const handleNewTrip = async () => {
+    const newSessionId = uuidv4();
+    setCurrentSessionId(newSessionId);
     setIsEditingName(false);
-    setItinerary({ events: [], is_conflict: false, validation_errors: [] });
+    
+    const newItinerary = { 
+      trip_name: 'New Trip',
+      events: [], 
+      is_conflict: false, 
+      validation_errors: [] 
+    };
+    
+    setItinerary(newItinerary);
     setActiveSegmentIndex(null);
     setShowProfileModal(true);
+
+    try {
+      await fetch(`${API_CONFIG.BASE_URL}/itinerary/${newSessionId}?user_id=${visitorId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newItinerary, traveler_profile: profile }),
+      });
+      fetchList();
+    } catch (e) {
+      console.error("Dashboard: Failed to create new trip.", e);
+    }
+    
     triggerToast('Started a new trip!');
   };
 
