@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 # Simple in-memory cache to prevent duplicate API calls
 _MATRIX_CACHE = LRUTTLCache()
 _PLACES_CACHE = LRUTTLCache()
+_GEOCODE_CACHE = LRUTTLCache()
 
-async def google_maps_matrix(origins: list[str], destinations: list[str], ctx: Optional[Context] = None) -> str:
+async def google_maps_matrix(origins: list[str], destinations: list[str], ctx: Context = None) -> str:
     """
     Calculates real-time driving time and distance between locations.
     """
@@ -64,7 +65,7 @@ async def search_places(
     location_type: Optional[str] = None,
     location_bias: Optional[str] = None,
     interests: Optional[list[str]] = None,
-    ctx: Optional[Context] = None
+    ctx: Context = None
 ) -> str:
     """
     Searches for venues, restaurants, or activities using the Google Places API.
@@ -94,8 +95,30 @@ async def search_places(
             enhanced_query = f"{query} matching interests: {interest_context}"
             
         active_location = destination or location_bias
+        location_bias_dict = None
+
         if active_location:
             enhanced_query += f" in {active_location}"
+            
+            # Geocode the location to get coordinates for a 50km bias circle
+            cached_geo = _GEOCODE_CACHE.get(active_location)
+            if cached_geo:
+                location_bias_dict = cached_geo
+            else:
+                try:
+                    geocode_result = await asyncio.to_thread(gmaps_client.geocode, active_location)
+                    if geocode_result:
+                        lat = geocode_result[0]["geometry"]["location"]["lat"]
+                        lng = geocode_result[0]["geometry"]["location"]["lng"]
+                        location_bias_dict = {
+                            "circle": {
+                                "center": {"latitude": lat, "longitude": lng},
+                                "radius": 50000.0  # 50km radius
+                            }
+                        }
+                        _GEOCODE_CACHE.set(active_location, location_bias_dict)
+                except Exception as e:
+                    logger.warning(f"Geocoding failed for {active_location}: {e}")
             
         logger.info(f"Tool invoked: search_places with query '{enhanced_query}'")
 
@@ -108,6 +131,7 @@ async def search_places(
                 "places.regularOpeningHours,places.utcOffsetMinutes,places.userRatingCount")
         request = {"text_query": enhanced_query, "max_result_count": 8}
         if location_type: request["included_type"] = location_type
+        if location_bias_dict: request["location_bias"] = location_bias_dict
         
         response = await asyncio.to_thread(
             places_client.search_text,
@@ -137,7 +161,7 @@ async def search_places(
     except Exception as e:
         return f"Error searching Google Places: {str(e)}"
 
-async def search_local_events(location: str, query: str = "festivals and events", ctx: Optional[Context] = None) -> str:
+async def search_local_events(location: str, query: str = "festivals and events", ctx: Context = None) -> str:
     """
     Searches for current local events, festivals, and happenings in a specific city.
     Useful for providing real-time value and engagement during the user intake process.

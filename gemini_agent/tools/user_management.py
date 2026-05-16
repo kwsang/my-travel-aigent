@@ -3,10 +3,11 @@ import logging
 from typing import Any
 from gemini_agent.clients import destinations_collection
 from gemini_agent.logic.models import TravelerProfile
+from google.adk.agents.invocation_context import InvocationContext as Context
 
 logger = logging.getLogger(__name__)
 
-async def record_user_profile(profile: TravelerProfile, tool_context: Any) -> str:
+async def record_user_profile(profile: TravelerProfile, ctx: Context = None) -> str:
     """
     Saves the gathered user travel preferences into the session state.
     Enforces Couple-First Pricing Logic and updates the profile in DB.
@@ -20,8 +21,8 @@ async def record_user_profile(profile: TravelerProfile, tool_context: Any) -> st
             profile.interests.append("romantic")
 
     # 3. Persistence: Save embedded into the Itinerary document
-    session_id = tool_context.session.id
-    user_id = tool_context.session.user_id
+    session_id = ctx.session.id
+    user_id = ctx.session.user_id
     try:
         db = destinations_collection.database
         await db["itineraries"].update_one(
@@ -32,10 +33,10 @@ async def record_user_profile(profile: TravelerProfile, tool_context: Any) -> st
     except Exception as e:
         logger.error(f"Failed to persist traveler profile to DB: {e}")
 
-    tool_context.state.update({"traveler_profile": profile.model_dump()})
+    ctx.state.update({"traveler_profile": profile.model_dump()})
     return "User profile recorded successfully. Transitioning to Architect mode."
 
-async def query_user_profile(tool_context: Any) -> str:
+async def query_user_profile(ctx: Context = None) -> str:
     """
     Retrieves the current traveler profile for this active itinerary session.
     """
@@ -43,8 +44,8 @@ async def query_user_profile(tool_context: Any) -> str:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
-        user_id = tool_context.session.user_id
-        session_id = tool_context.session.id
+        user_id = ctx.session.user_id
+        session_id = ctx.session.id
         db = destinations_collection.database
         itinerary = await db["itineraries"].find_one({"session_id": session_id, "user_id": user_id})
         if not itinerary or "traveler_profile" not in itinerary:

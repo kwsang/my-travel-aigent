@@ -5,7 +5,7 @@ import asyncio
 from typing import Optional
 from google.adk.agents.invocation_context import InvocationContext as Context
 
-def _get_active_destination(provided_name: str, ctx: Optional[Context]) -> str:
+def _get_active_destination(provided_name: str, ctx: Context = None) -> str:
     if ctx:
         state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
         itinerary = state.get("final_itinerary") or {}
@@ -60,7 +60,7 @@ async def _generate_item_tags(item: dict, valid_tags: list, item_type: str):
     except Exception:
         item["vibe_tags"] = []
 
-async def search_destinations(query: str, ctx: Optional[Context] = None) -> str:
+async def search_destinations(query: str, ctx: Context = None) -> str:
     """
     Performs a semantic search for travel destinations (strictly cities and towns).
     """
@@ -182,7 +182,7 @@ async def discover_new_destination(vibe_or_city: str) -> str:
     except Exception as e:
         return f"Discovery failed: {str(e)}"
 
-async def save_destination_accommodations(destination_name: str, accommodations: list[dict], ctx: Optional[Context] = None) -> str:
+async def save_destination_accommodations(destination_name: str, accommodations: list[dict], ctx: Context = None) -> str:
     """
     Saves a list of suggested accommodations to a specific destination in the atlas.
     Useful for caching great hotel options for a city so users can browse them later.
@@ -208,7 +208,7 @@ async def save_destination_accommodations(destination_name: str, accommodations:
     except Exception as e:
         return f"Error saving accommodations to destination: {str(e)}"
 
-async def save_destination_activities(destination_name: str, activities: list[dict], ctx: Optional[Context] = None) -> str:
+async def save_destination_activities(destination_name: str, activities: list[dict], ctx: Context = None) -> str:
     """
     Saves a list of suggested activities to a specific destination in the atlas.
     Useful for caching great experience and dining options for a city so users can browse them later.
@@ -234,7 +234,7 @@ async def save_destination_activities(destination_name: str, activities: list[di
     except Exception as e:
         return f"Error saving activities to destination: {str(e)}"
 
-async def get_cached_accommodations(destination_name: str, ctx: Optional[Context] = None) -> str:
+async def get_cached_accommodations(destination_name: str, ctx: Context = None) -> str:
     """
     Retrieves a list of highly recommended, pre-cached accommodations for a specific destination from the database.
     Always use this before falling back to search_places.
@@ -253,7 +253,7 @@ async def get_cached_accommodations(destination_name: str, ctx: Optional[Context
     except Exception as e:
         return f"Error fetching cached accommodations: {str(e)}"
 
-async def get_cached_activities(destination_name: str, ctx: Optional[Context] = None) -> str:
+async def get_cached_activities(destination_name: str, ctx: Context = None) -> str:
     """
     Retrieves a list of highly recommended, pre-cached activities and dining options for a specific destination from the database.
     Always use this before falling back to search_places.

@@ -47,7 +47,7 @@ def _fetch_route_sync(origin: str, destination: str, travel_mode: str) -> str:
     except Exception as e:
         return f"Exception occurred while calling Routes API: {str(e)}"
 
-async def get_route_directions(origin: str, destination: str, travel_mode: str = "DRIVE", ctx: Optional[Context] = None) -> str:
+async def get_route_directions(origin: str, destination: str, travel_mode: str = "DRIVE", ctx: Context = None) -> str:
     """
     Gets the route duration and distance between two locations using the Google Routes API.
     
