@@ -49,6 +49,13 @@ export default function TimelineItem({
   const itineraryData = useItineraryData();
   const { viewMode, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex, hoveredSegmentIndex, setHoveredSegmentIndex } = itineraryData;
 
+  // Safely extend details type to avoid 'any' casting for flight-specific fields
+  const flightDetails = event.details as typeof event.details & {
+    from?: string;
+    to?: string;
+    airline?: string;
+  };
+
   const hasConflict = React.useMemo(() => {
     if (!event.details?.name || !itineraryData.itinerary.validation_errors) return false;
     return itineraryData.itinerary.validation_errors.some(err => err.includes(`'${event.details?.name}'`));
@@ -112,16 +119,16 @@ export default function TimelineItem({
                   )}
                 </div>
               )}
-              {event.segment === 'FLIGHT' && (event.details as any)?.from && (event.details as any)?.to ? (
+              {event.segment === 'FLIGHT' && flightDetails?.from && flightDetails?.to ? (
                 <h4 className="font-semibold text-foreground leading-tight flex items-center gap-2">
-                  {(event.details as any).from} <Plane size={14} className="text-muted-foreground" /> {(event.details as any).to}
+                  {flightDetails.from} <Plane size={14} className="text-muted-foreground" /> {flightDetails.to}
                 </h4>
               ) : (
             <h4 className={`font-semibold text-foreground leading-tight ${event.segment === 'LOGISTICS' ? 'text-sm' : ''}`}>{event.details?.name || (event.segment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')}</h4>
               )}
             </div>
-            {event.segment === 'FLIGHT' && (event.details as any)?.airline ? (
-              <p className="text-sm font-medium text-sky-500/80">{(event.details as any).airline}</p>
+            {event.segment === 'FLIGHT' && flightDetails?.airline ? (
+              <p className="text-sm font-medium text-sky-500/80">{flightDetails.airline}</p>
             ) : (
           <p className={`${event.segment === 'LOGISTICS' ? 'text-xs' : 'text-sm'} text-muted-foreground`}>{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
             )}

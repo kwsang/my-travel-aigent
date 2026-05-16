@@ -35,6 +35,8 @@ class EventDetails(BaseModel):
     user_rating_count: Optional[int] = Field(None, description="Number of user reviews.")
     is_rental: bool = Field(default=False, description="True if this is a rental car segment.")
     vehicle_count: int = Field(default=1, description="Number of vehicles for large groups.")
+    travel_mode: Optional[str] = Field(None, description="Mode of transit (e.g. DRIVE, WALK, BICYCLE, TRANSIT).")
+    polyline: Optional[str] = Field(None, description="Encoded polyline string from the routes API for transit segments.")
 
 class UserProfilePreferences(BaseModel):
     risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')

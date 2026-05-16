@@ -11,7 +11,7 @@ import { API_CONFIG } from '@/config/constants';
 import { SegmentType, SegmentColors, SegmentIcons } from '@/components/dashboard/utils/segmentMapping';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
-const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
+const MAPS_LIBRARIES: ("marker" | "places" | "geometry")[] = ["marker", "geometry"];
 
 /**
  * MapHub Component
@@ -212,9 +212,19 @@ function MapInner() {
       path.push(startGeo);
     }
     segments.forEach((segment: Event) => {
+      const details = segment.details as typeof segment.details & { polyline?: string };
       const geo = segment.geo || segment.details?.geo;
       if (geo) {
-        path.push({ lat: geo.latitude, lng: geo.longitude });
+        if (details?.polyline && (window as any).google?.maps?.geometry?.encoding) {
+          try {
+            const decoded = (window as any).google.maps.geometry.encoding.decodePath(details.polyline);
+            decoded.forEach((p: any) => path.push({ lat: p.lat(), lng: p.lng() }));
+          } catch (e) {
+            path.push({ lat: geo.latitude, lng: geo.longitude });
+          }
+        } else {
+          path.push({ lat: geo.latitude, lng: geo.longitude });
+        }
       }
     });
     return path;
@@ -225,26 +235,55 @@ function MapInner() {
     const edges: { path: { lat: number; lng: number }[], options: any }[] = [];
     const validSegments = segments.filter((s: Event) => s.geo || s.details?.geo);
     
+    const getOptions = (segment: Event) => {
+      const details = segment.details as typeof segment.details & { travel_mode?: string };
+      const mode = details?.travel_mode || (segment.segment === 'FLIGHT' ? 'FLIGHT' : 'DRIVE');
+      let strokeOpacity = 0.8;
+      let strokeWeight = 4;
+      let icons = undefined;
+
+      if (segment.segment === 'FLIGHT' || mode === 'FLIGHT') {
+        strokeOpacity = 0;
+        icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 3 }, offset: '0', repeat: '15px' }];
+      } else if (mode === 'WALK' || mode === 'BICYCLE') {
+        strokeOpacity = 0;
+        strokeWeight = 3;
+        icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 2 }, offset: '0', repeat: '10px' }];
+      } else if (mode === 'TRANSIT') {
+        strokeOpacity = 0;
+        strokeWeight = 5;
+        icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.8, scale: 4 }, offset: '0', repeat: '20px' }];
+      }
+
+      return {
+        strokeColor: SegmentColors[segment.segment as SegmentType]?.bg || (segment.segment === 'FLIGHT' ? '#296eb4' : '#fdb833'),
+        strokeOpacity,
+        strokeWeight,
+        geodesic: true,
+        icons
+      };
+    };
+
     if (startGeo && validSegments.length > 0) {
       const firstSegment = validSegments[0];
+      const firstDetails = firstSegment.details as typeof firstSegment.details & { polyline?: string };
       const firstGeo = firstSegment.geo || firstSegment.details?.geo;
       if (firstGeo) {
+        let path = [
+          startGeo,
+          { lat: firstGeo.latitude, lng: firstGeo.longitude }
+        ];
+
+        if (firstDetails?.polyline && (window as any).google?.maps?.geometry?.encoding) {
+          try {
+            const decoded = (window as any).google.maps.geometry.encoding.decodePath(firstDetails.polyline);
+            path = decoded.map((p: any) => ({ lat: p.lat(), lng: p.lng() }));
+          } catch (e) {}
+        }
+
         edges.push({
-          path: [
-            startGeo,
-            { lat: firstGeo.latitude, lng: firstGeo.longitude }
-          ],
-          options: {
-            strokeColor: SegmentColors[firstSegment.segment as SegmentType]?.bg || (firstSegment.segment === 'FLIGHT' ? '#296eb4' : '#fdb833'),
-            strokeOpacity: firstSegment.segment === 'FLIGHT' ? 0 : 0.8,
-            strokeWeight: 4,
-            geodesic: true,
-            icons: firstSegment.segment === 'FLIGHT' ? [{
-              icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 3 },
-              offset: '0',
-              repeat: '15px'
-            }] : undefined,
-          }
+          path: path,
+          options: getOptions(firstSegment)
         });
       }
     }
@@ -252,26 +291,26 @@ function MapInner() {
     for (let i = 1; i < validSegments.length; i++) {
       const prev = validSegments[i - 1];
       const curr = validSegments[i];
+      const currDetails = curr.details as typeof curr.details & { polyline?: string };
       const prevGeo = prev.geo || prev.details?.geo;
       const currGeo = curr.geo || curr.details?.geo;
       
       if (prevGeo && currGeo) {
+        let path = [
+          { lat: prevGeo.latitude, lng: prevGeo.longitude },
+          { lat: currGeo.latitude, lng: currGeo.longitude }
+        ];
+
+        if (currDetails?.polyline && (window as any).google?.maps?.geometry?.encoding) {
+          try {
+            const decoded = (window as any).google.maps.geometry.encoding.decodePath(currDetails.polyline);
+            path = decoded.map((p: any) => ({ lat: p.lat(), lng: p.lng() }));
+          } catch (e) {}
+        }
+
         edges.push({
-          path: [
-            { lat: prevGeo.latitude, lng: prevGeo.longitude },
-            { lat: currGeo.latitude, lng: currGeo.longitude }
-          ],
-          options: {
-            strokeColor: SegmentColors[curr.segment as SegmentType]?.bg || (curr.segment === 'FLIGHT' ? '#296eb4' : '#fdb833'),
-            strokeOpacity: curr.segment === 'FLIGHT' ? 0 : 0.8,
-            strokeWeight: 4,
-            geodesic: true,
-            icons: curr.segment === 'FLIGHT' ? [{
-              icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 3 },
-              offset: '0',
-              repeat: '15px'
-            }] : undefined,
-          }
+          path: path,
+          options: getOptions(curr)
         });
       }
     }
