@@ -210,6 +210,11 @@ export default function TimelineView() {
 
     // Trigger debounced API sync
     syncItinerary(newSegments);
+
+    // Communicate the move to the agent
+    window.dispatchEvent(new CustomEvent('travel_aigent_timeline_drag_drop', {
+      detail: { item: draggedItem, originalDay, targetDay, updatedSegments: newSegments }
+    }));
   };
 
   return (

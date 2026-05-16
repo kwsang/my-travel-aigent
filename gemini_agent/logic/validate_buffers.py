@@ -50,26 +50,17 @@ def to_utc_aware(ts):
 
 def check_event_overlap(current_event: dict, next_event: dict):
     """
-    Determines if two events overlap. 
-    Special Case: Accommodation 'Stay' events are treated as point-in-time check-ins 
-    to allow other activities during the stay.
+    Determines if two events overlap.
     """
     # 1. Determine End Time of Current Event
     current_schedule = current_event.get("schedule", {})
-    current_details = current_event.get("details", {})
 
-    if current_event.get("segment") == "ACCOMMODATION" and "Stay" in current_details.get("name", ""):
-        current_start_str = current_schedule.get("local_start_time") or current_schedule.get("start_time_utc")
-        if not current_start_str: return False, 0
-        current_start = to_utc_aware(current_start_str)
-        current_end = current_start + datetime.timedelta(minutes=30)
-    else:
-        current_end_str = (current_schedule.get("local_end_time") or 
-                           current_schedule.get("local_start_time") or 
-                           current_schedule.get("end_time_utc") or 
-                           current_schedule.get("start_time_utc"))
-        if not current_end_str: return False, 0
-        current_end = to_utc_aware(current_end_str)
+    current_end_str = (current_schedule.get("local_end_time") or 
+                       current_schedule.get("local_start_time") or 
+                       current_schedule.get("end_time_utc") or 
+                       current_schedule.get("start_time_utc"))
+    if not current_end_str: return False, 0
+    current_end = to_utc_aware(current_end_str)
 
     # 2. Determine Start Time of Next Event
     next_schedule = next_event.get("schedule", {})
@@ -156,7 +147,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         ))
 
         # 1.5 Overlap Check
-        overlap_check_events = [e for e in day_events if e.get("segment") != "LOGISTICS"]
+        overlap_check_events = [e for e in day_events if e.get("segment") not in ["LOGISTICS", "ACCOMMODATION"]]
         for i in range(len(overlap_check_events) - 1):
             current_event = overlap_check_events[i]
             next_event = overlap_check_events[i+1]

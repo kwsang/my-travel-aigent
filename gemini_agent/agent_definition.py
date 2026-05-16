@@ -162,6 +162,8 @@ def create_travel_agent():
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST span exactly {duration} Days."
             
+        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state."
+
         return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
 
     def get_activity_planner_instructions(ctx: Context) -> str:
@@ -179,6 +181,8 @@ def create_travel_agent():
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST span exactly {duration} Days."
             
+        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state."
+
         return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
 
     pioneer_agent = Agent(
@@ -213,7 +217,6 @@ def create_travel_agent():
             finalize_tool,
             clone_tool
         ],
-        sub_agents=[pioneer_agent, activity_planner_agent],
         output_key="final_itinerary",
         description="Expert travel planner. Researches destinations, venues, and travel times to build high-fidelity itineraries."
     )
@@ -258,7 +261,9 @@ def create_travel_agent():
 
         return (
             f"You are the Travel Supervisor. {handoff_context} "
-            "Transfer the user to the 'architect' (which will delegate to its sub-agents) to handle research and itinerary building. "
+            "If the user asks specifically about travel, flights, or accommodation, transfer directly to the 'travel_pioneer'. "
+            "If the user asks specifically about activities or dining, transfer directly to the 'activity_planner'. "
+            "Otherwise, transfer the user to the 'architect' to handle overall research and itinerary coordination. "
             "Once an itinerary is built, ensure the user is satisfied."
         )
 
@@ -266,8 +271,8 @@ def create_travel_agent():
         name="travel_supervisor",
         model="gemini-2.5-flash", # gemini-1.5-flash is a hallucination
         instruction=supervisor_instructions,
-        sub_agents=[concierge_agent, architect_agent],
-        description="Orchestrates the travel planning process between the Concierge and the Architect."
+        sub_agents=[concierge_agent, architect_agent, pioneer_agent, activity_planner_agent],
+        description="Orchestrates the travel planning process between the Concierge, Architect, and Specialists."
     )
 
     # 6. Create the App with Context Caching (as seen in samples)

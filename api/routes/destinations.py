@@ -44,7 +44,7 @@ async def get_popular_destinations(limit: int = 8, db: AsyncIOMotorDatabase = De
             emoji = random.choice(DEFAULT_EMOJIS)
             
         result.append({
-            "name": f"{dest.get('name', 'Unknown')}, {dest.get('country', 'USA')}".strip(", "),
+            "name": f"{dest.get('name', 'Unknown')}, {dest.get('state', dest.get('country', ''))}".strip(", "),
             "lat": coords[1],
             "lng": coords[0],
             "emoji": emoji

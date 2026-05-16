@@ -31,9 +31,12 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isProcessingRef = useRef(false);
+  const isMessagesHoveredRef = useRef(false);
+  const prevMessagesLengthRef = useRef(messages.length);
 
   // Fetch history when session changes
   useEffect(() => {
@@ -67,14 +70,28 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
 
   // Auto-scroll to bottom on new messages or loading state change
   useEffect(() => {
-    if (scrollRef.current) {
+    if (!scrollRef.current) return;
+    
+    const isAtBottom = scrollRef.current.scrollHeight - scrollRef.current.scrollTop - scrollRef.current.clientHeight <= 50;
+    const isNewMessage = messages.length > prevMessagesLengthRef.current;
+    
+    if (isNewMessage) {
+      if (isMessagesHoveredRef.current || !isAtBottom) {
+        setHasUnreadMessages(true);
+      } else {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    } else if (!isMessagesHoveredRef.current && isAtBottom) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+    
+    prevMessagesLengthRef.current = messages.length;
   }, [messages, isLoading]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      setHasUnreadMessages(false);
     }
   };
 
@@ -82,7 +99,11 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
     // Show button if user scrolls up more than 50px from bottom
-    setShowScrollButton(scrollHeight - scrollTop - clientHeight > 50);
+    const isAtBottom = scrollHeight - scrollTop - clientHeight <= 50;
+    setShowScrollButton(!isAtBottom);
+    if (isAtBottom && hasUnreadMessages) {
+      setHasUnreadMessages(false);
+    }
   };
 
   // Spacebar to scroll down when hovering
@@ -192,80 +213,36 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     const msg = input.trim();
     setInput('');
     sendMessage(msg);
+    setTimeout(scrollToBottom, 100);
   };
 
-  // Listen for custom destination events from the map
+  // Listen for manual timeline drag and drop events
   useEffect(() => {
-    const handleSetDestination = (e: Event) => {
-      const customEvent = e as CustomEvent<string>;
-      const destination = customEvent.detail;
+    const handleTimelineDragDrop = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      const { item, originalDay, targetDay, updatedSegments } = customEvent.detail;
       
-      if (destination && !isLoading) {
+      if (!isLoading && item) {
+        const itemName = item.details?.name || item.segment || 'an event';
+        const updatedItinerary = { ...itinerary, events: updatedSegments };
+        
+        let actionText = `from Day ${originalDay} to Day ${targetDay}`;
+        if (originalDay === targetDay) {
+          actionText = `to a new time on Day ${targetDay}`;
+        }
+
         sendMessage(
-          `I'd like to plan a trip to ${destination}. Please build out my entire itinerary including flights, accommodation, activities, and dining.`, 
-          { ...itinerary, destination },
+          `I manually dragged and dropped ${itemName} ${actionText}. Please review the updated timeline for any conflicts, adjust the schedule to fit, and verify the budget.`,
+          updatedItinerary,
           undefined,
-          `I'd like to plan a trip to ${destination}.`
+          `I moved ${itemName} ${actionText}.`
         );
       }
     };
 
-    window.addEventListener('travel_aigent_set_destination', handleSetDestination);
-    return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
+    window.addEventListener('travel_aigent_timeline_drag_drop', handleTimelineDragDrop);
+    return () => window.removeEventListener('travel_aigent_timeline_drag_drop', handleTimelineDragDrop);
   }, [sendMessage, isLoading, itinerary]);
-
-  // Listen for accommodation selection events from the map
-  useEffect(() => {
-    const handleSelectAccommodation = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
-      const place = customEvent.detail;
-      
-      if (place && !isLoading) {
-        const placeName = place.details?.name || place.displayName?.text || place.name || 'that accommodation';
-        const placeData = {
-          name: placeName,
-          geo: place.geo || place.details?.geo || place.location,
-          price: place.details?.price || place.priceLevel || place.price_tier || place.price,
-          rating: place.details?.rating || place.rating
-        };
-        
-        const updatedItinerary = { ...itinerary };
-        
-        // Try to load suggested activities from the destination in MongoDB first
-        fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination || '')}`)
-          .then(res => res.ok ? res.json() : null)
-          .then(destData => {
-            if (destData?.suggested_activities && destData.suggested_activities.length > 0) {
-              sendMessage(
-                `Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details, and then review the budget and adjust any surrounding activities if necessary.`, 
-                updatedItinerary,
-                undefined,
-                `Please change my accommodation to ${placeName}.`
-              );
-            } else {
-              sendMessage(
-                `Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details. We don't have any activities cached for this city yet, so please research and schedule some activities and dining options.`, 
-                updatedItinerary,
-                undefined,
-                `Please change my accommodation to ${placeName} and suggest some activities.`
-              );
-            }
-          })
-          .catch(() => {
-            // Fallback if fetch fails
-            sendMessage(
-              `Please change my accommodation to this specific venue:\n\`\`\`json\n${JSON.stringify(placeData, null, 2)}\n\`\`\`\n\nUpdate the \`accommodation\` field and the ACCOMMODATION event in the itinerary with these exact details, and then review the budget and adjust any surrounding activities if necessary.`, 
-              updatedItinerary,
-              undefined,
-              `Please change my accommodation to ${placeName}.`
-            );
-          });
-      }
-    };
-
-    window.addEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
-    return () => window.removeEventListener('travel_aigent_select_accommodation', handleSelectAccommodation);
-  }, [sendMessage, isLoading, itinerary, setItinerary]);
 
   // Listen for profile update events from the profile modal
   useEffect(() => {
@@ -309,7 +286,13 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       </div>
 
       {/* Messages Area */}
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40">
+      <div 
+        ref={scrollRef} 
+        onScroll={handleScroll} 
+        onMouseEnter={() => { isMessagesHoveredRef.current = true; }}
+        onMouseLeave={() => { isMessagesHoveredRef.current = false; }}
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40"
+      >
         {messages.map((m: ChatMessage, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex gap-3 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -341,13 +324,14 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       </div>
 
       {/* Scroll to Bottom Button */}
-      {showScrollButton && (
+      {(showScrollButton || hasUnreadMessages) && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-20 right-6 p-2 bg-primary/90 text-primary-foreground rounded-full shadow-lg hover:bg-primary transition-all z-10 animate-in fade-in zoom-in-95"
+          className={`absolute bottom-20 right-6 flex items-center gap-1 p-2 ${hasUnreadMessages ? 'pr-4' : ''} bg-primary/90 text-primary-foreground rounded-full shadow-lg hover:bg-primary transition-all z-10 animate-in fade-in zoom-in-95`}
           title="Scroll to bottom (Space)"
         >
           <ChevronDown size={18} />
+          {hasUnreadMessages && <span className="text-xs font-semibold">New messages</span>}
         </button>
       )}
 

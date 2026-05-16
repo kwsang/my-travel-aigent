@@ -1,6 +1,6 @@
 import React from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { Sparkles, GripVertical, Star, Plane } from 'lucide-react';
+import { Sparkles, GripVertical, Star, Plane, AlertTriangle } from 'lucide-react';
 import { Event } from '@/types';
 import { SegmentType, SegmentIcons, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
 import { formatTime } from '@/utils/dateUtils';
@@ -49,6 +49,11 @@ export default function TimelineItem({
   const itineraryData = useItineraryData();
   const { viewMode, partySize, riskTolerance, activeSegmentIndex, setActiveSegmentIndex, hoveredSegmentIndex, setHoveredSegmentIndex } = itineraryData;
 
+  const hasConflict = React.useMemo(() => {
+    if (!event.details?.name || !itineraryData.itinerary.validation_errors) return false;
+    return itineraryData.itinerary.validation_errors.some(err => err.includes(`'${event.details?.name}'`));
+  }, [event.details?.name, itineraryData.itinerary.validation_errors]);
+
   return (
     <div
       id={`timeline-item-${absoluteIndex}`}
@@ -66,7 +71,9 @@ export default function TimelineItem({
       onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
       onMouseLeave={() => setHoveredSegmentIndex?.(null)}
       className={`relative rounded-xl border ${event.segment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer active:cursor-grab group ${
-        event.segment === 'FLIGHT' ? 'border-sky-500/30 bg-sky-500/5' : 'border-border bg-card/50'
+        hasConflict 
+          ? 'border-destructive/60 bg-destructive/10' 
+          : (event.segment === 'FLIGHT' ? 'border-sky-500/30 bg-sky-500/5' : 'border-border bg-card/50')
       } ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
       } ${
@@ -81,6 +88,11 @@ export default function TimelineItem({
       <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
         <GripVertical size={14} />
       </div>
+      {hasConflict && (
+        <div className="absolute -right-2 -top-2 bg-destructive text-destructive-foreground p-1 rounded-full shadow-sm animate-in zoom-in" title="This item has a scheduling conflict">
+          <AlertTriangle size={12} />
+        </div>
+      )}
       <div className="flex items-start justify-between">
       <div className={`flex flex-col ${event.segment === 'LOGISTICS' ? 'gap-0.5' : 'gap-1'}`}>
           <span 

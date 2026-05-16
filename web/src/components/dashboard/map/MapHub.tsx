@@ -55,6 +55,12 @@ function MapInner() {
 
   const [destinationInfo, setDestinationInfo] = React.useState<any>(null);
 
+  const [hoveredPopularIndex, setHoveredPopularIndex] = React.useState<number | null>(null);
+  const hoveredPopularIndexRef = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    hoveredPopularIndexRef.current = hoveredPopularIndex;
+  }, [hoveredPopularIndex]);
+
   React.useEffect(() => {
     if (itinerary.destination) {
       fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
@@ -66,14 +72,24 @@ function MapInner() {
     }
   }, [itinerary.destination]);
 
+  const fetchPopular = React.useCallback(() => {
+    fetch(`${API_CONFIG.BASE_URL}/destinations/popular`)
+      .then(res => res.json())
+      .then(data => setPopularDestinations(data))
+      .catch(err => console.error("Failed to load popular destinations", err));
+  }, []);
+
   React.useEffect(() => {
-    if (segments.length === 0 && popularDestinations.length === 0) {
-      fetch(`${API_CONFIG.BASE_URL}/destinations/popular`)
-        .then(res => res.json())
-        .then(data => setPopularDestinations(data))
-        .catch(err => console.error("Failed to load popular destinations", err));
+    if (segments.length === 0 && !itinerary.destination) {
+      fetchPopular();
+      const intervalId = setInterval(() => {
+        if (hoveredPopularIndexRef.current === null) {
+          fetchPopular();
+        }
+      }, 8000); // Refresh every 8 seconds, pausing if hovered
+      return () => clearInterval(intervalId);
     }
-  }, [segments.length, popularDestinations.length]);
+  }, [segments.length, itinerary.destination, fetchPopular]);
 
   // Extract starting location from profile preferences (populated by the Concierge agent)
   const startingLocation = profile?.preferences?.starting_location;
@@ -157,7 +173,6 @@ function MapInner() {
     }
     destinationInfo?.suggested_accommodations?.forEach((p: any) => coords.push(getCoords(p)));
     destinationInfo?.suggested_activities?.forEach((p: any) => coords.push(getCoords(p)));
-    popularDestinations.forEach(d => coords.push(`${d.lat.toFixed(5)},${d.lng.toFixed(5)}`));
 
     if (startGeo) {
       coords.push(`${startGeo.lat.toFixed(5)},${startGeo.lng.toFixed(5)}`);
@@ -165,7 +180,7 @@ function MapInner() {
 
     // Sort to ensure order doesn't matter, then stringify for a stable dependency.
     return JSON.stringify(coords.filter(Boolean).sort());
-  }, [segments, itinerary.accommodation, destinationInfo, popularDestinations, startGeo]);
+  }, [segments, itinerary.accommodation, destinationInfo, startGeo]);
 
   // Generate the sequential path for the polyline
   const routePath = React.useMemo(() => {
@@ -374,6 +389,28 @@ function MapInner() {
               </div>
             </AdvancedMarker>
           )}
+
+          {/* Popular Destinations Markers */}
+          {segments.length === 0 && !itinerary.destination && popularDestinations.map((dest, idx) => (
+            <AdvancedMarker
+              key={`popular-${dest.name}-${idx}`}
+              position={{ lat: dest.lat, lng: dest.lng }}
+              title={dest.name}
+              onClick={() => setItinerary?.(prev => ({ ...prev, destination: dest.name }))}
+              onMouseEnter={() => setHoveredPopularIndex(idx)}
+              onMouseLeave={() => setHoveredPopularIndex(null)}
+              zIndex={hoveredPopularIndex === idx ? 100 : 1}
+            >
+              <div className="flex flex-col items-center group transition-transform hover:scale-110 animate-in fade-in zoom-in duration-500 cursor-pointer">
+                <div className="bg-card border border-white/20 shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-primary group-hover:shadow-primary/20 transition-colors">
+                  {dest.emoji}
+                </div>
+                <div className="bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase text-foreground/80 border border-white/10 whitespace-nowrap pointer-events-none shadow-lg">
+                  {dest.name}
+                </div>
+              </div>
+            </AdvancedMarker>
+          ))}
 
           {/* Polyline Routes */}
           {routeEdges.map((edge, index) => (
