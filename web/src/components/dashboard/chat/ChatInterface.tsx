@@ -37,6 +37,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const isProcessingRef = useRef(false);
   const isMessagesHoveredRef = useRef(false);
   const prevMessagesLengthRef = useRef(messages.length);
+  const profileUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch history when session changes
   useEffect(() => {
@@ -244,20 +245,67 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('travel_aigent_timeline_drag_drop', handleTimelineDragDrop);
   }, [sendMessage, isLoading, itinerary]);
 
-  // Listen for profile update events from the profile modal
+  // Listen for custom destination events from the map
+  useEffect(() => {
+    const handleSetDestination = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const destination = customEvent.detail;
+      
+      if (destination && !isLoading) {
+        const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
+        const updatedItinerary = { 
+          ...itinerary, 
+          destination,
+          ...(isDefaultName ? { trip_name: `${destination} Trip` } : {})
+        };
+
+        sendMessage(
+          `I've selected ${destination} as my destination. Please communicate with the travel_pioneer to determine travel and accommodations based on my traveler profile.`, 
+          updatedItinerary,
+          undefined,
+          `I've selected ${destination}. Can you determine travel and accommodations?`
+        );
+      }
+    };
+
+    window.addEventListener('travel_aigent_set_destination', handleSetDestination);
+    return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
+  }, [sendMessage, isLoading, itinerary]);
+
+  // Listen for targeted profile update events from the profile modal
   useEffect(() => {
     const handleProfileUpdated = (e: Event) => {
       const customEvent = e as CustomEvent<any>;
-      const updatedProfile = customEvent.detail;
+      const { updatedProfile, targetAgent, changeDesc } = customEvent.detail;
       
-      if (updatedProfile && !isLoading) {
-        sendMessage(`I've updated my traveler profile and budget constraints. Please review and adjust the itinerary if needed.`, undefined, updatedProfile);
+      if (updatedProfile && targetAgent && !isLoading) {
+        if (profileUpdateTimerRef.current) {
+          clearTimeout(profileUpdateTimerRef.current);
+        }
+        
+        profileUpdateTimerRef.current = setTimeout(() => {
+          const updatedItinerary = {
+            ...itinerary,
+            budget: updatedProfile.budget || itinerary.budget
+          };
+          sendMessage(
+            `I've updated my ${changeDesc} in my traveler profile. Please communicate directly with the ${targetAgent} to review and adjust the itinerary if needed.`, 
+            updatedItinerary,
+            updatedProfile,
+            `I've updated my ${changeDesc}. Please review the itinerary.`
+          );
+        }, 3000); // 3-second debounce window
       }
     };
 
     window.addEventListener('travel_aigent_profile_updated', handleProfileUpdated);
-    return () => window.removeEventListener('travel_aigent_profile_updated', handleProfileUpdated);
-  }, [sendMessage, isLoading]);
+    return () => {
+      window.removeEventListener('travel_aigent_profile_updated', handleProfileUpdated);
+      if (profileUpdateTimerRef.current) {
+        clearTimeout(profileUpdateTimerRef.current);
+      }
+    };
+  }, [sendMessage, isLoading, itinerary]);
 
   return (
     <>

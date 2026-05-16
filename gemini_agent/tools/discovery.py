@@ -3,6 +3,41 @@ from gemini_agent.clients import voyage_client, destinations_collection, places_
 from .models import Destination
 import asyncio
 
+VALID_VIBES = [
+    "historic", "coastal", "romantic", "city", "urban", "mountain", 
+    "nature", "beach", "desert", "adventure", "culture", "food", 
+    "tropical", "winter"
+]
+
+VALID_ACCOMMODATION_TAGS = [
+    "luxury", "budget", "boutique", "resort", "historic", "romantic", 
+    "family", "business", "hostel", "bnb"
+]
+
+VALID_ACTIVITY_TAGS = [
+    "outdoor", "indoor", "cultural", "food", "nightlife", "shopping", 
+    "nature", "adventure", "relaxing", "family", "tour", "museum"
+]
+
+async def _generate_item_tags(item: dict, valid_tags: list, item_type: str):
+    """Helper to auto-generate tags for a given item using the discovery model."""
+    if not discovery_model:
+        item["vibe_tags"] = []
+        return
+    name = item.get("name", "Unknown")
+    desc = item.get("description", "")
+    prompt = (
+        f"Given the {item_type} '{name}' with description '{desc}', "
+        f"choose 1 to 3 of the most appropriate tags from this exact list: {', '.join(valid_tags)}. "
+        f"Return ONLY the tags as a comma-separated list, nothing else."
+    )
+    try:
+        resp = await discovery_model.generate_content_async(prompt)
+        suggested = [t.strip().lower() for t in resp.text.split(',')]
+        item["vibe_tags"] = [t for t in suggested if t in valid_tags]
+    except Exception:
+        item["vibe_tags"] = []
+
 async def search_destinations(query: str) -> str:
     """
     Performs a semantic search for travel destinations (strictly cities and towns).
@@ -60,7 +95,7 @@ async def discover_new_destination(vibe_or_city: str) -> str:
         if await destinations_collection.find_one({"name": {"$regex": f"^{candidate.split(',')[0]}", "$options": "i"}}):
             return f"Destination '{candidate}' is already in the atlas."
 
-        mask = "places.displayName,places.location,places.formattedAddress,places.types"
+        mask = "places.displayName,places.location,places.formattedAddress,places.types,places.addressComponents"
         request = {"text_query": f"{candidate}, USA", "included_type": "locality", "max_result_count": 1}
         
         response = await asyncio.to_thread(
@@ -76,15 +111,37 @@ async def discover_new_destination(vibe_or_city: str) -> str:
         description = (f"The city of {place.display_name.text}. A US destination discovered for its "
                       f"'{vibe_or_city}' characteristics, located in {place.formatted_address}.")
         
+        state = ""
+        for component in place.address_components:
+            if "administrative_area_level_1" in component.types:
+                state = component.short_text
+                break
+
+        vibe_prompt = (
+            f"Given the destination '{place.display_name.text}' with description '{description}', "
+            f"choose 2 to 4 of the most appropriate vibe tags from this exact list: {', '.join(VALID_VIBES)}. "
+            f"Return ONLY the tags as a comma-separated list, nothing else."
+        )
+        try:
+            vibe_response = await discovery_model.generate_content_async(vibe_prompt)
+            suggested_tags = [t.strip().lower() for t in vibe_response.text.split(',')]
+            vibe_tags = [t for t in suggested_tags if t in VALID_VIBES]
+        except Exception:
+            vibe_tags = []
+            
+        if not vibe_tags:
+            vibe_tags = vibe_or_city.lower().split()
+
         embed_resp = await asyncio.to_thread(voyage_client.embed, [description], model="voyage-4", input_type="document")
         embedding = embed_resp.embeddings[0]
         new_dest = {
             "name": place.display_name.text,
+            "state": state,
             "country": "USA",
             "description": description,
             "description_embedding": embedding,
             "location": {"type": "Point", "coordinates": [place.location.longitude, place.location.latitude]},
-            "vibe_tags": vibe_or_city.lower().split()
+            "vibe_tags": vibe_tags
         }
         await destinations_collection.insert_one(new_dest)
         return f"SUCCESS: Added '{place.display_name.text}' to the atlas."
@@ -99,6 +156,10 @@ async def save_destination_accommodations(destination_name: str, accommodations:
     try:
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
+            
+        # Concurrently generate vibe tags for all incoming accommodations
+        tasks = [_generate_item_tags(acc, VALID_ACCOMMODATION_TAGS, "accommodation") for acc in accommodations]
+        await asyncio.gather(*tasks)
             
         search_name = destination_name.split(',')[0].strip()
         result = await destinations_collection.update_one(
@@ -121,6 +182,10 @@ async def save_destination_activities(destination_name: str, activities: list[di
     try:
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
+            
+        # Concurrently generate vibe tags for all incoming activities
+        tasks = [_generate_item_tags(act, VALID_ACTIVITY_TAGS, "activity") for act in activities]
+        await asyncio.gather(*tasks)
             
         search_name = destination_name.split(',')[0].strip()
         result = await destinations_collection.update_one(

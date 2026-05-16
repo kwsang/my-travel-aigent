@@ -14,9 +14,9 @@ export const SegmentIcons: Record<SegmentType, LucideIcon> = {
 
 export const SegmentColors: Record<SegmentType, { bg: string }> = {
   ACCOMMODATION: { bg: '#ffd07b' }, // Jasmine
-  DINING: { bg: '#b1740f' }, // Copperwood
-  EXPERIENCE: { bg: '#fdb833' }, // Sunflower Gold
+  DINING: { bg: '#f43f5e' }, // Sunset Rose
+  EXPERIENCE: { bg: '#a855f7' }, // Twilight Purple
   FLIGHT: { bg: '#296eb4' }, // Bright Marine
   TRANSPORT: { bg: '#1789fc' }, // Blue Energy
-  LOGISTICS: { bg: '#b1740f' }, // Copperwood
+  LOGISTICS: { bg: '#64748b' }, // Slate Gray
 };

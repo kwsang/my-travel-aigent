@@ -17,10 +17,9 @@ import { useTimelineSync } from '@/hooks/useTimelineSync';
  * Supports Phase 4 logic for risk tolerance buffers.
  */
 export default function TimelineView() {
-  const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex, profile, viewMode, partySize } = useItineraryData();
+  const { itinerary, setItinerary, sessionId, userId, segments, activeSegmentIndex, profile, viewMode, partySize, expandedDays, setExpandedDays } = useItineraryData();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | string | null>(null);
-  const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
   
   const activeDay = activeSegmentIndex !== null ? segments[activeSegmentIndex]?.day : null;
   const { isSyncing, syncItinerary } = useTimelineSync(sessionId, userId, setItinerary);
@@ -32,10 +31,10 @@ export default function TimelineView() {
       const segmentDay = segments[activeSegmentIndex]?.day;
       if (segmentDay) {
         // Auto-expand the day if it is currently collapsed
-        setCollapsedDays(prev => {
-          if (!prev.has(segmentDay)) return prev;
+        setExpandedDays(prev => {
+          if (prev.has(segmentDay)) return prev;
           const next = new Set(prev);
-          next.delete(segmentDay);
+          next.add(segmentDay);
           return next;
         });
       }
@@ -51,7 +50,39 @@ export default function TimelineView() {
     return () => {
       if (scrollTimeout) clearTimeout(scrollTimeout);
     };
-  }, []);
+  }, [activeSegmentIndex, segments]);
+
+  const prevSegmentsRef = React.useRef(segments);
+
+  // Auto-expand days when new items are added to them
+  React.useEffect(() => {
+    const prevSegments = prevSegmentsRef.current;
+    if (segments !== prevSegments) {
+      const addedDays = new Set<number>();
+      
+      const prevDayCounts = new Map<number, number>();
+      prevSegments.forEach(s => prevDayCounts.set(s.day, (prevDayCounts.get(s.day) || 0) + 1));
+      
+      const currDayCounts = new Map<number, number>();
+      segments.forEach(s => currDayCounts.set(s.day, (currDayCounts.get(s.day) || 0) + 1));
+      
+      currDayCounts.forEach((count, day) => {
+        if (count > (prevDayCounts.get(day) || 0)) {
+          addedDays.add(day);
+        }
+      });
+
+      if (addedDays.size > 0) {
+        setExpandedDays(prev => {
+          const next = new Set(prev);
+          addedDays.forEach(day => next.add(day));
+          return next;
+        });
+      }
+
+      prevSegmentsRef.current = segments;
+    }
+  }, [segments]);
 
   // Determine the baseline start date of the trip for calendar labeling
   const baseTripStartDate = React.useMemo(() => {
@@ -75,7 +106,7 @@ export default function TimelineView() {
   }, [segments, profile?.preferences?.start_date]);
 
   const toggleDay = (day: number) => {
-    setCollapsedDays(prev => {
+    setExpandedDays(prev => {
       const next = new Set(prev);
       if (next.has(day)) next.delete(day);
       else next.add(day);
@@ -84,8 +115,13 @@ export default function TimelineView() {
   };
 
   // Extract unique days and sort them
-  const days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
-  const hasAnyCollapsed = collapsedDays.size > 0;
+  let days = Array.from(new Set(segments.map((s) => s.day))).sort((a, b) => a - b);
+  const targetDuration = profile?.preferences?.target_duration_days || itinerary?.duration_days || 0;
+  if (targetDuration > 0) {
+    const maxDay = Math.max(days.length > 0 ? Math.max(...days) : 0, targetDuration);
+    days = Array.from({ length: maxDay }, (_, i) => i + 1);
+  }
+  const hasAnyCollapsed = expandedDays.size < days.length;
 
   const formatDateString = (dateStr: string) => {
     if (!dateStr) return '';
@@ -124,7 +160,7 @@ export default function TimelineView() {
     return grouped;
   }, [segments]);
 
-  if (segments.length === 0) {
+  if (segments.length === 0 && days.length === 0) {
     return (
       <div className="flex flex-col gap-4 py-4">
         {dateHeader}
@@ -148,10 +184,10 @@ export default function TimelineView() {
     // Auto-expand collapsed days when hovering over them
     if (typeof index === 'string' && index.startsWith('day-')) {
       const dayNum = parseInt(index.split('-')[1], 10);
-      if (collapsedDays.has(dayNum)) {
-        setCollapsedDays(prev => {
+      if (!expandedDays.has(dayNum)) {
+        setExpandedDays(prev => {
           const next = new Set(prev);
-          next.delete(dayNum);
+          next.add(dayNum);
           return next;
         });
       }
@@ -249,7 +285,7 @@ export default function TimelineView() {
       {days.length > 1 && (
         <div className="flex justify-end -mb-6 z-10 relative">
           <button
-            onClick={() => hasAnyCollapsed ? setCollapsedDays(new Set()) : setCollapsedDays(new Set(days))}
+            onClick={() => hasAnyCollapsed ? setExpandedDays(new Set(days)) : setExpandedDays(new Set())}
             className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/5"
           >
             {hasAnyCollapsed ? 'Expand All' : 'Collapse All'}
@@ -258,7 +294,7 @@ export default function TimelineView() {
       )}
 
       {days.map((day) => {
-        const isCollapsed = collapsedDays.has(day);
+        const isCollapsed = !expandedDays.has(day);
         const dayDate = new Date(baseTripStartDate);
         dayDate.setUTCDate(baseTripStartDate.getUTCDate() + day - 1);
         const dateString = dayDate.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' });
@@ -275,8 +311,11 @@ export default function TimelineView() {
           }
         });
 
+        const isEmptyDay = dayEvents.length === 0;
+        const isDragOverDay = dragOverIndex === `day-${day}`;
+
         return (
-          <div key={day} className="flex flex-col gap-4">
+          <div key={day} className={`flex flex-col gap-4 transition-opacity duration-300 ${isEmptyDay && !isDragOverDay ? 'opacity-50 hover:opacity-100' : ''}`}>
             <div 
               className={`sticky top-0 z-10 -mx-6 px-6 py-2 backdrop-blur-md border-y cursor-pointer flex items-center justify-between transition-colors select-none group ${
                 activeDay === day 

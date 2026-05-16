@@ -66,6 +66,7 @@ export default function DashboardPage() {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const savedIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
 
   // Extracted Data Fetching Hook
   const {
@@ -100,6 +101,7 @@ export default function DashboardPage() {
   // Reset map highlights when changing trips
   useEffect(() => {
     setActiveSegmentIndex(null);
+    setExpandedDays(new Set());
   }, [currentSessionId]);
 
   // Debounced auto-save for itinerary and profile changes
@@ -284,8 +286,10 @@ export default function DashboardPage() {
     activeSegmentIndex,
     setActiveSegmentIndex,
     hoveredSegmentIndex,
-    setHoveredSegmentIndex
-  }), [itinerary, profile, setItinerary, setProfile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex, hoveredSegmentIndex]);
+    setHoveredSegmentIndex,
+    expandedDays,
+    setExpandedDays
+  }), [itinerary, profile, setItinerary, setProfile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex, hoveredSegmentIndex, expandedDays]);
 
   return (
     <ItineraryContext.Provider value={contextValue}>
@@ -353,6 +357,9 @@ export default function DashboardPage() {
           onClose={() => setShowProfileModal(false)}
           onSave={(newProfile) => {
             setProfile(newProfile);
+            if (newProfile.budget) {
+              setItinerary(prev => ({ ...prev, budget: newProfile.budget }));
+            }
             refreshDashboard();
             triggerToast('Traveler profile updated successfully!');
           }}

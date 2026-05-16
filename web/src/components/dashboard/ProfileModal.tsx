@@ -86,8 +86,53 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
         const updatedProfile = await response.json();
         onSave(updatedProfile);
 
-        // Notify the chat interface that the profile was updated
-        window.dispatchEvent(new CustomEvent('travel_aigent_profile_updated', { detail: updatedProfile }));
+        if (initialData) {
+          const oldPrefs = initialData.preferences || ({} as any);
+          const newPrefs = updatedProfile.preferences || ({} as any);
+          
+          const pioneerFieldsChanged = 
+            oldPrefs.transport_preference !== newPrefs.transport_preference ||
+            oldPrefs.personal_transport_available !== newPrefs.personal_transport_available ||
+            oldPrefs.starting_location !== newPrefs.starting_location ||
+            initialData.room_sharing !== updatedProfile.room_sharing ||
+            initialData.people_per_room !== updatedProfile.people_per_room;
+
+          const activityFieldsChanged = 
+            JSON.stringify(initialData.interests || []) !== JSON.stringify(updatedProfile.interests || []) ||
+            oldPrefs.circadian_preference !== newPrefs.circadian_preference ||
+            oldPrefs.risk_tolerance !== newPrefs.risk_tolerance;
+
+          const generalFieldsChanged = 
+            JSON.stringify(initialData.budget || {}) !== JSON.stringify(updatedProfile.budget || {}) ||
+            initialData.party_size !== updatedProfile.party_size ||
+            oldPrefs.group_planning_per_person !== newPrefs.group_planning_per_person ||
+            oldPrefs.start_date !== newPrefs.start_date ||
+            oldPrefs.end_date !== newPrefs.end_date ||
+            oldPrefs.target_duration_days !== newPrefs.target_duration_days;
+
+          let targetAgent = '';
+          let changeDesc = '';
+
+          if (generalFieldsChanged) {
+            targetAgent = 'architect';
+            changeDesc = 'general trip constraints (like budget, dates, or party size)';
+          } else if (pioneerFieldsChanged && activityFieldsChanged) {
+            targetAgent = 'architect';
+            changeDesc = 'transportation and activity preferences';
+          } else if (pioneerFieldsChanged) {
+            targetAgent = 'travel_pioneer';
+            changeDesc = 'transportation or accommodation preferences';
+          } else if (activityFieldsChanged) {
+            targetAgent = 'activity_planner';
+            changeDesc = 'activity, dining, or scheduling preferences';
+          }
+
+          if (targetAgent) {
+            window.dispatchEvent(new CustomEvent('travel_aigent_profile_updated', { 
+              detail: { updatedProfile, targetAgent, changeDesc } 
+            }));
+          }
+        }
 
         onClose();
       }

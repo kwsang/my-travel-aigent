@@ -1,14 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Map as MapIcon, MapPin, Navigation, AlertTriangle, Home } from 'lucide-react';
+import { Map as MapIcon, MapPin, Navigation, AlertTriangle, Home, Bed, Utensils, Star, Sparkles } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { APIProvider, Map, useMap, useApiIsLoaded, AdvancedMarker } from '@vis.gl/react-google-maps';
 import RoutePolyline from './RoutePolyline';
 import { marineSunsetMapStyle } from '@/config/mapStyles';
 import { Event } from '@/types';
 import { API_CONFIG } from '@/config/constants';
-import { SegmentType, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
+import { SegmentType, SegmentColors, SegmentIcons } from '@/components/dashboard/utils/segmentMapping';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places")[] = ["marker"];
@@ -51,6 +51,21 @@ function MapInner() {
   const map = useMap();
   const isLoaded = useApiIsLoaded();
 
+  // Helper to format mixed price representations from the API
+  const formatPrice = (p: any) => {
+    if (!p) return null;
+    if (typeof p === 'object' && p !== null) {
+      return `${p.currency === 'USD' ? '$' : (p.currency ? p.currency + ' ' : '')}${p.amount}`;
+    }
+    const s = String(p);
+    if (s === 'PRICE_LEVEL_FREE' || s === '0') return 'Free';
+    if (s === 'PRICE_LEVEL_INEXPENSIVE' || s === '1') return '$';
+    if (s === 'PRICE_LEVEL_MODERATE' || s === '2') return '$$';
+    if (s === 'PRICE_LEVEL_EXPENSIVE' || s === '3') return '$$$';
+    if (s === 'PRICE_LEVEL_VERY_EXPENSIVE' || s === '4') return '$$$$';
+    return s;
+  };
+
   const [popularDestinations, setPopularDestinations] = React.useState<{name: string; lat: number; lng: number; emoji: string}[]>([]);
 
   const [destinationInfo, setDestinationInfo] = React.useState<any>(null);
@@ -86,7 +101,7 @@ function MapInner() {
         if (hoveredPopularIndexRef.current === null) {
           fetchPopular();
         }
-      }, 8000); // Refresh every 8 seconds, pausing if hovered
+      }, 15000); // Refresh every 15 seconds, pausing if hovered
       return () => clearInterval(intervalId);
     }
   }, [segments.length, itinerary.destination, fetchPopular]);
@@ -147,6 +162,10 @@ function MapInner() {
       }
     }
 
+    if (destinationInfo?.location?.coordinates) {
+      return { lat: destinationInfo.location.coordinates[1], lng: destinationInfo.location.coordinates[0] };
+    }
+
     const dest = popularDestinations.find(d => d.name === itinerary.destination);
     if (dest) {
       return { lat: dest.lat, lng: dest.lng };
@@ -176,6 +195,10 @@ function MapInner() {
 
     if (startGeo) {
       coords.push(`${startGeo.lat.toFixed(5)},${startGeo.lng.toFixed(5)}`);
+    }
+
+    if (destinationInfo?.location?.coordinates) {
+      coords.push(`${destinationInfo.location.coordinates[1].toFixed(5)},${destinationInfo.location.coordinates[0].toFixed(5)}`);
     }
 
     // Sort to ensure order doesn't matter, then stringify for a stable dependency.
@@ -298,7 +321,7 @@ function MapInner() {
         map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.setZoom(15);
       }
-    } else if (routePath.length > 0 || itinerary.accommodation || (!itinerary.accommodation && destinationInfo?.suggested_accommodations?.length) || destinationInfo?.suggested_activities?.length) {
+    } else if (routePath.length > 0 || itinerary.accommodation || (!itinerary.accommodation && destinationInfo?.suggested_accommodations?.length) || destinationInfo?.suggested_activities?.length || (itinerary.destination && destinationInfo?.location?.coordinates)) {
       // Zoom to fit all segments and suggestions if no active segment is selected
       const bounds = new (window as any).google.maps.LatLngBounds();
       let pointCount = 0;
@@ -341,6 +364,13 @@ function MapInner() {
           lastPoint = pos;
         }
       });
+
+      if (itinerary.destination && destinationInfo?.location?.coordinates) {
+        const pos = { lat: destinationInfo.location.coordinates[1], lng: destinationInfo.location.coordinates[0] };
+        bounds.extend(pos);
+        pointCount++;
+        lastPoint = pos;
+      }
 
       if (pointCount === 1 && lastPoint) {
         map.panTo(lastPoint);
@@ -396,7 +426,17 @@ function MapInner() {
               key={`popular-${dest.name}-${idx}`}
               position={{ lat: dest.lat, lng: dest.lng }}
               title={dest.name}
-              onClick={() => setItinerary?.(prev => ({ ...prev, destination: dest.name }))}
+              onClick={() => {
+                setItinerary?.(prev => {
+                  const isDefaultName = !prev.trip_name || prev.trip_name === 'New Trip';
+                  return { 
+                    ...prev, 
+                    destination: dest.name,
+                    ...(isDefaultName ? { trip_name: `${dest.name} Trip` } : {})
+                  };
+                });
+                window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: dest.name }));
+              }}
               onMouseEnter={() => setHoveredPopularIndex(idx)}
               onMouseLeave={() => setHoveredPopularIndex(null)}
               zIndex={hoveredPopularIndex === idx ? 100 : 1}
@@ -411,6 +451,160 @@ function MapInner() {
               </div>
             </AdvancedMarker>
           ))}
+
+          {/* Selected Destination Marker */}
+          {itinerary.destination && destinationInfo?.location?.coordinates && (
+            <AdvancedMarker
+              position={{ lat: destinationInfo.location.coordinates[1], lng: destinationInfo.location.coordinates[0] }}
+              title={itinerary.destination}
+            >
+              <div className="flex flex-col items-center group transition-transform hover:scale-110 animate-in fade-in zoom-in duration-500 cursor-default">
+                <div className="bg-primary/90 border-2 border-white/20 shadow-xl rounded-full w-12 h-12 flex items-center justify-center text-2xl mb-1 transition-colors">
+                  📍
+                </div>
+                <div className="bg-background/90 backdrop-blur-sm px-3 py-1 rounded-md text-xs font-bold tracking-wider uppercase text-foreground/90 border border-primary/40 whitespace-nowrap pointer-events-none shadow-lg">
+                  {itinerary.destination}
+                </div>
+              </div>
+            </AdvancedMarker>
+          )}
+
+          {/* Suggested Accommodations */}
+          {!!itinerary.destination && !itinerary.accommodation && destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => {
+            const geo = place.geo || place.details?.geo || place.location;
+            if (!geo) return null;
+            
+            const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Place';
+            const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
+            const rating = place.details?.rating || place.rating;
+            const ratingCount = place.details?.user_rating_count || place.userRatingCount || place.user_rating_count;
+
+            return (
+                <AdvancedMarker
+                    key={`suggestion-acc-${idx}`}
+                    position={{ lat: geo.latitude, lng: geo.longitude }}
+                    title={placeName}
+                >
+                    <div className="flex flex-col items-center group animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div className="relative bg-violet-500 border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-violet-300 group-hover:shadow-violet-500/30 transition-all">
+                            <Bed size={18} className="text-white" />
+                            {(price || rating) && (
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
+                                    {price && (
+                                        <span>{formatPrice(price)}</span>
+                                    )}
+                                    {price && rating && <span className="opacity-70">•</span>}
+                                    {rating && (
+                                        <span className="flex items-center gap-0.5">
+                                            <Star size={9} className="fill-white" /> 
+                                            {rating}
+                                            {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-foreground/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                            {placeName}
+                        </div>
+                    </div>
+                </AdvancedMarker>
+            );
+          })}
+
+          {/* Suggested Activities */}
+          {!!itinerary.destination && destinationInfo?.suggested_activities?.map((place: any, idx: number) => {
+            const geo = place.geo || place.details?.geo || place.location;
+            if (!geo) return null;
+            
+            const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Activity';
+            const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
+            const rating = place.details?.rating || place.rating;
+            const ratingCount = place.details?.user_rating_count || place.userRatingCount || place.user_rating_count;
+
+            return (
+                <AdvancedMarker
+                    key={`suggestion-act-${idx}`}
+                    position={{ lat: geo.latitude, lng: geo.longitude }}
+                    title={placeName}
+                >
+                    <div className="flex flex-col items-center group animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div className="relative bg-amber-500 border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-amber-300 group-hover:shadow-amber-500/30 transition-all">
+                            <Utensils size={18} className="text-white" />
+                            {(price || rating) && (
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
+                                    {price && (
+                                        <span>{formatPrice(price)}</span>
+                                    )}
+                                    {price && rating && <span className="opacity-70">•</span>}
+                                    {rating && (
+                                        <span className="flex items-center gap-0.5">
+                                            <Star size={9} className="fill-white" /> 
+                                            {rating}
+                                            {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-foreground/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
+                            {placeName}
+                        </div>
+                    </div>
+                </AdvancedMarker>
+            );
+          })}
+
+          {/* Timeline Segments */}
+          {segments.map((segment: Event, index: number) => {
+            const geo = segment.geo || segment.details?.geo;
+            if (!geo) return null;
+            
+            const placeName = segment.details?.name || 'Unnamed Event';
+            const price = segment.details?.price;
+            const rating = segment.details?.rating;
+            const ratingCount = segment.details?.user_rating_count;
+            const isHovered = hoveredSegmentIndex === index;
+            const isActive = activeSegmentIndex === index;
+
+            return (
+              <AdvancedMarker
+                key={`${segment.day}-${index}`} 
+                position={{ lat: geo.latitude, lng: geo.longitude }} 
+                title={placeName}
+                onClick={() => setActiveSegmentIndex(index)}
+                zIndex={isActive || isHovered ? 100 : 10}
+              >
+                <div 
+                  className="flex flex-col items-center group cursor-pointer"
+                  onMouseEnter={() => setHoveredSegmentIndex?.(index)}
+                  onMouseLeave={() => setHoveredSegmentIndex?.(null)}
+                >
+                  <div className="relative border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 transition-all" style={{ backgroundColor: SegmentColors[segment.segment as SegmentType]?.bg || '#fdb833' }}>
+                    <div className="text-white scale-75">
+                      {React.createElement(SegmentIcons[segment.segment as SegmentType] || Sparkles, { className: 'w-6 h-6' })}
+                    </div>
+                    {(price || rating) && (
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
+                            {price && <span>{formatPrice(price)}</span>}
+                            {price && rating && <span className="opacity-70">•</span>}
+                            {rating && (
+                                <span className="flex items-center gap-0.5">
+                                    <Star size={9} className="fill-white" /> 
+                                    {rating}
+                                    {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                  </div>
+                  <div className={`bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-foreground/80 border border-white/10 whitespace-nowrap shadow-lg transition-opacity ${isActive || isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {placeName}
+                  </div>
+                </div>
+              </AdvancedMarker>
+            );
+          })}
 
           {/* Polyline Routes */}
           {routeEdges.map((edge, index) => (

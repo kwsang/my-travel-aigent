@@ -127,7 +127,67 @@ export default function TimelineItem({
             )}
           </div>
           <div className="text-right flex flex-col items-end gap-1 shrink-0">
-        <time className={`font-semibold text-foreground/80 ${event.segment === 'LOGISTICS' ? 'text-xs' : 'text-sm'}`}>{formatTime(event.schedule?.local_start_time)}</time>
+        <div className="flex flex-col items-end">
+          <time className={`font-semibold ${
+            (event.segment === 'FLIGHT' || event.segment === 'TRANSPORT' || event.segment === 'EXPERIENCE') && event.schedule?.local_end_time 
+              ? 'text-foreground/70 text-xs' 
+              : 'text-foreground/90 text-sm'
+          } ${event.segment === 'LOGISTICS' ? '!text-xs' : ''}`}>
+            {formatTime(event.schedule?.local_start_time)}
+            {(event.segment === 'FLIGHT' || event.segment === 'TRANSPORT' || event.segment === 'EXPERIENCE') && event.schedule?.timezone && (
+              <span className="text-[10px] ml-1 font-normal tracking-wide opacity-80">
+                {(() => {
+                  try {
+                    const d = new Date(event.schedule.start_time_utc || (event.schedule.local_start_time ? event.schedule.local_start_time + 'Z' : Date.now()));
+                    const tzPart = new Intl.DateTimeFormat('en-US', { timeZone: event.schedule.timezone, timeZoneName: 'short' }).formatToParts(d).find(p => p.type === 'timeZoneName');
+                    return tzPart ? tzPart.value : '';
+                  } catch {
+                    return '';
+                  }
+                })()}
+              </span>
+            )}
+          </time>
+          {(event.segment === 'FLIGHT' || event.segment === 'TRANSPORT' || event.segment === 'EXPERIENCE') && event.schedule?.local_end_time && (
+            <>
+              <time className="font-bold text-foreground mt-0.5 flex items-center gap-1 text-sm">
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">to</span>
+              <span>{formatTime(event.schedule.local_end_time)}</span>
+              {event.schedule.timezone && (
+                <span className="text-[9px] font-normal tracking-wide">
+                  {(() => {
+                    try {
+                      const d = new Date(event.schedule.end_time_utc || (event.schedule.local_end_time ? event.schedule.local_end_time + 'Z' : Date.now()));
+                      const tzPart = new Intl.DateTimeFormat('en-US', { timeZone: event.schedule.timezone, timeZoneName: 'short' }).formatToParts(d).find(p => p.type === 'timeZoneName');
+                      return tzPart ? tzPart.value : '';
+                    } catch {
+                      return '';
+                    }
+                  })()}
+                </span>
+              )}
+              </time>
+              {(() => {
+                const startStr = event.schedule.start_time_utc || (event.schedule.local_start_time ? event.schedule.local_start_time + 'Z' : null);
+                const endStr = event.schedule.end_time_utc || (event.schedule.local_end_time ? event.schedule.local_end_time + 'Z' : null);
+                if (!startStr || !endStr) return null;
+                
+                const start = new Date(startStr).getTime();
+                const end = new Date(endStr).getTime();
+                if (isNaN(start) || isNaN(end) || end <= start) return null;
+                
+                const diffMins = Math.floor((end - start) / 60000);
+                const h = Math.floor(diffMins / 60);
+                const m = diffMins % 60;
+                return (
+                  <div className="text-[10px] font-medium text-muted-foreground mt-1 bg-white/5 border border-white/10 px-2 py-0.5 rounded">
+                    {h > 0 ? `${h}h ` : ''}{m}m
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </div>
             {event.details?.price && event.segment !== 'LOGISTICS' && (
               <p className="text-sm font-bold text-emerald-600 mt-0.5">
                 {typeof event.details.price === 'object' ? (

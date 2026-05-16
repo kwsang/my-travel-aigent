@@ -31,14 +31,14 @@ export default function BudgetPanel() {
           <div className="flex items-center justify-end gap-1 font-mono text-lg font-bold">
             <Banknote className={`w-5 h-5 mr-1 ${isOverThreshold ? 'text-destructive' : 'text-muted-foreground'}`} />
             <span className={`${isOverThreshold ? 'text-destructive' : 'text-foreground'} text-stroke-1`}>
-              {currency} {displayTotal.toLocaleString()}
+              {currency === 'USD' ? '$' : `${currency} `}{displayTotal.toLocaleString()}
             </span>
             {rawLimit > 0 && (
               <span className="text-slate-400 font-medium mx-1">/</span>
             )}
             {rawLimit > 0 && (
               <span className="text-slate-500 text-sm">
-                {currency} {displayLimit.toLocaleString()}
+                {currency === 'USD' ? '$' : `${currency} `}{displayLimit.toLocaleString()}
               </span>
             )}
           </div>

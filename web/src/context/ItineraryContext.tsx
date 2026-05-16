@@ -16,6 +16,8 @@ export interface ItineraryContextType {
   setHoveredSegmentIndex: React.Dispatch<React.SetStateAction<number | null>>;
   profile?: TravelerProfile | null;
   setProfile?: React.Dispatch<React.SetStateAction<TravelerProfile | null>> | ((profile: any) => void);
+  expandedDays: Set<number>;
+  setExpandedDays: React.Dispatch<React.SetStateAction<Set<number>>>;
 }
 
 export const ItineraryContext = createContext<ItineraryContextType | undefined>(undefined);

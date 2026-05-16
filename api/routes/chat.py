@@ -42,15 +42,28 @@ async def chat(
             if session.state is None:
                 session.state = {}
                 
+            update_state = {}
+                
             if request.traveler_profile is not None:
                 session.state["traveler_profile"] = request.traveler_profile
+                update_state["data.state.traveler_profile"] = request.traveler_profile
                 prefs = request.traveler_profile.get("preferences") or {}
                 logger.info(f"Injected Profile Constraints - Start: {prefs.get('start_date')}, End: {prefs.get('end_date')}, Days: {prefs.get('target_duration_days')}")
 
             if request.itinerary is not None:
                 session.state["final_itinerary"] = request.itinerary
+                update_state["data.state.final_itinerary"] = request.itinerary
                 
-            await runner.session_service.save_session(session)
+            # Mutating `session.state` updates the in-memory reference used by the Runner.
+            # We also persist it directly to MongoDB to ensure it isn't lost if the server restarts.
+            await session_db.sessions.update_one(
+                {"session_id": request.session_id, "user_id": user_id, "app_name": "my_travel_aigent"},
+                {
+                    "$set": update_state,
+                    "$setOnInsert": {"data.events": []}
+                },
+                upsert=True
+            )
 
         async def event_generator():
             try:
