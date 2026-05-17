@@ -23,20 +23,22 @@ export function useMapClick(
             ['locality'].includes(t)
           ));
           
-          const destName = region ? region.formatted_address : (results.find((r: any) => r.types.includes('country')) || results[0]).formatted_address;
-          
-          setActiveSuggestion({
-            _suggestionType: 'destination',
-            details: {
-              name: destName,
-              description: 'Suggested Destination',
-              geo: {
-                latitude: e.detail.latLng.lat,
-                longitude: e.detail.latLng.lng
+          if (region) {
+            setActiveSuggestion({
+              _suggestionType: 'destination',
+              details: {
+                name: region.formatted_address,
+                description: 'Suggested Destination',
+                geo: {
+                  latitude: e.detail.latLng.lat,
+                  longitude: e.detail.latLng.lng
+                }
               }
-            }
-          });
-          setActiveSegmentIndex(null);
+            });
+            setActiveSegmentIndex(null);
+          } else {
+            showToast('Invalid Destination', 'Please click a valid city or town on the map.');
+          }
         } else {
           showToast('Invalid Destination', 'Please click a valid land area on the map.');
         }

@@ -496,7 +496,7 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
 }
 
 function LocationAutocomplete({ value, onChange }: { value: string, onChange: (val: string) => void }) {
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const places = useMapsLibrary('places');
   const onChangeRef = React.useRef(onChange);
 
@@ -505,76 +505,54 @@ function LocationAutocomplete({ value, onChange }: { value: string, onChange: (v
   }, [onChange]);
 
   React.useEffect(() => {
-    if (!places || !inputRef.current) return;
+    if (!places || !containerRef.current) return;
 
-    const autocomplete = new places.Autocomplete(inputRef.current, {
-      types: ['(cities)'],
-      fields: ['formatted_address', 'name']
-    });
+    containerRef.current.innerHTML = '';
+    const autocomplete = new (places as any).PlaceAutocompleteElement();
+    containerRef.current.appendChild(autocomplete);
 
-    const listener = autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (place.formatted_address) {
-        onChangeRef.current(place.formatted_address);
-      } else if (place.name) {
-        onChangeRef.current(place.name);
-      }
-    });
+    const listener = (e: any) => {
+      const place = e.place;
+      if (!place) return;
+      
+      place.fetchFields({ fields: ['displayName', 'formattedAddress'] }).then(() => {
+        if (place.formattedAddress) {
+          onChangeRef.current(place.formattedAddress);
+        } else if (place.displayName) {
+          onChangeRef.current(place.displayName);
+        }
+      });
+    };
+
+    autocomplete.addEventListener('gmp-placeselect', listener);
 
     return () => {
-      if (listener) listener.remove();
+      autocomplete.removeEventListener('gmp-placeselect', listener);
     };
   }, [places]);
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        .pac-container {
-          background-color: #020617; /* Tailwind Slate 950 */
+        gmp-place-autocomplete {
+          width: 100%;
+        }
+        gmp-place-autocomplete input {
+          width: 100%;
+          background-color: rgba(255, 255, 255, 0.05);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 0.75rem;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-          z-index: 9999;
-          font-family: inherit;
-          margin-top: 4px;
+          padding: 0.75rem 1rem;
+          color: white;
+          transition: all 0.2s;
         }
-        .pac-item {
-          padding: 10px 14px;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
-          color: rgba(255, 255, 255, 0.6);
-          cursor: pointer;
-          transition: background-color 0.2s ease;
-        }
-        .pac-item:first-of-type {
-          border-top: none;
-        }
-        .pac-item:hover, .pac-item-selected {
-          background-color: rgba(255, 255, 255, 0.1);
-        }
-        .pac-item-query {
-          color: rgba(255, 255, 255, 0.9);
-          font-size: 14px;
-          padding-right: 4px;
-        }
-        .pac-matched {
-          color: #818cf8; /* Tailwind Indigo 400 */
-        }
-        .pac-icon {
-          display: none; /* Hide default dated pin icons */
-        }
-        .pac-logo:after {
-          filter: invert(0.8);
-          opacity: 0.5;
+        gmp-place-autocomplete input:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.5);
         }
       ` }} />
-      <input 
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-        placeholder="e.g. New York, USA"
-      />
+      {value && <div className="text-xs font-semibold text-primary mb-2">Selected: {value}</div>}
+      <div ref={containerRef} className="w-full" />
     </>
   );
 }
