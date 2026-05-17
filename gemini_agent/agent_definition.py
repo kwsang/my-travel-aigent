@@ -276,8 +276,16 @@ def create_travel_agent():
             if profile_start and itinerary_start and profile_start != itinerary_start:
                 handoff_context += f" [CONFLICT ALERT] The user profile starting location is '{profile_start}', but this draft itinerary starts from '{itinerary_start}'."
 
-            if itinerary_data.get("events") and len(itinerary_data.get("events")) > 0:
-                handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
+            events = itinerary_data.get("events") or []
+            if len(events) > 0:
+                has_accommodation = any(e.get("segment") == "ACCOMMODATION" for e in events)
+                has_transport = any(e.get("segment") in ["TRANSPORT", "FLIGHT"] for e in events)
+                has_activities = any(e.get("segment") in ["EXPERIENCE", "DINING"] for e in events)
+                
+                if has_accommodation and has_transport and not has_activities:
+                    handoff_context += f"{map_context} Initial accommodation and transport are settled. Transfer directly to the 'activity_planner' to schedule daily experiences and dining."
+                else:
+                    handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
             elif destination:
                 handoff_context += f"{map_context} No events have been planned yet. Transfer to the 'travel_pioneer' to plan initial flights and accommodation."
 

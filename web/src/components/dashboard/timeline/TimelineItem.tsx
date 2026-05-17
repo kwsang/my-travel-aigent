@@ -61,11 +61,19 @@ export default function TimelineItem({
     return itineraryData.itinerary.validation_errors.some(err => err.includes(`'${event.details?.name}'`));
   }, [event.details?.name, itineraryData.itinerary.validation_errors]);
 
+  const isDraggable = event.segment !== 'TRANSPORT' && event.segment !== 'FLIGHT';
+
   return (
     <div
       id={`timeline-item-${absoluteIndex}`}
-      draggable
-      onDragStart={(e) => onDragStart(e, absoluteIndex)}
+      draggable={isDraggable}
+      onDragStart={(e) => {
+        if (isDraggable) {
+          onDragStart(e, absoluteIndex);
+        } else {
+          e.preventDefault();
+        }
+      }}
       onDragEnter={(e) => onDragEnter(e, absoluteIndex)}
       onDragLeave={onDragLeave}
       onDragEnd={onDragEnd}
@@ -77,7 +85,7 @@ export default function TimelineItem({
       onClick={() => setActiveSegmentIndex(activeSegmentIndex === absoluteIndex ? null : absoluteIndex)}
       onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
       onMouseLeave={() => setHoveredSegmentIndex?.(null)}
-      className={`relative rounded-xl border ${event.segment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer active:cursor-grab group ${
+      className={`relative rounded-xl border ${event.segment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer group ${isDraggable ? 'active:cursor-grab' : ''} ${
         hasConflict 
           ? 'border-destructive/60 bg-destructive/10' 
           : (event.segment === 'FLIGHT' ? 'border-sky-500/30 bg-sky-500/5' : 'border-border bg-card/50')
@@ -92,9 +100,11 @@ export default function TimelineItem({
       } animate-in fade-in slide-in-from-left-8 duration-500`}
       style={{ animationFillMode: 'backwards', animationDelay: `${(absoluteIndex % 15) * 150}ms` }}
     >
-      <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
-        <GripVertical size={14} />
-      </div>
+      {isDraggable && (
+        <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-card border border-border rounded p-0.5 text-muted-foreground shadow-sm z-10">
+          <GripVertical size={14} />
+        </div>
+      )}
       {hasConflict && (
         <div className="absolute -right-2 -top-2 bg-destructive text-destructive-foreground p-1 rounded-full shadow-sm animate-in zoom-in" title="This item has a scheduling conflict">
           <AlertTriangle size={12} />
@@ -195,7 +205,7 @@ export default function TimelineItem({
             </>
           )}
         </div>
-            {event.details?.price && event.segment !== 'LOGISTICS' && (
+            {event.details?.price && event.segment !== 'LOGISTICS' && event.segment !== 'TRANSPORT' && (
               <p className="text-sm font-bold text-emerald-600 mt-0.5">
                 {typeof event.details.price === 'object' ? (
                   <>
@@ -207,6 +217,11 @@ export default function TimelineItem({
                 ) : (
                   formatStringPrice(event.details.price)
                 )}
+              </p>
+            )}
+            {(event.segment === 'ACCOMMODATION' || event.segment === 'EXPERIENCE' || event.segment === 'DINING') && event.details?.city && (
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 mt-1">
+                {event.details.city.split(',').slice(0, 2).join(',').trim()}
               </p>
             )}
         </div>

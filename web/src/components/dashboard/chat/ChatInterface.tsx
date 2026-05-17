@@ -75,8 +75,11 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     
     const isAtBottom = scrollRef.current.scrollHeight - scrollRef.current.scrollTop - scrollRef.current.clientHeight <= 50;
     const isNewMessage = messages.length > prevMessagesLengthRef.current;
+    const isHistoryLoad = prevMessagesLengthRef.current <= 1 && messages.length > 1;
     
-    if (isNewMessage) {
+    if (isHistoryLoad) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    } else if (isNewMessage) {
       if (isMessagesHoveredRef.current || !isAtBottom) {
         setHasUnreadMessages(true);
       } else {

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, PlaneTakeoff, Globe, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Globe, ShieldCheck, BrainCircuit, Map as MapIcon, Wallet, Route } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 
 /**
@@ -39,38 +39,50 @@ export default function LandingPage() {
               Start Planning Now
               <ArrowRight className="group-hover:translate-x-1 transition-transform" />
             </Link>
-            <a 
-              href="#features" 
+            <Link 
+              href="/features" 
               className="text-slate-500 font-semibold hover:text-slate-700 transition-colors"
             >
               How it works
-            </a>
+            </Link>
           </div>
 
-          {/* Minimal Feature Grid */}
-          <div id="features" className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-20 border-t border-slate-200">
+          {/* Expanded Feature Grid */}
+          <div id="features" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pt-20 border-t border-slate-200">
             <div className="space-y-2">
               <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center mx-auto text-indigo-600">
-                <PlaneTakeoff size={20} />
+                <BrainCircuit size={20} />
               </div>
-              <h3 className="font-bold text-slate-900">AI Logic</h3>
-              <p className="text-sm text-slate-500">Gemini ensures your schedule makes sense geographically and temporally.</p>
+              <h3 className="font-bold text-slate-900">Multi-Agent AI</h3>
+              <p className="text-sm text-slate-500">A Supervisor coordinates Pioneer, Architect, and Planner agents to build your perfect trip.</p>
             </div>
             <div className="space-y-2">
               <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center mx-auto text-indigo-600">
-                <ShieldCheck size={20} />
-              </div>
-              <h3 className="font-bold text-slate-900">Conflict Detection</h3>
-              <p className="text-sm text-slate-500">Real-time validation flags overlaps and budget overages instantly.</p>
-            </div>
-            <div className="space-y-2">
-              <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center mx-auto text-indigo-600">
-                <Globe size={20} />
+                <MapIcon size={20} />
               </div>
               <h3 className="font-bold text-slate-900">Visual Workspace</h3>
-              <p className="text-sm text-slate-500">See your trip come to life with an interactive timeline and map view.</p>
+              <p className="text-sm text-slate-500">See your trip come to life with an interactive drag-and-drop timeline and map view.</p>
+            </div>
+            <div className="space-y-2">
+              <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center mx-auto text-indigo-600">
+                <Route size={20} />
+              </div>
+              <h3 className="font-bold text-slate-900">Smart Logistics</h3>
+              <p className="text-sm text-slate-500">Automatically calculates driving times, flight paths, and flags physically impossible commutes.</p>
+            </div>
+            <div className="space-y-2">
+              <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center mx-auto text-indigo-600">
+                <Wallet size={20} />
+              </div>
+              <h3 className="font-bold text-slate-900">Budget & Conflicts</h3>
+              <p className="text-sm text-slate-500">Real-time validation tracks costs per-person and flags schedule overlaps or budget overruns.</p>
             </div>
           </div>
+          <div className="mt-12">
+          <Link href="/features" className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors flex items-center justify-center gap-1">
+            Explore all features <ArrowRight size={16} />
+          </Link>
+        </div>
         </div>
 
         <footer className="mt-20 text-slate-400 text-sm">

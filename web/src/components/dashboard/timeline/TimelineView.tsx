@@ -54,6 +54,25 @@ export default function TimelineView() {
 
   const prevSegmentsRef = React.useRef(segments);
 
+  // Auto-expand all days on initial mount
+  React.useEffect(() => {
+    const allDays = new Set(segments.map(s => s.day));
+    const targetDuration = profile?.preferences?.target_duration_days || itinerary?.duration_days || 0;
+    const maxDay = Math.max(allDays.size > 0 ? Math.max(...Array.from(allDays)) : 0, targetDuration);
+    
+    if (maxDay > 0) {
+      setExpandedDays(prev => {
+        if (prev.size === 0) {
+          const next = new Set(prev);
+          for (let i = 1; i <= maxDay; i++) next.add(i);
+          return next;
+        }
+        return prev;
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-expand days when new items are added to them
   React.useEffect(() => {
     const prevSegments = prevSegmentsRef.current;

@@ -221,7 +221,8 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                     errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap:.1f}h gap and no accommodation block.")
 
         # 5. Transport Logic Check (Preference & Necessity)
-        if profile.preferences.personal_transport_available:
+        has_flight = any(e.get("segment") == "FLIGHT" for e in events)
+        if profile.preferences.personal_transport_available and not has_flight:
             rentals = [e for e in day_events if e.get("segment") == "TRANSPORT" and e.get("details", {}).get("is_rental") is True]
             if rentals:
                 errors.append(f"FAIL: Rental car suggested on {day} despite personal transport being available.")

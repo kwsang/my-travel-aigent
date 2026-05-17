@@ -70,7 +70,7 @@ To ensure logistical precision, you must use the GeoJSON coordinates provided in
 1. **Coordinate Primacy:** Always use the `geo` field (or `origin_geo`/`destination_geo` for flights) as the primary input for Google Maps API tool calls. Do not rely on name-based lookups which can be ambiguous.
 2. **Tool Selection:** Use the `traffic_tool` (Distance Matrix) to quickly evaluate travel times between multiple options or venues. You MUST use the `get_route_directions` tool when explicitly scheduling a `TRANSPORT` segment to get the exact duration, `travelMode`, and the encoded `polyline` string. Save the polyline into the event's `details.polyline` field, and the mode into `details.travel_mode`.
 3. **Proximity Validation:** Before finalizing a sequence, validate that the physical distance between the coordinates of Event A and Event B is travelable within the `applied_buffer_minutes`.
-4. **Arrival/Departure Anchors:** Use the flight's `destination_geo` as the starting anchor for the post-arrival commute to the next segment.
+4. **Dynamic Anchoring:** Use the user's actual physical location at a given time as the anchor for the next event. For example, use the flight's `destination_geo` as the anchor for the post-arrival commute, and use a morning activity's `geo` coordinate as the location bias when searching for a nearby lunch spot.
 5. **Arrival Sanity Check:** You MUST NOT schedule any `DINING` or `EXPERIENCE` segments in the destination city before the user's arrival `FLIGHT` or `TRANSPORT` segment has completed. The user cannot physically dine or do activities somewhere they have not yet arrived.
 
 ### 6. Buffer Overrun & Dynamic Recovery
