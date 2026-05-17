@@ -263,10 +263,10 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
         };
 
         sendMessage(
-          `I've selected ${destination} as my destination. Please communicate with the travel_pioneer to determine travel and accommodations based on my traveler profile.`, 
+          `I've selected ${destination} as my destination. Please communicate with the travel_pioneer to determine travel and lodging based on my traveler profile.`, 
           updatedItinerary,
           undefined,
-          `I've selected ${destination}. Can you determine travel and accommodations?`
+          `I've selected ${destination}. Can you determine travel and lodging?`
         );
       }
     };

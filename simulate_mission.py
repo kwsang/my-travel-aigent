@@ -59,9 +59,9 @@ async def test_destination_selection_flow():
     """
     Simulates the frontend map-click flow.
     Validates that the Architect delegates to the Pioneer and that
-    accommodations are successfully returned and saved in the state.
+    lodging are successfully returned and saved in the state.
     """
-    print("=== Test: Destination Selection & Accommodation Suggestion ===\n")
+    print("=== Test: Destination Selection & Lodging Suggestion ===\n")
     
     my_app = agent_definition.create_travel_agent()
     session_service = InMemorySessionService()
@@ -120,13 +120,13 @@ async def test_destination_selection_flow():
         if isinstance(itinerary, str):
             itinerary = json.loads(itinerary)
             
-        accommodation = itinerary.get("accommodation")
+        lodging = itinerary.get("lodging")
         events = itinerary.get("events", [])
         
         print("\n--- Validating Delegation State ---")
-        assert accommodation, "FAIL: No accommodation was found in the state."
-        name = accommodation.get("name") or accommodation.get("details", {}).get("name", "Unknown")
-        print(f"✅ SUCCESS: Found selected accommodation: {name}")
+        assert lodging, "FAIL: No lodging was found in the state."
+        name = lodging.get("name") or lodging.get("details", {}).get("name", "Unknown")
+        print(f"✅ SUCCESS: Found selected lodging: {name}")
             
         transit_events = [e for e in events if e.get("segment") in ["FLIGHT", "TRANSPORT"]]
         assert transit_events, "FAIL: No transit segments were planned."
@@ -187,8 +187,8 @@ async def test_full_agent_orchestration():
         assert user_prefs, "FAIL: Agent did not produce user_prefs in the session state."
         
         print("\n--- Running Automated Validations on Agent Output ---")
-        print("\n[DEBUG] Selected Accommodation from State:")
-        print(json.dumps(itinerary.get("accommodation", {}), indent=2, default=str))
+        print("\n[DEBUG] Selected Lodging from State:")
+        print(json.dumps(itinerary.get("lodging", {}), indent=2, default=str))
         
         struct_errors = validate_itinerary_structure(itinerary, "relaxed", "night_owl", user_prefs)
         _, budget_errors = validate_itinerary_budget(itinerary, user_prefs)

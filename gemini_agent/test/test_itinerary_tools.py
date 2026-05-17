@@ -34,7 +34,7 @@ def get_valid_dummy_event():
     # Matches the strict Pydantic requirements for Event
     return {
         "day": 1,
-        "segment": "ACCOMMODATION",
+        "segment": "LODGING",
         "schedule": {"local_start_time": "2026-05-22T15:00:00"},
         "details": {"name": "Hotel Savannah"}
     }
@@ -42,7 +42,7 @@ def get_valid_dummy_event():
 def test_save_itinerary_bypass_identical(mock_db):
     existing_itinerary = {
         "destination": "Savannah, GA",
-        "accommodation": {"name": "Hotel Savannah"},
+        "lodging": {"name": "Hotel Savannah"},
         "events": [get_valid_dummy_event()]
     }
     
@@ -53,7 +53,7 @@ def test_save_itinerary_bypass_identical(mock_db):
         events=json.dumps(existing_itinerary["events"]),
         tool_context=ctx,
         destination="Savannah, GA",
-        accommodation=json.dumps(existing_itinerary["accommodation"]),
+        lodging=json.dumps(existing_itinerary["lodging"]),
     ))
     
     assert "SUCCESS: Itinerary is already up to date" in result
@@ -62,7 +62,7 @@ def test_save_itinerary_bypass_identical(mock_db):
 def test_save_itinerary_detects_changes_and_saves(mock_db):
     existing_itinerary = {
         "destination": "Savannah, GA",
-        "accommodation": {"name": "Hotel Savannah"},
+        "lodging": {"name": "Hotel Savannah"},
         "events": [get_valid_dummy_event()]
     }
     
@@ -73,7 +73,7 @@ def test_save_itinerary_detects_changes_and_saves(mock_db):
         events=json.dumps(existing_itinerary["events"]),
         tool_context=ctx,
         destination="Atlanta, GA", # Changed!
-        accommodation=json.dumps(existing_itinerary["accommodation"]),
+        lodging=json.dumps(existing_itinerary["lodging"]),
     ))
     
     assert "SUCCESS: Draft itinerary updated" in result

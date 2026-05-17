@@ -57,7 +57,7 @@ This integration enforces the **"Closed Door" Rule** and the **Transparency Rule
 - **Rating Thresholds**: 
     - If `rating` < `min_rating`, the agent must flag the event as a **"Budget Alternative"**.
     - Use the `userRatingCount` to verify the credibility of the recommendation.
-- **Amenity Verification**: For `ACCOMMODATION`, verify that requested amenities (e.g., "pool", "gym") exist before confirming the selection.
+- **Amenity Verification**: For `LODGING`, verify that requested amenities (e.g., "pool", "gym") exist before confirming the selection.
 
 ## 4. Integration Checklist (ADK SDK)
 To finalize this phase, the following tools must be registered within the `LlmAgent` or `AdkApp` classes:

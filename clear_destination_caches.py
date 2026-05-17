@@ -15,11 +15,11 @@ async def clear_caches():
         logger.error("Database connection is not initialized. Check your credentials.")
         return
 
-    logger.info("Clearing corrupted suggested_accommodations and suggested_activities...")
+    logger.info("Clearing corrupted suggested_lodging and suggested_activities...")
     
     result = await destinations_collection.update_many(
         {}, 
-        {"$unset": {"suggested_accommodations": "", "suggested_activities": ""}}
+        {"$unset": {"suggested_lodging": "", "suggested_activities": ""}}
     )
     
     logger.info(f"Successfully cleared caches for {result.modified_count} destinations. The background task will now fetch fresh data!")

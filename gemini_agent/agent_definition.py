@@ -18,9 +18,9 @@ from gemini_agent.tools.tools import (
     record_user_profile, 
     search_destinations, 
     discover_new_destination, 
-    save_destination_accommodations,
+    save_destination_lodging,
     save_destination_activities,
-    get_cached_accommodations,
+    get_cached_lodging,
     get_cached_activities,
     search_places,
     query_user_profile,
@@ -47,9 +47,9 @@ def create_travel_agent():
     record_profile_tool = FunctionTool(func=record_user_profile)
     search_tool = FunctionTool(func=search_destinations)
     discovery_tool = FunctionTool(func=discover_new_destination)
-    save_dest_acc_tool = FunctionTool(func=save_destination_accommodations)
+    save_dest_acc_tool = FunctionTool(func=save_destination_lodging)
     save_dest_act_tool = FunctionTool(func=save_destination_activities)
-    get_cached_acc_tool = FunctionTool(func=get_cached_accommodations)
+    get_cached_acc_tool = FunctionTool(func=get_cached_lodging)
     get_cached_act_tool = FunctionTool(func=get_cached_activities)
     places_search_tool = FunctionTool(func=search_places)
     events_tool = FunctionTool(func=search_local_events)
@@ -144,7 +144,7 @@ def create_travel_agent():
             prompt += f"\n\n[SYSTEM MONITOR ALERT]\nThe following logistical violations were detected:\n{violations}\nYou MUST address these by finding closer alternatives."
         
         # Add explicit formatting rules to ensure reliable UI splitting
-        prompt += "\n\nFORMATTING RULE: Use Markdown H3 headers ('### Section Name') for all major itinerary components (e.g., '### Accommodation', '### Transport', '### Dining', '### Day 1'). Do not use these headers for regular text."
+        prompt += "\n\nFORMATTING RULE: Use Markdown H3 headers ('### Section Name') for all major itinerary components (e.g., '### Lodging', '### Transport', '### Dining', '### Day 1'). Do not use these headers for regular text."
         
         # Explicitly enforce exact dates if they exist in the profile
         prefs = profile.get("preferences") or {}
@@ -208,7 +208,7 @@ def create_travel_agent():
         static_instruction=system_instructions,
         instruction=get_pioneer_instructions,
         tools=[search_tool, discovery_tool, get_cached_acc_tool, save_dest_acc_tool, places_search_tool, traffic_tool, route_directions_tool, persist_tool],
-        description="Specializes in geographic anchoring, transportation, and finding the perfect destination and accommodation."
+        description="Specializes in geographic anchoring, transportation, and finding the perfect destination and lodging."
     )
 
     activity_planner_agent = Agent(
@@ -278,16 +278,16 @@ def create_travel_agent():
 
             events = itinerary_data.get("events") or []
             if len(events) > 0:
-                has_accommodation = any(e.get("segment") == "ACCOMMODATION" for e in events)
+                has_lodging = any(e.get("segment") == "LODGING" for e in events)
                 has_transport = any(e.get("segment") in ["TRANSPORT", "FLIGHT"] for e in events)
                 has_activities = any(e.get("segment") in ["EXPERIENCE", "DINING"] for e in events)
                 
-                if has_accommodation and has_transport and not has_activities:
-                    handoff_context += f"{map_context} Initial accommodation and transport are settled. You MUST invoke the 'call_activity_planner' tool to schedule daily experiences and dining."
+                if has_lodging and has_transport and not has_activities:
+                    handoff_context += f"{map_context} Initial lodging and transport are settled. You MUST invoke the 'call_activity_planner' tool to schedule daily experiences and dining."
                 else:
                     handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
             elif destination:
-                handoff_context += f"{map_context} No events have been planned yet. You MUST invoke the 'call_travel_pioneer' tool to plan initial flights and accommodation."
+                handoff_context += f"{map_context} No events have been planned yet. You MUST invoke the 'call_travel_pioneer' tool to plan initial flights and lodging."
 
         logger.info(f"[SUPERVISOR] Handoff Context: {handoff_context}")
 
@@ -296,8 +296,8 @@ def create_travel_agent():
             "You MUST use your provided agent transfer tools to handoff the conversation. "
             "If the handoff context explicitly instructs you to invoke a specific tool, you MUST prioritize that instruction. "
             "If the user asks to communicate with a specific agent, invoke their transfer tool. "
-            "If the user mentions or selects a destination, you MUST invoke the 'call_travel_pioneer' tool to plan accommodation and travel logistics (flights/driving). "
-            "If the user asks specifically about travel, flights, or accommodation, invoke the 'call_travel_pioneer' tool. "
+            "If the user mentions or selects a destination, you MUST invoke the 'call_travel_pioneer' tool to plan lodging and travel logistics (flights/driving). "
+            "If the user asks specifically about travel, flights, or lodging, invoke the 'call_travel_pioneer' tool. "
             "If the user asks specifically about activities or dining, invoke the 'call_activity_planner' tool. "
             "Otherwise, invoke the 'call_architect' tool to handle overall research and itinerary coordination. "
             "Once an itinerary is built, ensure the user is satisfied. NEVER just say you are transferring without actually invoking the tool."

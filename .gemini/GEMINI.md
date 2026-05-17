@@ -10,9 +10,9 @@ For the My Travel AIgent project, MongoDB is the ideal choice for our agent's da
 ## Targeted Problems
 As a user, I want to see how several trips might be planned before choosing a particular trip.
 
-As a user, I want to limit my expenses while maximizing my enjoyment. For example, I would prefer to drive to a destination if it's in reasonable driving distance, but would prefer to fly otherwise. If I can drive there in the morning, check in at a reasonable time, I would feel like I got my money's worth with the hotel stay. If I'm driving all day to get there, just to sleep, it's not as enjoyable. Likewise, if I can drive there, do activites, and drive back at a reasonable time, I won't need to find accommodations, which would save me money.
+As a user, I want to limit my expenses while maximizing my enjoyment. For example, I would prefer to drive to a destination if it's in reasonable driving distance, but would prefer to fly otherwise. If I can drive there in the morning, check in at a reasonable time, I would feel like I got my money's worth with the hotel stay. If I'm driving all day to get there, just to sleep, it's not as enjoyable. Likewise, if I can drive there, do activites, and drive back at a reasonable time, I won't need to find lodging, which would save me money.
 
-As a user, I want to either choose between luxury or budget, or find a balance. This is especially true for accommodations. I generally prefer accommodations with the nicest possible amenities and good reviews but still within my budget.
+As a user, I want to either choose between luxury or budget, or find a balance. This is especially true for lodging. I generally prefer lodging with the nicest possible amenities and good reviews but still within my budget.
 
 As a user, I want to avoid wasting time, like in heavy commute traffic or spending too much time at the airport during layovers.
 

@@ -10,9 +10,9 @@ from .user_management import (
 from .discovery import (
     search_destinations,
     discover_new_destination,
-    save_destination_accommodations,
+    save_destination_lodging,
     save_destination_activities,
-    get_cached_accommodations,
+    get_cached_lodging,
     get_cached_activities
 )
 

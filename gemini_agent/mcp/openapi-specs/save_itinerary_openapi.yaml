@@ -25,7 +25,7 @@ paths:
                   type: array
                   items:
                     type: object
-                    description: A travel segment (FLIGHT, ACCOMMODATION, etc.)
+                    description: A travel segment (FLIGHT, LODGING, etc.)
                 metadata:
                   type: object
               required:

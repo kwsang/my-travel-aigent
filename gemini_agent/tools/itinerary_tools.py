@@ -48,7 +48,7 @@ async def save_itinerary(
     events: str,
     tool_context: InvocationContext,
     destination: str = None,
-    accommodation: str = None,
+    lodging: str = None,
 ) -> str:
     """
     Persists a travel itinerary to MongoDB Atlas. 
@@ -57,7 +57,7 @@ async def save_itinerary(
     Args:
         events: A JSON string representing the FULL, complete array of itinerary events. Must include all previously scheduled events.
         destination: The confirmed destination city (e.g., 'Savannah, GA, USA').
-        accommodation: A JSON string representing the selected accommodation object.
+        lodging: A JSON string representing the selected lodging object.
     """
     try:
         if destinations_collection is None:
@@ -87,15 +87,15 @@ async def save_itinerary(
         elif isinstance(events, list):
             parsed_events = events
             
-        parsed_accommodation = None
-        if isinstance(accommodation, str):
+        parsed_lodging = None
+        if isinstance(lodging, str):
             try: 
-                parsed_accommodation = _parse_json_or_literal(accommodation, None)
+                parsed_lodging = _parse_json_or_literal(lodging, None)
             except Exception as e:
-                logger.error(f"Error parsing 'accommodation' JSON: {str(e)}")
-                return f"Error parsing 'accommodation' JSON: {str(e)}"
-        elif isinstance(accommodation, dict):
-            parsed_accommodation = accommodation
+                logger.error(f"Error parsing 'lodging' JSON: {str(e)}")
+                return f"Error parsing 'lodging' JSON: {str(e)}"
+        elif isinstance(lodging, dict):
+            parsed_lodging = lodging
 
         route_cache = tool_context.state.get("_route_cache", {})
         venue_cache = tool_context.state.get("_venue_cache", {})
@@ -124,18 +124,18 @@ async def save_itinerary(
                         details["polyline"] = old_details["polyline"]
                         break
 
-        if parsed_accommodation:
-            name = parsed_accommodation.get("name")
+        if parsed_lodging:
+            name = parsed_lodging.get("name")
             if name and name in venue_cache:
                 for k, v in venue_cache[name].items():
-                    if k not in parsed_accommodation:
-                        parsed_accommodation[k] = v
+                    if k not in parsed_lodging:
+                        parsed_lodging[k] = v
 
         # Deep equality check to prevent redundant saves from the LLM
         has_changes = False
         if destination and destination != existing_state.get("destination"):
             has_changes = True
-        if parsed_accommodation and parsed_accommodation != existing_state.get("accommodation"):
+        if parsed_lodging and parsed_lodging != existing_state.get("lodging"):
             has_changes = True
         if parsed_events != existing_state.get("events", []):
             has_changes = True
@@ -148,7 +148,7 @@ async def save_itinerary(
         # Merge incoming data over existing state
         merged_data = {**existing_state}
         if destination: merged_data["destination"] = destination
-        if parsed_accommodation: merged_data["accommodation"] = parsed_accommodation
+        if parsed_lodging: merged_data["lodging"] = parsed_lodging
         merged_data["events"] = parsed_events
         
         if "trip_name" not in merged_data: merged_data["trip_name"] = "New Trip"

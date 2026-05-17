@@ -67,7 +67,7 @@ VALID_VIBES = [
     "tropical", "winter"
 ]
 
-VALID_ACCOMMODATION_TAGS = [
+VALID_LODGING_TAGS = [
     "luxury", "budget", "boutique", "resort", "historic", "romantic", 
     "family", "business", "hostel", "bnb"
 ]
@@ -220,42 +220,42 @@ async def discover_new_destination(vibe_or_city: str) -> str:
     except Exception as e:
         return f"Discovery failed: {str(e)}"
 
-async def save_destination_accommodations(destination_name: str, accommodations: str, tool_context: InvocationContext) -> str:
+async def save_destination_lodging(destination_name: str, lodging: str, tool_context: InvocationContext) -> str:
     """
-    Saves a list of suggested accommodations to a specific destination in the atlas.
+    Saves a list of suggested lodging to a specific destination in the atlas.
     Useful for caching great hotel options for a city so users can browse them later.
 
     Args:
         destination_name: The name of the destination.
-        accommodations: A JSON string representing the list of accommodation objects.
+        lodging: A JSON string representing the list of lodging objects.
     """
     active_dest = _get_active_destination(destination_name, tool_context)
     try:
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
             
-        parsed_accommodations = []
-        if isinstance(accommodations, str):
-            try: parsed_accommodations = _parse_json_or_literal(accommodations, [])
-            except Exception as e: return f"Error parsing 'accommodations' JSON: {str(e)}"
-        elif isinstance(accommodations, list):
-            parsed_accommodations = accommodations
+        parsed_lodging = []
+        if isinstance(lodging, str):
+            try: parsed_lodging = _parse_json_or_literal(lodging, [])
+            except Exception as e: return f"Error parsing 'lodging' JSON: {str(e)}"
+        elif isinstance(lodging, list):
+            parsed_lodging = lodging
 
-        # Concurrently generate vibe tags for all incoming accommodations
-        tasks = [_generate_item_tags(acc, VALID_ACCOMMODATION_TAGS, "accommodation") for acc in parsed_accommodations]
+        # Concurrently generate vibe tags for all incoming lodging
+        tasks = [_generate_item_tags(acc, VALID_LODGING_TAGS, "lodging") for acc in parsed_lodging]
         await asyncio.gather(*tasks)
             
         result = await destinations_collection.update_one(
             _build_destination_query(active_dest),
-            {"$set": {"suggested_accommodations": parsed_accommodations}}
+            {"$set": {"suggested_lodging": parsed_lodging}}
         )
         
         if result.matched_count == 0:
             return f"Error: Destination '{active_dest}' not found in the atlas. Use discover_new_destination first."
             
-        return f"SUCCESS: Accommodations saved to destination '{active_dest}'."
+        return f"SUCCESS: Lodgings saved to destination '{active_dest}'."
     except Exception as e:
-        return f"Error saving accommodations to destination: {str(e)}"
+        return f"Error saving lodging to destination: {str(e)}"
 
 async def save_destination_activities(destination_name: str, activities: str, tool_context: InvocationContext) -> str:
     """
@@ -294,9 +294,9 @@ async def save_destination_activities(destination_name: str, activities: str, to
     except Exception as e:
         return f"Error saving activities to destination: {str(e)}"
 
-async def get_cached_accommodations(destination_name: str, tool_context: InvocationContext) -> str:
+async def get_cached_lodging(destination_name: str, tool_context: InvocationContext) -> str:
     """
-    Retrieves a list of highly recommended, pre-cached accommodations for a specific destination from the database.
+    Retrieves a list of highly recommended, pre-cached lodging for a specific destination from the database.
     Always use this before falling back to search_places.
     """
     active_dest = _get_active_destination(destination_name, tool_context)
@@ -306,8 +306,8 @@ async def get_cached_accommodations(destination_name: str, tool_context: Invocat
             
         dest = await destinations_collection.find_one(_build_destination_query(active_dest))
         
-        if dest and dest.get("suggested_accommodations"):
-            accs = dest["suggested_accommodations"]
+        if dest and dest.get("suggested_lodging"):
+            accs = dest["suggested_lodging"]
             if tool_context:
                 state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
                 if "_venue_cache" not in state:
@@ -316,9 +316,9 @@ async def get_cached_accommodations(destination_name: str, tool_context: Invocat
                     state["_venue_cache"][acc.get("name", "")] = acc
             return json.dumps(accs, default=str)
             
-        return "No cached accommodations found. Please use the search_places tool instead."
+        return "No cached lodging found. Please use the search_places tool instead."
     except Exception as e:
-        return f"Error fetching cached accommodations: {str(e)}"
+        return f"Error fetching cached lodging: {str(e)}"
 
 async def get_cached_activities(destination_name: str, tool_context: InvocationContext) -> str:
     """

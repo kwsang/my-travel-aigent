@@ -47,14 +47,14 @@ async def clean_distant_suggestions():
         # MongoDB GeoJSON uses [longitude, latitude]
         dest_lon, dest_lat = location["coordinates"]
 
-        accommodations = doc.get("suggested_accommodations", [])
+        lodging = doc.get("suggested_lodging", [])
         activities = doc.get("suggested_activities", [])
 
-        valid_accommodations = []
+        valid_lodging = []
         valid_activities = []
         changed = False
 
-        for items, valid_list, item_type in [(accommodations, valid_accommodations, "accommodation"), (activities, valid_activities, "activity")]:
+        for items, valid_list, item_type in [(lodging, valid_lodging, "lodging"), (activities, valid_activities, "activity")]:
             for item in items:
                 geo = item.get("geo", {}) or item.get("details", {}).get("geo", {})
                 if geo and "latitude" in geo and "longitude" in geo:
@@ -69,7 +69,7 @@ async def clean_distant_suggestions():
                     valid_list.append(item)
 
         if changed:
-            await destinations_collection.update_one({"_id": doc["_id"]}, {"$set": {"suggested_accommodations": valid_accommodations, "suggested_activities": valid_activities}})
+            await destinations_collection.update_one({"_id": doc["_id"]}, {"$set": {"suggested_lodging": valid_lodging, "suggested_activities": valid_activities}})
             logger.info(f"Updated '{name}' in database.")
 
     logger.info(f"Cleanup complete. Removed a total of {total_removed} distant suggestions.")

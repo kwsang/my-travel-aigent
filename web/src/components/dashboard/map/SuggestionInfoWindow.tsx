@@ -5,12 +5,12 @@ import { Star, Plus } from 'lucide-react';
 interface SuggestionInfoWindowProps {
   place: any;
   onClose: () => void;
-  onAddAccommodation: (place: any) => void;
+  onAddLodging: (place: any) => void;
   onAddActivity: (placeName: string, eventCategory: string) => void;
   formatPrice: (p: any) => string | null;
 }
 
-export default function SuggestionInfoWindow({ place, onClose, onAddAccommodation, onAddActivity, formatPrice }: SuggestionInfoWindowProps) {
+export default function SuggestionInfoWindow({ place, onClose, onAddLodging, onAddActivity, formatPrice }: SuggestionInfoWindowProps) {
   const geo = place.geo || place.details?.geo || place.location;
   if (!geo) return null;
   
@@ -65,8 +65,8 @@ export default function SuggestionInfoWindow({ place, onClose, onAddAccommodatio
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (place._suggestionType === 'accommodation') {
-              onAddAccommodation(place);
+            if (place._suggestionType === 'lodging') {
+              onAddLodging(place);
             } else {
               const isDining = place.types?.some((t: string) => ['restaurant', 'cafe', 'food', 'bar', 'bakery'].includes(t));
               onAddActivity(placeName as string, isDining ? 'dining' : 'activity');

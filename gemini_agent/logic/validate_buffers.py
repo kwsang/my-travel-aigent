@@ -149,7 +149,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
         # 1.5 Overlap Check
         overlap_check_events = [
             e for e in day_events 
-            if e.get("segment") not in ["LOGISTICS", "ACCOMMODATION"]
+            if e.get("segment") not in ["LOGISTICS", "LODGING"]
             and not (e.get("segment") == "TRANSPORT" and e.get("details", {}).get("is_rental"))
         ]
         for i in range(len(overlap_check_events) - 1):
@@ -200,9 +200,9 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                              if e.get("segment") == "DINING" and e.get("details", {}).get("category") == "Dinner"), -1)
             
             if dinner_idx > 0:
-                # Check for an explicit accommodation retreat or a 2+ hour gap from the last activity's end
+                # Check for an explicit lodging retreat or a 2+ hour gap from the last activity's end
                 prev_event = day_events[dinner_idx-1]
-                is_retreat = prev_event.get("segment") == "ACCOMMODATION"
+                is_retreat = prev_event.get("segment") == "LODGING"
                 
                 # Physical duration gap calculation using UTC aware datetimes
                 dinner_schedule = day_events[dinner_idx].get("schedule", {})
@@ -218,7 +218,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                 gap = (dinner_start_utc - prev_end).total_seconds() / 3600
                 
                 if gap < 2.0 and not is_retreat:
-                    errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap:.1f}h gap and no accommodation block.")
+                    errors.append(f"FAIL: Retreat Rule violation on {day}. Only {gap:.1f}h gap and no lodging block.")
 
         # 5. Transport Logic Check (Preference & Necessity)
         has_flight = any(e.get("segment") == "FLIGHT" for e in events)
@@ -248,12 +248,12 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                     # Skip transport to hotel check
                     if next_ev.get("segment") == "TRANSPORT" and i + 2 < len(day_events):
                         next_ev = day_events[i+2]
-                    if next_ev["segment"] not in ["ACCOMMODATION", "TRANSPORT"]:
-                        errors.append(f"FAIL: Transit realism on day {day}. Late flight arrival ({arrival_dt.time()}) must be followed by ACCOMMODATION.")
+                    if next_ev["segment"] not in ["LODGING", "TRANSPORT"]:
+                        errors.append(f"FAIL: Transit realism on day {day}. Late flight arrival ({arrival_dt.time()}) must be followed by LODGING.")
 
         # 6. Last Day Constraints (Water/Pool Rule)
         if day == last_day_idx:
-            # Find checkout time (end of accommodation) that falls on this day
+            # Find checkout time (end of lodging) that falls on this day
             checkout_time = None
             for e in events: # Iterate through all events to find the checkout
                 e_schedule = e.get("schedule", {})
@@ -262,7 +262,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                     e_end_dt = datetime.datetime.fromisoformat(e_end_str)
                     e_end_day = (e_end_dt.date() - start_date).days + 1
                     
-                    if e.get("segment") == "ACCOMMODATION" and e_end_day == day:
+                    if e.get("segment") == "LODGING" and e_end_day == day:
                         checkout_time = e_end_dt
                         break
             
@@ -336,7 +336,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                         elif event_city:
                             current_city = event_city
                             
-                elif segment in ["DINING", "EXPERIENCE", "ACCOMMODATION"]:
+                elif segment in ["DINING", "EXPERIENCE", "LODGING"]:
                     # If the event requires them to be at the destination but they haven't arrived
                     if event_city == dest_city and current_city != dest_city:
                         start_time_str = e.get("schedule", {}).get("local_start_time", "Unknown Time")
@@ -393,7 +393,7 @@ def validate_itinerary_budget(itinerary: dict, user_prefs: dict):
 
         base_amt = price_data.get("amount", 0.0)
         
-        if event["segment"] == "ACCOMMODATION":
+        if event["segment"] == "LODGING":
             if room_sharing:
                 # Account for specific room density
                 num_rooms = math.ceil(total_people / people_per_room)
@@ -557,7 +557,7 @@ def run_scenario_5_validation():
                 }
             },
             {
-                "segment": "ACCOMMODATION", # Explicit retreat
+                "segment": "LODGING", # Explicit retreat
                 "schedule": {
                     "local_start_time": "2026-07-01T18:00:00",
                     "local_end_time": "2026-07-01T20:00:00",
@@ -636,7 +636,7 @@ def run_scenario_5_validation():
                 }
             },
             {
-                "segment": "ACCOMMODATION", # Explicit retreat
+                "segment": "LODGING", # Explicit retreat
                 "schedule": {
                     "local_start_time": "2026-07-02T17:30:00",
                     "local_end_time": "2026-07-02T20:30:00",

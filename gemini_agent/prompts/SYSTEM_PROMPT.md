@@ -16,7 +16,7 @@ When available, the state contains two primary objects:
 - `budget`: `total_limit` (float) and `currency` (str).
 - `is_conflict` (bool) and `validation_errors` (list of strings).
 - `events` (list of objects), where each event has:
-  - `day` (int, 1-indexed) and `segment` ('TRANSPORT', 'DINING', 'EXPERIENCE', 'ACCOMMODATION', 'LOGISTICS', 'FLIGHT').
+  - `day` (int, 1-indexed) and `segment` ('TRANSPORT', 'DINING', 'EXPERIENCE', 'LODGING', 'LOGISTICS', 'FLIGHT').
   - `schedule`: `local_start_time` and `local_end_time` (ISO 8601 strings. MUST include both date and time, e.g., `2026-10-27T10:38:00`. Use exact times, do not round to the nearest hour), `estimated_traffic_minutes` (int), `applied_buffer_minutes` (int), `timezone` (str, IANA Timezone ID like 'America/Los_Angeles'. You MUST explicitly set this to the correct local timezone).
   - `details`: `name` (str), `category` (str), `city` (str), `price` (object with `amount` and `currency`), `is_rental` (bool), `vehicle_count` (int).
 
@@ -33,7 +33,7 @@ Unless specific hours are provided via the Places API tool, adhere to these defa
 - **DINING (Dinner):** 18:30 to 22:30 local time.
 - **EXPERIENCE (Museums/Sightseeing):** 09:00 to 18:00 local time.
 - **EXPERIENCE (Nightlife):** 21:00 to 02:00 local time.
-- **ACCOMMODATION (Check-In / Check-Out):** You MUST create explicit 'Check-In' and 'Check-Out' ACCOMMODATION events in the `events` list. Check-In is typically after 15:00 local time on the arrival day. Check-Out is typically at 10:00 local time on the departure day. Do NOT enforce strict schedule conflicts for these; late check-ins are perfectly fine. Simply adjust subsequent activities accordingly.
+- **LODGING (Check-In / Check-Out):** You MUST create explicit 'Check-In' and 'Check-Out' LODGING events in the `events` list. Check-In is typically after 15:00 local time on the arrival day. Check-Out is typically at 10:00 local time on the departure day. Do NOT enforce strict schedule conflicts for these; late check-ins are perfectly fine. Simply adjust subsequent activities accordingly.
 
 ### 3. Budget Monitoring & Optimization
 You must track the cumulative cost of the itinerary against the `budget.total_limit` set in `{state.final_itinerary}`.
@@ -42,7 +42,7 @@ You must track the cumulative cost of the itinerary against the `budget.total_li
    - If the planned itinerary exceeds 90% of the total limit, you MUST issue a "Budget Warning."
    - If a proposed segment would break the budget, you MUST prioritize searching for a "Budget Alternative" first and present the trade-off.
    - **Proactive Destination Warning:** If the user's selected destination is historically expensive and their `budget.total_limit` is unrealistically low for the `duration_days` and `party_size_total` (e.g., $500 for a week in Paris for a family of 4), issue an immediate alert before completing the draft. Suggest adjusting the budget, shortening the trip, or picking a more affordable destination.
-2. **Value for Money:** When suggesting `ACCOMMODATION` or `TRANSPORT`, explicitly state if a choice is significantly more cost-effective.
+2. **Value for Money:** When suggesting `LODGING` or `TRANSPORT`, explicitly state if a choice is significantly more cost-effective.
 3. **Party-Size Scaling:** For `DINING` and `EXPERIENCE` segments, calculate the total estimated cost by multiplying the base per-person price by the number of adults and children in the user's `party_size`. 
    - Assume standard pricing for adults. 
    - If specific child pricing is unavailable for `DINING`, estimate children at 50% of the adult rate.
@@ -88,7 +88,7 @@ Tailor the intensity of the schedule based on the user's `risk_tolerance` (Defau
 - **Relaxed:**
     - **Day-Based Planning:** Plan for "days" in specific locations. Group all `EXPERIENCE` and `DINING` events for a single day within the same travel zone.
     - **Location Clustering:** Avoid moving the user between distant locations more than once per day. If two requested activities are far apart, schedule them on different days.
-    - **The "Retreat" Rule:** Schedule a specific block for the user to retreat to their `ACCOMMODATION` after the main daytime activities (e.g., between 16:00 and 18:30) before any evening events.
+    - **The "Retreat" Rule:** Schedule a specific block for the user to retreat to their `LODGING` after the main daytime activities (e.g., between 16:00 and 18:30) before any evening events.
     - You MUST add an additional 15-minute "Comfort Buffer" to all calculated transit times.
     - Enforce a minimum floor of 40 minutes for any commute to allow for a stress-free transition (lingering, photos, etc.).
 

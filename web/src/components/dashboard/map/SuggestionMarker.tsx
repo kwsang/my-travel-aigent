@@ -5,7 +5,7 @@ import { Bed, Utensils, Sparkles, Star } from 'lucide-react';
 interface SuggestionMarkerProps {
   place: any;
   idx: number;
-  type: 'accommodation' | 'activity';
+  type: 'lodging' | 'activity';
   onClick: () => void;
   formatPrice: (p: any) => string | null;
 }
@@ -26,7 +26,7 @@ export default function SuggestionMarker({ place, idx, type, onClick, formatPric
   let borderHoverClass = 'group-hover:border-pink-300';
   let shadowHoverClass = 'group-hover:shadow-pink-500/30';
 
-  if (type === 'accommodation') {
+  if (type === 'lodging') {
     Icon = Bed;
     bgClass = 'bg-violet-500';
     borderHoverClass = 'group-hover:border-violet-300';

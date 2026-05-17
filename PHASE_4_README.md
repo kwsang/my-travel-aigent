@@ -21,7 +21,7 @@ This is where the agent applies the rules from `SYSTEM_PROMPT.md`:
 1. **Sequence**: Arrange events chronologically.
 2. **Buffer Injection**: Call `google_maps_matrix` to get real traffic, then apply the `calculate_buffer` logic.
 3. **Venue Check**: Call `google_places_details` to verify the "Closed Door" rule.
-4. **Retreat Rule**: For "Relaxed" users, ensure the 2-hour accommodation block exists before dinner.
+4. **Retreat Rule**: For "Relaxed" users, ensure the 2-hour lodging block exists before dinner.
 5. **Persistence**: Invoke `save_itinerary` once the user approves the draft to ensure the mission is recorded.
 
 ## 4. Tool Specification (OpenAPI)

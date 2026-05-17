@@ -40,7 +40,7 @@ export type SegmentType =
   | "TRANSPORT"
   | "DINING"
   | "EXPERIENCE"
-  | "ACCOMMODATION"
+  | "LODGING"
   | "LOGISTICS"
   | "FLIGHT";
 
@@ -68,7 +68,7 @@ export interface Itinerary {
   budget?: Budget;
   status?: 'draft' | 'final';
   destination?: string; // Add this line!
-  accommodation?: any;
+  lodging?: any;
   updated_at: string;
   is_conflict: boolean;
   validation_errors: string[];

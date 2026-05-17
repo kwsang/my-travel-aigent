@@ -18,7 +18,7 @@ class Destination(BaseModel):
     description: str
     location: GeoPoint
     vibe_tags: List[str]
-    suggested_accommodations: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    suggested_lodging: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     suggested_activities: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
 
 class Price(BaseModel):
@@ -95,7 +95,7 @@ class ProfileUpdateRequest(BaseModel):
 class Event(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
     day: int = Field(..., description="The sequential day of the trip (1-indexed).")
-    segment: Literal["TRANSPORT", "DINING", "EXPERIENCE", "ACCOMMODATION", "LOGISTICS", "FLIGHT"] = Field(..., description="The logistical segment type.")
+    segment: Literal["TRANSPORT", "DINING", "EXPERIENCE", "LODGING", "LOGISTICS", "FLIGHT"] = Field(..., description="The logistical segment type.")
     schedule: Schedule
     geo: Optional[GeoCoordinates] = Field(None, description="Optional root-level coordinates for transit origins/destinations.")
     details: EventDetails
@@ -109,8 +109,8 @@ class Event(BaseModel):
                 return "DINING"
             if "EXPERIENCE" in v_upper or "ACTIVITY" in v_upper:
                 return "EXPERIENCE"
-            if "ACCOMMODATION" in v_upper or "HOTEL" in v_upper:
-                return "ACCOMMODATION"
+            if "LODGING" in v_upper or "HOTEL" in v_upper:
+                return "LODGING"
             if "FLIGHT" in v_upper:
                 return "FLIGHT"
             if "TRANSPORT" in v_upper or "DRIVE" in v_upper:
@@ -158,7 +158,7 @@ class Event(BaseModel):
                 elif segment_type == "EXPERIENCE":
                     duration_hours = 3
                 else:
-                    duration_hours = 1  # Default fallback for TRANSPORT, ACCOMMODATION, etc.
+                    duration_hours = 1  # Default fallback for TRANSPORT, LODGING, etc.
                     
                 end_dt = start_dt + timedelta(hours=duration_hours)
                 v['local_end_time'] = end_dt.strftime("%Y-%m-%dT%H:%M:%S")
@@ -181,7 +181,7 @@ class Itinerary(BaseModel):
     session_id: str = ""
     trip_name: str
     destination: Optional[str] = None
-    accommodation: Optional[Dict[str, Any]] = Field(None, description="The selected accommodation for the trip.")
+    lodging: Optional[Dict[str, Any]] = Field(None, description="The selected lodging for the trip.")
     duration_days: int
     party_size_total: int
     status: Literal["draft", "final"] = Field(default="draft")
@@ -203,7 +203,7 @@ class ItineraryPatchRequest(BaseModel):
     events: Optional[List[Event]] = Field(None, description="Updated events from the UI.")
     budget: Optional[TripBudget] = Field(None, description="Updated budget from the UI.")
     destination: Optional[str] = Field(None, description="Manual override for the primary destination.")
-    accommodation: Optional[Dict[str, Any]] = Field(None, description="Manual override for the accommodation.")
+    lodging: Optional[Dict[str, Any]] = Field(None, description="Manual override for the lodging.")
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
     status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
     traveler_profile: Optional[TravelerProfile] = Field(None, description="Updated traveler profile.")

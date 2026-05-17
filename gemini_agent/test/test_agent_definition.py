@@ -40,7 +40,7 @@ def test_supervisor_with_events(supervisor_instructions):
         "user_profile_data": {"preferences": {}},
         "final_itinerary": {
             "destination": "Orlando, FL",
-            "events": [{"segment": "ACCOMMODATION"}]
+            "events": [{"segment": "LODGING"}]
         }
     })
     result = supervisor_instructions(ctx)
@@ -55,7 +55,7 @@ def test_supervisor_conflict_alert(supervisor_instructions):
         },
         "final_itinerary": {
             "metadata": {"starting_location": "Seattle, WA"},
-            "events": [{"segment": "ACCOMMODATION"}]
+            "events": [{"segment": "LODGING"}]
         }
     })
     result = supervisor_instructions(ctx)

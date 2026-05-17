@@ -233,7 +233,7 @@ export default function TimelineItem({
                 )}
               </p>
             )}
-            {(effectiveSegment === 'ACCOMMODATION' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && event.details?.city && (
+            {(effectiveSegment === 'LODGING' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && event.details?.city && (
               <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 mt-1">
                 {event.details.city.split(',').slice(0, 2).join(',').trim()}
               </p>

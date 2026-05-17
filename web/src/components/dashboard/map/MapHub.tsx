@@ -148,13 +148,13 @@ function MapInner() {
   const mapCenter = React.useMemo(() => {
     const defaultCenter = { lat: 39.8283, lng: -98.5795 }; // Center on continental US
     const centerSegment = segments.find((s: Event) => s.geo || s.details?.geo);
-    const geo = centerSegment?.geo || centerSegment?.details?.geo || itinerary.accommodation?.geo || itinerary.accommodation?.details?.geo || itinerary.accommodation?.location;
+    const geo = centerSegment?.geo || centerSegment?.details?.geo || itinerary.lodging?.geo || itinerary.lodging?.details?.geo || itinerary.lodging?.location;
     if (geo) {
       return { lat: geo.latitude, lng: geo.longitude };
     }
     
-    if (!itinerary.accommodation && destinationInfo?.suggested_accommodations && destinationInfo.suggested_accommodations.length > 0) {
-      const firstSugg = destinationInfo.suggested_accommodations[0];
+    if (!itinerary.lodging && destinationInfo?.suggested_lodging && destinationInfo.suggested_lodging.length > 0) {
+      const firstSugg = destinationInfo.suggested_lodging[0];
       const suggGeo = firstSugg.geo || firstSugg.details?.geo || firstSugg.location;
       if (suggGeo) {
         return { lat: suggGeo.latitude, lng: suggGeo.longitude };
@@ -178,7 +178,7 @@ function MapInner() {
       return { lat: dest.lat, lng: dest.lng };
     }
     return defaultCenter;
-  }, [segments, itinerary.destination, itinerary.accommodation, popularDestinations, destinationInfo?.suggested_accommodations, destinationInfo?.suggested_activities]);
+  }, [segments, itinerary.destination, itinerary.lodging, popularDestinations, destinationInfo?.suggested_lodging, destinationInfo?.suggested_activities]);
 
   // Create a stable signature of all geographic points to display on the map.
   // This prevents the map from re-fitting its bounds unless the actual coordinates of markers change.
@@ -200,10 +200,10 @@ function MapInner() {
         coords.push(details.polyline);
       }
     });
-    if (itinerary.accommodation) {
-      coords.push(getCoords(itinerary.accommodation));
+    if (itinerary.lodging) {
+      coords.push(getCoords(itinerary.lodging));
     }
-    destinationInfo?.suggested_accommodations?.forEach((p: any) => coords.push(getCoords(p)));
+    destinationInfo?.suggested_lodging?.forEach((p: any) => coords.push(getCoords(p)));
     destinationInfo?.suggested_activities?.forEach((p: any) => coords.push(getCoords(p)));
 
     if (startGeo) {
@@ -216,7 +216,7 @@ function MapInner() {
 
     // Sort to ensure order doesn't matter, then stringify for a stable dependency.
     return JSON.stringify(coords.filter(Boolean).sort());
-  }, [segments, itinerary.accommodation, destinationInfo, startGeo]);
+  }, [segments, itinerary.lodging, destinationInfo, startGeo]);
 
   // Generate individual edges for the polyline to style flights differently
   const routeEdges = React.useMemo(() => {
@@ -311,8 +311,8 @@ function MapInner() {
               }
               
               // If no next point is found, fallback based on flight direction (Outbound vs Return)
-              if (!nextPos && itinerary.accommodation && index < segments.length / 2) {
-                const accGeo = itinerary.accommodation.geo || itinerary.accommodation.details?.geo || itinerary.accommodation.location;
+              if (!nextPos && itinerary.lodging && index < segments.length / 2) {
+                const accGeo = itinerary.lodging.geo || itinerary.lodging.details?.geo || itinerary.lodging.location;
                 if (accGeo) {
                   nextPos = { lat: accGeo.latitude, lng: accGeo.longitude };
                 } else if (destinationInfo?.location?.coordinates) {
@@ -411,7 +411,7 @@ function MapInner() {
         map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.setZoom(15);
       }
-    } else if (segments.length > 0 || itinerary.accommodation || (!itinerary.accommodation && destinationInfo?.suggested_accommodations?.length) || destinationInfo?.suggested_activities?.length || (itinerary.destination && destinationInfo?.location?.coordinates)) {
+    } else if (segments.length > 0 || itinerary.lodging || (!itinerary.lodging && destinationInfo?.suggested_lodging?.length) || destinationInfo?.suggested_activities?.length || (itinerary.destination && destinationInfo?.location?.coordinates)) {
       // Zoom to fit all segments and suggestions if no active segment is selected
       const bounds = new (window as any).google.maps.LatLngBounds();
       let pointCount = 0;
@@ -428,8 +428,8 @@ function MapInner() {
         }
       });
 
-      if (itinerary.accommodation) {
-        const geo = itinerary.accommodation.geo || itinerary.accommodation.details?.geo || itinerary.accommodation.location;
+      if (itinerary.lodging) {
+        const geo = itinerary.lodging.geo || itinerary.lodging.details?.geo || itinerary.lodging.location;
         if (geo) {
           const pos = { lat: geo.latitude, lng: geo.longitude };
           bounds.extend(pos);
@@ -438,8 +438,8 @@ function MapInner() {
         }
       }
 
-      if (!itinerary.accommodation) {
-        destinationInfo?.suggested_accommodations?.forEach((place: any) => {
+      if (!itinerary.lodging) {
+        destinationInfo?.suggested_lodging?.forEach((place: any) => {
           const geo = place.geo || place.details?.geo || place.location;
           if (geo) {
             const pos = { lat: geo.latitude, lng: geo.longitude };
@@ -473,7 +473,7 @@ function MapInner() {
       } else if (pointCount > 1) {
         map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
       }
-    } else if (segments.length === 0 && !itinerary.accommodation) {
+    } else if (segments.length === 0 && !itinerary.lodging) {
       const dest = popularDestinations.find(d => d.name === itinerary.destination);
       if (dest) {
         map.panTo({ lat: dest.lat, lng: dest.lng });
@@ -605,15 +605,15 @@ function MapInner() {
             </AdvancedMarker>
           )}
 
-          {/* Suggested Accommodations */}
-          {!!itinerary.destination && !itinerary.accommodation && destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => (
+          {/* Suggested Lodgings */}
+          {!!itinerary.destination && !itinerary.lodging && destinationInfo?.suggested_lodging?.map((place: any, idx: number) => (
             <SuggestionMarker
               key={`suggestion-acc-${idx}`}
               place={place}
               idx={idx}
-              type="accommodation"
+              type="lodging"
               onClick={() => {
-                setActiveSuggestion({ ...place, _suggestionType: 'accommodation' });
+                setActiveSuggestion({ ...place, _suggestionType: 'lodging' });
                 setActiveSegmentIndex(null as any);
               }}
               formatPrice={formatPrice}
@@ -680,7 +680,7 @@ function MapInner() {
             <SuggestionInfoWindow
               place={activeSuggestion}
               onClose={() => setActiveSuggestion(null)}
-              onAddAccommodation={(place) => setItinerary?.((prev: any) => ({ ...prev, accommodation: place }))}
+              onAddLodging={(place) => setItinerary?.((prev: any) => ({ ...prev, lodging: place }))}
               onAddActivity={(placeName, eventCategory) => window.dispatchEvent(new CustomEvent('travel_aigent_add_activity', { detail: { placeName, eventCategory } }))}
               formatPrice={formatPrice}
             />

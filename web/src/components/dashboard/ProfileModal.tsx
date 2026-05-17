@@ -121,7 +121,7 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
             changeDesc = 'transportation and activity preferences';
           } else if (pioneerFieldsChanged) {
             targetAgent = 'travel_pioneer';
-            changeDesc = 'transportation or accommodation preferences';
+            changeDesc = 'transportation or lodging preferences';
           } else if (activityFieldsChanged) {
             targetAgent = 'activity_planner';
             changeDesc = 'activity, dining, or scheduling preferences';

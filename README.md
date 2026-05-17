@@ -8,7 +8,7 @@ Next-Gen Travel Planning powered by the Google Agent Development Kit (ADK) and G
 - **Interactive Visual Workspace:** A dynamic Next.js dashboard featuring a drag-and-drop chronological timeline and an integrated Google Map that dynamically plots out your journey.
 - **Smart Logistics:** Leverages the Google Maps Routes and Distance Matrix APIs to automatically calculate driving times, plot flight paths, and prevent physically impossible schedules (e.g., dining in a city you haven't arrived in yet).
 - **Budget & Conflict Engine:** Validates the itinerary structure in real-time, tracking per-person or group budgets, flagging temporal overlaps, and adjusting for circadian rhythms.
-- **Autonomous Discovery & Caching:** Background processes autonomously search for and cache top-rated accommodations and activities using Voyage AI semantic search embeddings to reduce API latency.
+- **Autonomous Discovery & Caching:** Background processes autonomously search for and cache top-rated lodging and activities using Voyage AI semantic search embeddings to reduce API latency.
 
 ## 🏗 Architecture
 
@@ -21,7 +21,7 @@ Next-Gen Travel Planning powered by the Google Agent Development Kit (ADK) and G
 
 1. **Travel Supervisor:** Evaluates the state of the conversation and dynamically invokes transfer tools to route the user to the correct specialist.
 2. **Concierge:** Focuses on user profiling and data gathering to establish budgets and risk tolerances.
-3. **Travel Pioneer:** Specializes in geographic anchoring, calculating transportation routes, and locking down accommodations and flights.
+3. **Travel Pioneer:** Specializes in geographic anchoring, calculating transportation routes, and locking down lodging and flights.
 4. **Activity Planner:** Fills the itinerary with incredible experiences and dining that match the user's vibe, adhering strictly to operating hours.
 5. **Architect:** Coordinates the overall itinerary, finalizing details and saving the drafts to the database.
 

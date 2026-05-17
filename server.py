@@ -13,7 +13,7 @@ from api.routes import chat, itinerary, profile, destinations
 from dotenv import load_dotenv
 
 from gemini_agent.tools.geo_tools import search_places
-from gemini_agent.tools.discovery import save_destination_accommodations, save_destination_activities
+from gemini_agent.tools.discovery import save_destination_lodging, save_destination_activities
 
 load_dotenv()
 
@@ -41,11 +41,11 @@ async def precache_destinations_task(app: FastAPI):
         try:
             db = app.state.db
             if db is not None:
-                # Find a destination missing accommodations or activities
+                # Find a destination missing lodging or activities
                 dest = await db.destinations.find_one({
                     "$or": [
-                        {"suggested_accommodations": {"$exists": False}},
-                        {"suggested_accommodations": {"$size": 0}},
+                        {"suggested_lodging": {"$exists": False}},
+                        {"suggested_lodging": {"$size": 0}},
                         {"suggested_activities": {"$exists": False}},
                         {"suggested_activities": {"$size": 0}}
                     ]
@@ -61,11 +61,11 @@ async def precache_destinations_task(app: FastAPI):
                     
                     logger.info(f"Autonomously pre-caching missing data for: {full_location}")
 
-                    if not dest.get("suggested_accommodations"):
+                    if not dest.get("suggested_lodging"):
                         hotels_json = await search_places(query=f"best hotels and resorts in {full_location}", location_type="lodging", tool_context=None)
                         if hotels_json and not hotels_json.startswith("Error"):
                             try:
-                                await save_destination_accommodations(full_location, json.loads(hotels_json)[:3], tool_context=None)
+                                await save_destination_lodging(full_location, json.loads(hotels_json)[:3], tool_context=None)
                             except json.JSONDecodeError:
                                 logger.warning(f"Failed to parse hotels JSON for {full_location}")
 

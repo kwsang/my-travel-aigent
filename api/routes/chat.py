@@ -187,7 +187,7 @@ async def chat(
                                     "events": itinerary.get("events", []),
                                     "trip_name": itinerary.get("trip_name", "Your Trip"),
                                     "destination": itinerary.get("destination"),
-                                    "accommodation": itinerary.get("accommodation"),
+                                    "lodging": itinerary.get("lodging"),
                                     "duration_days": itinerary.get("duration_days", 0),
                                     "party_size_total": party_size or 1,
                                     "status": itinerary.get("status", "draft"),

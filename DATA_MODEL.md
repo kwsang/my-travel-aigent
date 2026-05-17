@@ -16,13 +16,13 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 #### Metadata Standards
 - **Itinerary Duration:** The root itinerary must include `duration_days` representing the total length of the trip.
 - **Itinerary Status:** The root itinerary must include a `status` field. Supported values: `draft` (initial research or visual modification) and `final` (approved by user and committed).
-- **ACCOMMODATION Metadata:** Must include `stay_duration_nights`, `property_type` (e.g., Hotel, House Rental), `beds` (count), `amenities` (list), and `policies` for early check-in/checkout.
+- **LODGING Metadata:** Must include `stay_duration_nights`, `property_type` (e.g., Hotel, House Rental), `beds` (count), `amenities` (list), and `policies` for early check-in/checkout.
 - **TRANSPORT Metadata:** Must include `vehicle_type`, `vehicle_count`, `is_rental`, and `provider`.
 - **VENUE Metadata:** For `DINING` and `EXPERIENCE`, include boolean flags for service options: `dineIn`, `servesVegetarianFood`, `servesBreakfast`, `servesLunch`, `servesDinner`, `goodForChildren`, and `wheelchairAccessibleEntrance`.
 
 #### Market Segments
 - `FLIGHT`: Commercial air travel.
-- `ACCOMMODATION`: Hotels, resorts, rentals (e.g., Airbnb), or hostels.
+- `LODGING`: Hotels, resorts, rentals (e.g., Airbnb), or hostels.
 - `DINING`: Restaurants, cafes, bars, and food tours.
 - `TRANSPORT`: Rental cars, trains, ferries, and local transit.
 - `EXPERIENCE`: Guided tours, museum entries, workshops, and attractions.
@@ -36,7 +36,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
      - *Peak Hour Adjustment:* Increase multiplier to `1.5` for commutes between 07:30-09:30 and 16:30-18:30 local time.
      - *Minimum Floor:* Never drop below a 20-minute buffer to account for parking/unloading.
 2. **Check-in Windows:** 
-   - If the user arrives via `FLIGHT` or `TRANSPORT` before 12:00 PM, the agent prioritizes `ACCOMMODATION` with "early check-in" or luggage drop-off capabilities.
+   - If the user arrives via `FLIGHT` or `TRANSPORT` before 12:00 PM, the agent prioritizes `LODGING` with "early check-in" or luggage drop-off capabilities.
 3. **Driving vs. Flying:** 
    - If travel time is < 6 hours and arrival is before 12:00 PM, suggest `TRANSPORT` (Driving) to maximize the hotel stay value.
 4. **Airport Efficiency:** 
@@ -169,7 +169,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     },
     {
       "day": 1,
-      "segment": "ACCOMMODATION",
+      "segment": "LODGING",
       "schedule": {
         "start_time_utc": "2024-07-01T22:00:00Z",
         "end_time_utc": "2024-07-01T23:00:00Z",
