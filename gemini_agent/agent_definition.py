@@ -283,17 +283,18 @@ def create_travel_agent():
                 has_activities = any(e.get("segment") in ["EXPERIENCE", "DINING"] for e in events)
                 
                 if has_accommodation and has_transport and not has_activities:
-                    handoff_context += f"{map_context} Initial accommodation and transport are settled. Transfer directly to the 'activity_planner' to schedule daily experiences and dining."
+                    handoff_context += f"{map_context} Initial accommodation and transport are settled. You MUST invoke the 'call_activity_planner' tool to schedule daily experiences and dining."
                 else:
                     handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
             elif destination:
-                handoff_context += f"{map_context} No events have been planned yet. Transfer to the 'travel_pioneer' to plan initial flights and accommodation."
+                handoff_context += f"{map_context} No events have been planned yet. You MUST invoke the 'call_travel_pioneer' tool to plan initial flights and accommodation."
 
         logger.info(f"[SUPERVISOR] Handoff Context: {handoff_context}")
 
         return (
             f"You are the Travel Supervisor. {handoff_context} "
             "You MUST use your provided agent transfer tools to handoff the conversation. "
+            "If the handoff context explicitly instructs you to invoke a specific tool, you MUST prioritize that instruction. "
             "If the user asks to communicate with a specific agent, invoke their transfer tool. "
             "If the user mentions or selects a destination, you MUST invoke the 'call_travel_pioneer' tool to plan accommodation and travel logistics (flights/driving). "
             "If the user asks specifically about travel, flights, or accommodation, invoke the 'call_travel_pioneer' tool. "

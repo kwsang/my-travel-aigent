@@ -125,7 +125,7 @@ export default function TimelineItem({
           >
             {React.createElement(SegmentIcons[effectiveSegment as SegmentType] || DefaultIcon, { className: 'w-3 h-3' })}
             {effectiveSegment.replace('_', ' ')}
-            {event.details?.category && (
+            {event.details?.category && event.details.category.toLowerCase() !== effectiveSegment.toLowerCase() && (
               <span className="capitalize normal-case tracking-normal opacity-90 ml-0.5">
                 ({event.details.category})
               </span>

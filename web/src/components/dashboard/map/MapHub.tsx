@@ -247,15 +247,15 @@ function MapInner() {
 
       if (segment.segment === 'FLIGHT' || mode === 'FLIGHT') {
         strokeOpacity = 0;
-        icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: hasActive ? (isActive ? 1.0 : 0.15) : 0.9, scale: 3 }, offset: '0', repeat: '15px' }];
+        icons = [{ icon: { path: 'M 0,-1 0,1', strokeColor: routePalette[edgeIndex % routePalette.length], strokeOpacity: hasActive ? (isActive ? 1.0 : 0.15) : 0.9, scale: 3 }, offset: '0', repeat: '15px' }];
       } else if (mode === 'WALK' || mode === 'BICYCLE') {
         strokeOpacity = 0;
         strokeWeight = 3;
-        icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: hasActive ? (isActive ? 1.0 : 0.15) : 0.8, scale: 2 }, offset: '0', repeat: '10px' }];
+        icons = [{ icon: { path: 'M 0,-1 0,1', strokeColor: routePalette[edgeIndex % routePalette.length], strokeOpacity: hasActive ? (isActive ? 1.0 : 0.15) : 0.8, scale: 2 }, offset: '0', repeat: '10px' }];
       } else if (mode === 'TRANSIT') {
         strokeOpacity = 0;
         strokeWeight = 5;
-        icons = [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: hasActive ? (isActive ? 1.0 : 0.15) : 0.8, scale: 4 }, offset: '0', repeat: '20px' }];
+        icons = [{ icon: { path: 'M 0,-1 0,1', strokeColor: routePalette[edgeIndex % routePalette.length], strokeOpacity: hasActive ? (isActive ? 1.0 : 0.15) : 0.8, scale: 4 }, offset: '0', repeat: '20px' }];
       } else {
         strokeOpacity = hasActive ? (isActive ? 1.0 : 0.15) : 0.8;
         strokeWeight = hasActive && isActive ? 6 : 4;
@@ -280,12 +280,7 @@ function MapInner() {
         let path: { lat: number; lng: number }[] = [];
 
         if (curr.segment === 'TRANSPORT' || curr.segment === 'FLIGHT') {
-        if (currDetails?.polyline && (window as any).google?.maps?.geometry?.encoding) {
-          try {
-            const decoded = (window as any).google.maps.geometry.encoding.decodePath(currDetails.polyline);
-            path = decoded.map((p: any) => ({ lat: p.lat(), lng: p.lng() }));
-          } catch (e) {}
-        } else if (curr.segment === 'FLIGHT') {
+        if (curr.segment === 'FLIGHT') {
           const originPos = lastValidGeo || startGeo;
           if (originPos) {
             let nextPos: { lat: number; lng: number } | null = null;
@@ -332,6 +327,11 @@ function MapInner() {
               path = [originPos, nextPos];
             }
           }
+        } else if (currDetails?.polyline && (window as any).google?.maps?.geometry?.encoding) {
+          try {
+            const decoded = (window as any).google.maps.geometry.encoding.decodePath(currDetails.polyline);
+            path = decoded.map((p: any) => ({ lat: p.lat(), lng: p.lng() }));
+          } catch (e) {}
         } else if (lastValidGeo && currGeo) {
           path = [
             lastValidGeo,
@@ -636,22 +636,26 @@ function MapInner() {
           ))}
 
           {/* Timeline Segments */}
-          {segments.map((segment: Event, index: number) => (
-            <TimelineMarker
-              key={`${segment.day}-${index}`}
-              segment={segment}
-              index={index}
-              isActive={activeSegmentIndex === index}
-              isHovered={hoveredSegmentIndex === index}
-              onClick={() => {
-                setActiveSegmentIndex(activeSegmentIndex === index ? null : index);
-                setActiveSuggestion(null);
-              }}
-              onMouseEnter={() => setHoveredSegmentIndex?.(index)}
-              onMouseLeave={() => setHoveredSegmentIndex?.(null)}
-              formatPrice={formatPrice}
-            />
-          ))}
+          {segments.map((segment: Event, index: number) => {
+            if (['TRANSPORT', 'FLIGHT', 'LOGISTICS'].includes(segment.segment)) return null;
+            
+            return (
+              <TimelineMarker
+                key={`${segment.day}-${index}`} 
+                segment={segment}
+                index={index}
+                isActive={activeSegmentIndex === index}
+                isHovered={hoveredSegmentIndex === index}
+                onClick={() => {
+                  setActiveSegmentIndex(activeSegmentIndex === index ? null : index);
+                  setActiveSuggestion(null);
+                }}
+                onMouseEnter={() => setHoveredSegmentIndex?.(index)}
+                onMouseLeave={() => setHoveredSegmentIndex?.(null)}
+                formatPrice={formatPrice}
+              />
+            );
+          })}
 
           {/* Polyline Routes */}
           {routeEdges.map((edge, index) => (
