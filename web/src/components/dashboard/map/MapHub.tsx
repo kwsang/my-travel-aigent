@@ -47,7 +47,7 @@ export default function MapHub() {
 }
 
 function MapInner() {
-  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary, setItinerary, hoveredSegmentIndex, setHoveredSegmentIndex } = useItineraryData();
+  const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary, setItinerary, hoveredSegmentIndex, setHoveredSegmentIndex, sessionId, userId } = useItineraryData();
   const map = useMap();
   const isLoaded = useApiIsLoaded();
 
@@ -188,7 +188,11 @@ function MapInner() {
     const coords: (string | null)[] = [];
 
     // Add coordinates from all potential marker sources
-    segments.forEach(s => coords.push(getCoords(s)));
+    segments.forEach(s => {
+      coords.push(getCoords(s));
+      const details = s.details as typeof s.details & { polyline?: string };
+      if (details?.polyline) coords.push(details.polyline);
+    });
     if (itinerary.accommodation) {
       coords.push(getCoords(itinerary.accommodation));
     }
@@ -207,37 +211,23 @@ function MapInner() {
     return JSON.stringify(coords.filter(Boolean).sort());
   }, [segments, itinerary.accommodation, destinationInfo, startGeo]);
 
-  // Generate the sequential path for the polyline
-  const routePath = React.useMemo(() => {
-    const path: { lat: number; lng: number }[] = [];
-    if (startGeo) {
-      path.push(startGeo);
-    }
-    segments.forEach((segment: Event) => {
-      const details = segment.details as typeof segment.details & { polyline?: string };
-      const geo = segment.geo || segment.details?.geo;
-      if (geo) {
-        if (details?.polyline && (window as any).google?.maps?.geometry?.encoding) {
-          try {
-            const decoded = (window as any).google.maps.geometry.encoding.decodePath(details.polyline);
-            decoded.forEach((p: any) => path.push({ lat: p.lat(), lng: p.lng() }));
-          } catch (e) {
-            path.push({ lat: geo.latitude, lng: geo.longitude });
-          }
-        } else {
-          path.push({ lat: geo.latitude, lng: geo.longitude });
-        }
-      }
-    });
-    return path;
-  }, [segments, startGeo]);
-
   // Generate individual edges for the polyline to style flights differently
   const routeEdges = React.useMemo(() => {
     const edges: { path: { lat: number; lng: number }[], options: any }[] = [];
-    const validSegments = segments.filter((s: Event) => s.geo || s.details?.geo);
     
-    const getOptions = (segment: Event) => {
+    // A palette of distinct, vibrant colors for overlapping routes
+    const routePalette = [
+      '#1789fc', // Primary Blue
+      '#fdb833', // Accent Gold
+      '#10b981', // Emerald
+      '#ec4899', // Pink
+      '#8b5cf6', // Violet
+      '#f43f5e', // Rose
+      '#06b6d4', // Cyan
+      '#eab308'  // Yellow
+    ];
+
+    const getOptions = (segment: Event, edgeIndex: number) => {
       const details = segment.details as typeof segment.details & { travel_mode?: string };
       const mode = details?.travel_mode || (segment.segment === 'FLIGHT' ? 'FLIGHT' : 'DRIVE');
       let strokeOpacity = 0.8;
@@ -258,66 +248,49 @@ function MapInner() {
       }
 
       return {
-        strokeColor: SegmentColors[segment.segment as SegmentType]?.bg || (segment.segment === 'FLIGHT' ? '#296eb4' : '#fdb833'),
+        strokeColor: routePalette[edgeIndex % routePalette.length],
         strokeOpacity,
         strokeWeight,
         geodesic: true,
         icons
       };
     };
+    let lastValidGeo: { lat: number; lng: number } | null = null;
+    let edgeCounter = 0;
 
-    if (startGeo && validSegments.length > 0) {
-      const firstSegment = validSegments[0];
-      const firstDetails = firstSegment.details as typeof firstSegment.details & { polyline?: string };
-      const firstGeo = firstSegment.geo || firstSegment.details?.geo;
-      if (firstGeo) {
-        let path = [
-          startGeo,
-          { lat: firstGeo.latitude, lng: firstGeo.longitude }
-        ];
-
-        if (firstDetails?.polyline && (window as any).google?.maps?.geometry?.encoding) {
-          try {
-            const decoded = (window as any).google.maps.geometry.encoding.decodePath(firstDetails.polyline);
-            path = decoded.map((p: any) => ({ lat: p.lat(), lng: p.lng() }));
-          } catch (e) {}
-        }
-
-        edges.push({
-          path: path,
-          options: getOptions(firstSegment)
-        });
-      }
-    }
-
-    for (let i = 1; i < validSegments.length; i++) {
-      const prev = validSegments[i - 1];
-      const curr = validSegments[i];
-      const currDetails = curr.details as typeof curr.details & { polyline?: string };
-      const prevGeo = prev.geo || prev.details?.geo;
-      const currGeo = curr.geo || curr.details?.geo;
-      
-      if (prevGeo && currGeo) {
-        let path = [
-          { lat: prevGeo.latitude, lng: prevGeo.longitude },
-          { lat: currGeo.latitude, lng: currGeo.longitude }
-        ];
+      segments.forEach((curr) => {
+        const currDetails = curr.details as typeof curr.details & { polyline?: string };
+        const currGeo = curr.geo || curr.details?.geo;
+        
+        let path: { lat: number; lng: number }[] = [];
 
         if (currDetails?.polyline && (window as any).google?.maps?.geometry?.encoding) {
           try {
             const decoded = (window as any).google.maps.geometry.encoding.decodePath(currDetails.polyline);
             path = decoded.map((p: any) => ({ lat: p.lat(), lng: p.lng() }));
           } catch (e) {}
-        }
+        } else if (lastValidGeo && currGeo) {
+        path = [
+          lastValidGeo,
+          { lat: currGeo.latitude, lng: currGeo.longitude }
+        ];
+      }
+
+      if (path.length > 0) {
 
         edges.push({
           path: path,
-          options: getOptions(curr)
+          options: getOptions(curr, edgeCounter++)
         });
       }
-    }
+      if (currGeo) {
+        lastValidGeo = { lat: currGeo.latitude, lng: currGeo.longitude };
+      } else if (path.length > 0) {
+        lastValidGeo = path[path.length - 1];
+      }
+        });
     return edges;
-  }, [segments, startGeo]);
+      }, [segments]);
 
   // Automatically fit bounds or pan to active segment
   React.useEffect(() => {
@@ -340,6 +313,9 @@ function MapInner() {
             break;
           }
         }
+        if (!prevGeo && startGeo) {
+          prevGeo = { latitude: startGeo.lat, longitude: startGeo.lng };
+        }
         // If the transport segment itself doesn't have a geo, find the next one
         if (!nextGeo) {
           for (let i = activeSegmentIndex + 1; i < segments.length; i++) {
@@ -357,21 +333,35 @@ function MapInner() {
         const bounds = new (window as any).google.maps.LatLngBounds();
         bounds.extend({ lat: prevGeo!.latitude, lng: prevGeo!.longitude });
         bounds.extend({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
+        
+        const details = activeSegment.details as any;
+        if (details?.polyline && (window as any).google?.maps?.geometry?.encoding) {
+          try {
+            const decoded = (window as any).google.maps.geometry.encoding.decodePath(details.polyline);
+            decoded.forEach((p: any) => bounds.extend(p));
+          } catch(e) {}
+        }
+        
         map.panToBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 });
       } else if (nextGeo) {
         map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.setZoom(15);
       }
-    } else if (routePath.length > 0 || itinerary.accommodation || (!itinerary.accommodation && destinationInfo?.suggested_accommodations?.length) || destinationInfo?.suggested_activities?.length || (itinerary.destination && destinationInfo?.location?.coordinates)) {
+    } else if (segments.length > 0 || itinerary.accommodation || (!itinerary.accommodation && destinationInfo?.suggested_accommodations?.length) || destinationInfo?.suggested_activities?.length || (itinerary.destination && destinationInfo?.location?.coordinates)) {
       // Zoom to fit all segments and suggestions if no active segment is selected
       const bounds = new (window as any).google.maps.LatLngBounds();
       let pointCount = 0;
       let lastPoint: { lat: number; lng: number } | null = null;
 
-      routePath.forEach((pos) => {
-        bounds.extend(pos);
-        pointCount++;
-        lastPoint = pos;
+      segments.forEach((segment: Event) => {
+        if (['FLIGHT', 'TRANSPORT'].includes(segment.segment)) return; // Exclude transit segments from general overview bounds
+        const geo = segment.geo || segment.details?.geo;
+        if (geo) {
+          const pos = { lat: geo.latitude, lng: geo.longitude };
+          bounds.extend(pos);
+          pointCount++;
+          lastPoint = pos;
+        }
       });
 
       if (itinerary.accommodation) {
@@ -467,15 +457,28 @@ function MapInner() {
               key={`popular-${dest.name}-${idx}`}
               position={{ lat: dest.lat, lng: dest.lng }}
               title={dest.name}
-              onClick={() => {
-                setItinerary?.(prev => {
-                  const isDefaultName = !prev.trip_name || prev.trip_name === 'New Trip';
-                  return { 
-                    ...prev, 
-                    destination: dest.name,
-                    ...(isDefaultName ? { trip_name: `${dest.name} Trip` } : {})
-                  };
-                });
+              onClick={async () => {
+                console.log(`[MapHub] Popular destination clicked: ${dest.name}`);
+                const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
+                const newItinerary = { 
+                  ...itinerary, 
+                  destination: dest.name,
+                  ...(isDefaultName ? { trip_name: `${dest.name} Trip` } : {})
+                };
+                setItinerary?.(newItinerary);
+                
+                if (sessionId && userId) {
+                  try {
+                    await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessionId}?user_id=${userId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(newItinerary),
+                    });
+                  } catch (e) {
+                    console.error("Failed to instantly save destination", e);
+                  }
+                }
+                console.log(`[MapHub] Dispatching 'travel_aigent_set_destination' event...`);
                 window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: dest.name }));
               }}
               onMouseEnter={() => setHoveredPopularIndex(idx)}

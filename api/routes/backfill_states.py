@@ -28,7 +28,7 @@ async def backfill_states():
         name = doc.get("name")
         logger.info(f"Fetching state for '{name}'...")
 
-        request = {"text_query": f"{name}, USA", "included_type": "locality", "max_result_count": 1}
+        request = {"text_query": name, "included_type": "locality", "max_result_count": 1}
 
         try:
             response = await asyncio.to_thread(
@@ -37,11 +37,16 @@ async def backfill_states():
 
             if response.places:
                 state = next((c.short_text for c in response.places[0].address_components if "administrative_area_level_1" in c.types), None)
+                country = next((c.short_text for c in response.places[0].address_components if "country" in c.types), None)
                 
-                if state:
-                    await destinations_collection.update_one({"_id": doc["_id"]}, {"$set": {"state": state}})
-                    logger.info(f"  -> Updated with state: {state}")
-                else:
+                updates = {}
+                if state: updates["state"] = state
+                if country: updates["country"] = country
+
+                if updates:
+                    await destinations_collection.update_one({"_id": doc["_id"]}, {"$set": updates})
+                    logger.info(f"  -> Updated with: {updates}")
+                if not state:
                     logger.warning(f"  -> No state component found for {name}.")
             else:
                 logger.warning(f"  -> Google Places returned no results for {name}.")

@@ -158,3 +158,45 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--primary);
 }
+
+/* Google Maps Place Autocomplete Web Component Styling */
+gmp-place-autocomplete {
+  width: 100%;
+  
+  --pac-font-family: var(--font-sans); 
+  
+  /* Match Tailwind's dark oceanic theme */
+  --pac-color-background: var(--background);
+  --pac-color-text: var(--foreground);
+  --pac-color-text-secondary: var(--muted-foreground);
+  --pac-color-border: var(--border);
+  
+  /* Match primary color */
+  --pac-color-primary: var(--primary); 
+  --pac-color-icon: var(--muted-foreground);
+  
+  --pac-border-radius: var(--radius-md); 
+  --pac-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+}
+
+/* Target the input element inside the Web Component */
+gmp-place-autocomplete::part(input) {
+  padding-top: 0.5rem;    
+  padding-bottom: 0.5rem;
+  padding-left: 0.75rem;  
+  padding-right: 0.75rem;
+  font-size: 0.875rem;    
+  line-height: 1.25rem;
+  background-color: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+/* Replicate Tailwind's standard focus ring */
+gmp-place-autocomplete::part(input):focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  border-color: var(--ring); 
+  box-shadow: 0 0 0 1px var(--ring); 
+}

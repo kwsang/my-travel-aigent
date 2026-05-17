@@ -1,45 +1,164 @@
 import json
 import datetime
 import logging
+import re
+import ast
 from typing import Any, Optional
 from gemini_agent.clients import destinations_collection
 from gemini_agent.logic.models import Itinerary
-from google.adk.agents.invocation_context import InvocationContext as Context
+from google.adk.agents.invocation_context import InvocationContext
 
 logger = logging.getLogger(__name__)
 
-async def save_itinerary(itinerary: Itinerary, ctx: Context = None) -> str:
+def _parse_json_or_literal(raw_str: str, default_val: Any) -> Any:
+    if not isinstance(raw_str, str):
+        return raw_str
+    s = raw_str.strip()
+    if not s:
+        return default_val
+        
+    match = re.search(r'```(?:json)?\s*(.*?)\s*```', s, re.DOTALL | re.IGNORECASE)
+    if match:
+        s = match.group(1).strip()
+        
+    # Auto-fix truncated JSON arrays common in LLM outputs
+    if s.startswith('[') and not s.endswith(']'):
+        s += ']'
+    elif s.startswith('{') and not s.endswith('}'):
+        s += '}'
+
+    # 1. Try JSON parsing. Replace invalid single-quote escapes first.
+    try:
+        s_json = s.replace("\\'", "'")
+        return json.loads(s_json, strict=False)
+    except json.JSONDecodeError:
+        # 2. Fallback to Python literal evaluation
+        try:
+            s_py = re.sub(r'\btrue\b', 'True', s)
+            s_py = re.sub(r'\bfalse\b', 'False', s_py)
+            s_py = re.sub(r'\bnull\b', 'None', s_py)
+            return ast.literal_eval(s_py)
+        except Exception:
+            raise ValueError(f"Could not parse string as JSON or Python literal. String was: {s[:100]}...")
+
+async def save_itinerary(
+    events: str,
+    tool_context: InvocationContext,
+    destination: str = None,
+    accommodation: str = None,
+) -> str:
     """
     Persists a travel itinerary to MongoDB Atlas. 
     Updates the existing draft for this session if it exists, otherwise creates it.
 
     Args:
-        itinerary: The itinerary data to save.
+        events: A JSON string representing the FULL, complete array of itinerary events. Must include all previously scheduled events.
+        destination: The confirmed destination city (e.g., 'Savannah, GA, USA').
+        accommodation: A JSON string representing the selected accommodation object.
     """
     try:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
+        if not tool_context: return "Error: tool_context is missing."
+
         # Capture context and timestamps for iterative updates
-        session_id = ctx.session.id
-        user_id = ctx.session.user_id
+        session_id = tool_context.session.id
+        user_id = tool_context.session.user_id
         
         # Merge with existing state to prevent data loss if the LLM omits optional fields
-        existing_state = ctx.state.get("final_itinerary")
+        existing_state = tool_context.state.get("final_itinerary")
         if isinstance(existing_state, str):
             try: existing_state = json.loads(existing_state)
             except: existing_state = {}
         if not existing_state:
             existing_state = {}
 
+        parsed_events = []
+        if isinstance(events, str):
+            try: 
+                parsed_events = _parse_json_or_literal(events, [])
+            except Exception as e:
+                logger.error(f"Error parsing 'events' JSON: {str(e)}")
+                return f"Error parsing 'events' JSON: {str(e)}"
+        elif isinstance(events, list):
+            parsed_events = events
+            
+        parsed_accommodation = None
+        if isinstance(accommodation, str):
+            try: 
+                parsed_accommodation = _parse_json_or_literal(accommodation, None)
+            except Exception as e:
+                logger.error(f"Error parsing 'accommodation' JSON: {str(e)}")
+                return f"Error parsing 'accommodation' JSON: {str(e)}"
+        elif isinstance(accommodation, dict):
+            parsed_accommodation = accommodation
+
+        route_cache = tool_context.state.get("_route_cache", {})
+        venue_cache = tool_context.state.get("_venue_cache", {})
+        existing_events = existing_state.get("events", [])
+        for new_ev in parsed_events:
+            if not isinstance(new_ev, dict): continue
+            details = new_ev.get("details", {})
+            if not isinstance(details, dict): continue
+            
+            name = details.get("name")
+            if name and name in venue_cache:
+                cached_venue = venue_cache[name]
+                for k, v in cached_venue.items():
+                    if k not in details:
+                        details[k] = v
+            
+            if "polyline" in details and isinstance(details["polyline"], str):
+                token = details["polyline"]
+                if token.startswith("route_") and token in route_cache:
+                    details["polyline"] = route_cache[token]
+                    
+            if "polyline" not in details or not details["polyline"]:
+                for old_ev in existing_events:
+                    old_details = old_ev.get("details", {})
+                    if old_details.get("name") == details.get("name") and "polyline" in old_details:
+                        details["polyline"] = old_details["polyline"]
+                        break
+
+        if parsed_accommodation:
+            name = parsed_accommodation.get("name")
+            if name and name in venue_cache:
+                for k, v in venue_cache[name].items():
+                    if k not in parsed_accommodation:
+                        parsed_accommodation[k] = v
+
+        # Deep equality check to prevent redundant saves from the LLM
+        has_changes = False
+        if destination and destination != existing_state.get("destination"):
+            has_changes = True
+        if parsed_accommodation and parsed_accommodation != existing_state.get("accommodation"):
+            has_changes = True
+        if parsed_events != existing_state.get("events", []):
+            has_changes = True
+            
+        if not has_changes:
+            logger.info(f"save_itinerary bypassed for session {session_id}: Payload is identical to current state.")
+            return f"SUCCESS: Itinerary is already up to date. No changes were necessary."
+
         # Prepare document data with session linkage for UI synchronization
-        # Exclude unset fields so we don't overwrite existing valid data with None
-        new_data = itinerary.model_dump(exclude_unset=True)
-        itinerary_data = {**existing_state, **new_data}
+        # Merge incoming data over existing state
+        merged_data = {**existing_state}
+        if destination: merged_data["destination"] = destination
+        if parsed_accommodation: merged_data["accommodation"] = parsed_accommodation
+        merged_data["events"] = parsed_events
+        
+        if "trip_name" not in merged_data: merged_data["trip_name"] = "New Trip"
+        if "duration_days" not in merged_data: merged_data["duration_days"] = 0
+        if "party_size_total" not in merged_data: merged_data["party_size_total"] = 1
+
+        itinerary_obj = Itinerary.model_validate(merged_data)
+        itinerary_data = itinerary_obj.model_dump()
         
         itinerary_data["session_id"] = session_id
         itinerary_data["user_id"] = user_id # Enforce consistency with session identity
         itinerary_data["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        itinerary_data.pop("_id", None)
 
         db = destinations_collection.database
         # Use session_id as the primary anchor to ensure we update the same draft
@@ -50,15 +169,16 @@ async def save_itinerary(itinerary: Itinerary, ctx: Context = None) -> str:
         )
         
         # CRITICAL: Update the agent's memory state so subsequent agents see the saved events!
-        ctx.state.update({"final_itinerary": itinerary_data, "active_itinerary": itinerary_data})
+        tool_context.state.update({"final_itinerary": itinerary_data, "active_itinerary": itinerary_data})
 
         if result.upserted_id:
             return f"SUCCESS: New draft itinerary created for session {session_id}."
         return f"SUCCESS: Draft itinerary updated for session {session_id}."
     except Exception as e:
+        logger.error(f"CRITICAL: Validation error while saving itinerary: {str(e)}")
         return f"Error saving itinerary: {str(e)}"
 
-async def get_itinerary(trip_name: Optional[str] = None, ctx: Context = None) -> str:
+async def get_itinerary(tool_context: InvocationContext, trip_name: Optional[str] = None) -> str:
     """
     Retrieves saved itineraries for a given user from MongoDB Atlas.
     If trip_name is provided, it filters for that specific trip.
@@ -68,7 +188,8 @@ async def get_itinerary(trip_name: Optional[str] = None, ctx: Context = None) ->
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
-        user_id = ctx.session.user_id
+        if not tool_context: return "Error: tool_context is missing."
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         query = {"user_id": user_id}
         if trip_name:
@@ -81,11 +202,17 @@ async def get_itinerary(trip_name: Optional[str] = None, ctx: Context = None) ->
                 msg += f" with name '{trip_name}'"
             return msg + "."
 
+        # Strip massive polyline strings to save tokens and prevent agent context overflow
+        for res in results:
+            for event in res.get("events", []):
+                if isinstance(event, dict) and "details" in event and isinstance(event["details"], dict):
+                    event["details"].pop("polyline", None)
+
         return json.dumps(results, default=str)
     except Exception as e:
         return f"Error retrieving itinerary: {str(e)}"
 
-async def delete_itinerary(trip_name: str, ctx: Context = None) -> str:
+async def delete_itinerary(trip_name: str, tool_context: InvocationContext) -> str:
     """
     Deletes a specific itinerary for a given user from MongoDB Atlas by trip name.
     """
@@ -94,7 +221,8 @@ async def delete_itinerary(trip_name: str, ctx: Context = None) -> str:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
-        user_id = ctx.session.user_id
+        if not tool_context: return "Error: tool_context is missing."
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         result = await db["itineraries"].delete_one({"user_id": user_id, "trip_name": trip_name})
         
@@ -105,7 +233,7 @@ async def delete_itinerary(trip_name: str, ctx: Context = None) -> str:
     except Exception as e:
         return f"Error deleting itinerary: {str(e)}"
 
-async def update_itinerary_status(trip_name: str, status: str, ctx: Context = None) -> str:
+async def update_itinerary_status(trip_name: str, status: str, tool_context: InvocationContext) -> str:
     """
     Updates the status of a specific itinerary (e.g., from 'draft' to 'final').
     """
@@ -114,7 +242,8 @@ async def update_itinerary_status(trip_name: str, status: str, ctx: Context = No
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
-        user_id = ctx.session.user_id
+        if not tool_context: return "Error: tool_context is missing."
+        user_id = tool_context.session.user_id
         if status not in ["draft", "final"]:
             return f"Error: Invalid status '{status}'. Must be 'draft' or 'final'."
 
@@ -134,7 +263,7 @@ async def update_itinerary_status(trip_name: str, status: str, ctx: Context = No
     except Exception as e:
         return f"Error updating itinerary status: {str(e)}"
 
-async def clone_itinerary(source_trip_name: str, new_trip_name: str, ctx: Context = None) -> str:
+async def clone_itinerary(source_trip_name: str, new_trip_name: str, tool_context: InvocationContext) -> str:
     """
     Creates a new draft itinerary by cloning an existing one.
     Useful for exploring variations of a trip while keeping the original plan intact.
@@ -144,7 +273,8 @@ async def clone_itinerary(source_trip_name: str, new_trip_name: str, ctx: Contex
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
-        user_id = ctx.session.user_id
+        if not tool_context: return "Error: tool_context is missing."
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         source_doc = await db["itineraries"].find_one({"user_id": user_id, "trip_name": source_trip_name})
         
@@ -169,7 +299,7 @@ async def clone_itinerary(source_trip_name: str, new_trip_name: str, ctx: Contex
     except Exception as e:
         return f"Error cloning itinerary: {str(e)}"
 
-async def list_trip_versions(source_trip_name: str, ctx: Context = None) -> str:
+async def list_trip_versions(source_trip_name: str, tool_context: InvocationContext) -> str:
     """
     Retrieves all draft versions cloned from a specific itinerary.
     """
@@ -178,7 +308,8 @@ async def list_trip_versions(source_trip_name: str, ctx: Context = None) -> str:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
-        user_id = ctx.session.user_id
+        if not tool_context: return "Error: tool_context is missing."
+        user_id = tool_context.session.user_id
         db = destinations_collection.database
         query = {
             "user_id": user_id,
@@ -190,11 +321,17 @@ async def list_trip_versions(source_trip_name: str, ctx: Context = None) -> str:
         if not results:
             return f"No draft versions found cloned from '{source_trip_name}' for user '{user_id}'."
 
+        # Strip massive polyline strings to save tokens and prevent agent context overflow
+        for res in results:
+            for event in res.get("events", []):
+                if isinstance(event, dict) and "details" in event and isinstance(event["details"], dict):
+                    event["details"].pop("polyline", None)
+
         return json.dumps(results, default=str)
     except Exception as e:
         return f"Error listing trip versions: {str(e)}"
 
-async def finalize_itinerary(trip_name: str, ctx: Context = None) -> str:
+async def finalize_itinerary(trip_name: str, tool_context: InvocationContext) -> str:
     """
     Finalizes the trip by updating its status to 'final' and ensuring the latest 
     state from the agent's memory is persisted to MongoDB.
@@ -204,11 +341,12 @@ async def finalize_itinerary(trip_name: str, ctx: Context = None) -> str:
         if destinations_collection is None:
             return "Error: Database connection is currently unavailable."
             
+        if not tool_context: return "Error: tool_context is missing."
         db = destinations_collection.database
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        session_id = ctx.session.id
-        user_id = ctx.session.user_id
-        state = ctx.state
+        session_id = tool_context.session.id
+        user_id = tool_context.session.user_id
+        state = tool_context.state
         
         # 1. Search for the itinerary in agent memory
         # Architect agent uses 'final_itinerary', general tools might use 'active_itinerary'
@@ -223,6 +361,7 @@ async def finalize_itinerary(trip_name: str, ctx: Context = None) -> str:
             
             itinerary_data = itinerary.model_dump()
             itinerary_data["session_id"] = session_id
+            itinerary_data.pop("_id", None)
             
             # Upsert into MongoDB to ensure latest edits are captured
             await db["itineraries"].update_one(

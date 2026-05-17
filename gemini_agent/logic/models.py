@@ -28,7 +28,7 @@ class Price(BaseModel):
     is_estimated: bool = Field(default=True, description="Whether the price is a placeholder or confirmed.")
 
 class Schedule(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
     local_start_time: str = Field(..., description="ISO 8601 datetime string for local start time (must include date and time).")
     local_end_time: Optional[str] = Field(None, description="ISO 8601 datetime string for local end time.")
     start_time_utc: Optional[str] = Field(None, description="UTC normalized start time.")
@@ -38,9 +38,9 @@ class Schedule(BaseModel):
     applied_buffer_minutes: Optional[int] = Field(None, description="Buffer calculated by validation logic.")
 
 class EventDetails(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
     name: str = Field(..., description="Display name of the venue or activity.")
-    category: str = Field(..., description="Broad category (e.g., Museum, Fine Dining).")
+    category: Optional[str] = Field(None, description="Broad category (e.g., Museum, Fine Dining).")
     city: Optional[str] = Field(None, description="Primary city for clustering logic.")
     travel_zone: Optional[str] = Field(None, description="Micro-location zone within a city.")
     geo: Optional[GeoCoordinates] = Field(None, description="Geographic coordinates of the venue or location.")
@@ -93,7 +93,7 @@ class ProfileUpdateRequest(BaseModel):
     interests: Optional[List[str]] = None
 
 class Event(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
     day: int = Field(..., description="The sequential day of the trip (1-indexed).")
     segment: Literal["TRANSPORT", "DINING", "EXPERIENCE", "ACCOMMODATION", "LOGISTICS", "FLIGHT"] = Field(..., description="The logistical segment type.")
     schedule: Schedule
@@ -149,7 +149,7 @@ class Event(BaseModel):
         return v
 
 class Itinerary(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
     user_id: str = ""
     session_id: str = ""
     trip_name: str

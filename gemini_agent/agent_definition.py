@@ -1,16 +1,18 @@
 import os
 import json
+import copy
 import yaml
+import logging
 from google.adk.agents import Agent
 from google.adk.apps.app import App
 from google.genai import types as genai_types
-from google.adk.agents.context_cache_config import ContextCacheConfig
 from google.adk.agents.invocation_context import InvocationContext as Context
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.openapi_tool.openapi_spec_parser.openapi_toolset import OpenAPIToolset
 
 from gemini_agent.plugins.logistics_monitor import LogisticsMonitorPlugin
 from gemini_agent.plugins.timing_plugin import ExecutionTimingPlugin
+from gemini_agent.plugins.inter_agent_logger import InterAgentLoggingPlugin
 from gemini_agent.logic.models import TravelerProfile
 from gemini_agent.tools.tools import (
     record_user_profile, 
@@ -33,6 +35,8 @@ from gemini_agent.tools.tools import (
     search_local_events
 )
 from gemini_agent.tools.routes import get_route_directions
+
+logger = logging.getLogger(__name__)
 
 def create_travel_agent():
     """
@@ -93,6 +97,12 @@ def create_travel_agent():
             try: profile = json.loads(profile)
             except: profile = {}
             
+        if isinstance(itinerary, dict) and "events" in itinerary:
+            itinerary = copy.deepcopy(itinerary)
+            for event in itinerary.get("events", []):
+                if "details" in event:
+                    event["details"].pop("polyline", None)
+            
         return profile, itinerary
 
     # 4. Define specialized Agents
@@ -100,7 +110,7 @@ def create_travel_agent():
     # 4.1 Concierge: Focused on user profiling and data gathering
     def get_concierge_instructions(ctx: Context) -> str:
         profile, itinerary = _get_safe_state(ctx)
-        return f"{concierge_goal}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+        return f"{concierge_goal}\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"
 
     concierge_agent = Agent(
         name="concierge",
@@ -147,7 +157,8 @@ def create_travel_agent():
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested a trip duration of {duration} Days. Ensure the itinerary covers exactly {duration} days."
 
-        prompt += f"\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."
+        prompt += f"\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"
         return prompt
 
     def get_pioneer_instructions(ctx: Context) -> str:
@@ -164,9 +175,9 @@ def create_travel_agent():
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST span exactly {duration} Days."
             
-        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state."
+        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."
 
-        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"
 
     def get_activity_planner_instructions(ctx: Context) -> str:
         profile, itinerary = _get_safe_state(ctx)
@@ -187,9 +198,9 @@ def create_travel_agent():
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST span exactly {duration} Days."
             
-        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state."
+        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."
 
-        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile)}\nItinerary: {json.dumps(itinerary)}"
+        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"
 
     pioneer_agent = Agent(
         name="travel_pioneer",
@@ -241,8 +252,10 @@ def create_travel_agent():
         destination = itinerary_data.get("destination")
         map_context = f" The user has explicitly selected '{destination}' as their destination from the map. Please ensure you explicitly qualify its state and country to avoid ambiguity." if destination else ""
 
-        # Decide which specialist should handle the turn based on the existence of profile data
         profile_data = state.get("traveler_profile") or state.get("user_profile_data")
+        logger.info(f"[SUPERVISOR] Evaluated State -> Destination: {destination}, Profile Exists: {bool(profile_data)}")
+
+        # Decide which specialist should handle the turn based on the existence of profile data
         if not profile_data:
             return (
                 f"You are the Travel Supervisor.{map_context} We do not have the user's full travel preferences yet. "
@@ -268,13 +281,17 @@ def create_travel_agent():
             elif destination:
                 handoff_context += f"{map_context} No events have been planned yet. Transfer to the 'travel_pioneer' to plan initial flights and accommodation."
 
+        logger.info(f"[SUPERVISOR] Handoff Context: {handoff_context}")
+
         return (
             f"You are the Travel Supervisor. {handoff_context} "
-            "If the user asks to communicate with a specific agent, transfer directly to them. "
-            "If the user asks specifically about travel, flights, or accommodation, transfer directly to the 'travel_pioneer'. "
-            "If the user asks specifically about activities or dining, transfer directly to the 'activity_planner'. "
-            "Otherwise, transfer the user to the 'architect' to handle overall research and itinerary coordination. "
-            "Once an itinerary is built, ensure the user is satisfied."
+            "You MUST use your provided agent transfer tools to handoff the conversation. "
+            "If the user asks to communicate with a specific agent, invoke their transfer tool. "
+            "If the user mentions or selects a destination, you MUST invoke the 'call_travel_pioneer' tool to plan accommodation and travel logistics (flights/driving). "
+            "If the user asks specifically about travel, flights, or accommodation, invoke the 'call_travel_pioneer' tool. "
+            "If the user asks specifically about activities or dining, invoke the 'call_activity_planner' tool. "
+            "Otherwise, invoke the 'call_architect' tool to handle overall research and itinerary coordination. "
+            "Once an itinerary is built, ensure the user is satisfied. NEVER just say you are transferring without actually invoking the tool."
         )
 
     supervisor = Agent(
@@ -285,17 +302,12 @@ def create_travel_agent():
         description="Orchestrates the travel planning process between the Concierge, Architect, and Specialists."
     )
 
-    # 6. Create the App with Context Caching (as seen in samples)
-    # This stores the large SYSTEM_PROMPT in cache to reduce latency.
-    plugins = [LogisticsMonitorPlugin(), ExecutionTimingPlugin()]
+    # 6. Create the App
+    plugins = [LogisticsMonitorPlugin(), ExecutionTimingPlugin(), InterAgentLoggingPlugin()]
 
     app = App(
         name="my_travel_aigent",
         root_agent=supervisor,
-        context_cache_config=ContextCacheConfig(
-            min_tokens=2048,
-            ttl_seconds=600,
-        ),
         plugins=plugins
     )
     

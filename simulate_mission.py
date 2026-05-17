@@ -4,6 +4,7 @@ import datetime
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import logging
+import pytest
 
 # New ADK Imports
 from google.genai import types
@@ -18,6 +19,9 @@ from gemini_agent.test.test_maps_integration import get_real_traffic_duration
 from gemini_agent.test.test_places_integration import find_place_id, validate_venue_availability
 
 load_dotenv()
+
+# Suppress ADK Experimental Feature Warnings
+os.environ["ADK_SUPPRESS_EXPERIMENTAL_FEATURE_WARNINGS"] = "true"
 
 # Enable ADK Debug logging to see Agent Delegation and Tool Calls
 logging.basicConfig(level=logging.INFO, format='%(name)s - %(message)s')
@@ -50,32 +54,7 @@ def evaluate_transport_mode(distance_hours, arrival_time_str):
         return "TRANSPORT (Driving)", "Maximize hotel value and save on airfare."
     return "FLIGHT", "Faster arrival for long-distance travel."
 
-async def simulate_adk_agent_run(user_input: str):
-    """
-    True ADK Simulation: Tests the actual Agent orchestration instead of manual logic.
-    """
-    print("\n--- Starting ADK Agent Runner Simulation ---")
-    # This assumes an 'architect' agent is defined in your package
-    my_app = agent_definition.create_travel_agent()
-    runner = Runner(app=my_app, session_service=InMemorySessionService(), auto_create_session=True)
-    
-    # Simulate the start of a session
-    session_id = f"sim_{datetime.datetime.now().timestamp()}"
-    
-    full_text = ""
-    async for event in runner.run_async(
-        user_id="sim_user",
-        session_id=session_id,
-        new_message=types.Content(role="user", parts=[types.Part(text=user_input)])
-    ):
-        if event.content and event.content.parts:
-            for part in event.content.parts:
-                if part.text:
-                    full_text += part.text
-    
-    print(f"Agent Response: {full_text}")
-    return full_text
-
+@pytest.mark.asyncio
 async def test_destination_selection_flow():
     """
     Simulates the frontend map-click flow.
@@ -90,7 +69,7 @@ async def test_destination_selection_flow():
     
     user_id = "test_map_user"
     session_id = f"test_map_session_{int(datetime.datetime.now().timestamp())}"
-    destination = "Tokyo, Japan"
+    destination = "Orlando, FL"
     
     # 1. Pre-inject the state (mimicking chat.py's UI sync)
     initial_state = {
@@ -103,12 +82,12 @@ async def test_destination_selection_flow():
                 "transport_preference": "public",
                 "personal_transport_available": False,
                 "group_planning_per_person": False,
-                "starting_location": "New York, USA"
+                "starting_location": "Atlanta, GA"
             }
         },
         "final_itinerary": {
             "destination": destination,
-            "trip_name": "Japan Adventure",
+            "trip_name": "Orlando Adventure",
             "duration_days": 4,
             "party_size_total": 2,
             "events": [],
@@ -120,7 +99,7 @@ async def test_destination_selection_flow():
         app_name="my_travel_aigent", user_id=user_id, session_id=session_id, state=initial_state
     )
     
-    user_input = f"I'd like to plan a trip to {destination}. We are traveling from New York for 4 days in October 2026."
+    user_input = f"I'd like to plan a trip to {destination}. We are traveling from Atlanta, GA for 4 days in October 2026."
     print(f"Simulating Map Click Event: {user_input}\n")
     
     # 2. Run the Agent
@@ -141,19 +120,23 @@ async def test_destination_selection_flow():
         if isinstance(itinerary, str):
             itinerary = json.loads(itinerary)
             
-        accommodations = itinerary.get("suggested_accommodations", [])
+        accommodation = itinerary.get("accommodation")
+        events = itinerary.get("events", [])
         
         print("\n--- Validating Delegation State ---")
-        if accommodations and len(accommodations) > 0:
-            print(f"✅ SUCCESS: Found {len(accommodations)} suggested accommodations!")
-            for idx, acc in enumerate(accommodations):
-                name = acc.get("details", {}).get("name", "Unknown")
-                price = acc.get("details", {}).get("price", {}).get("amount", "N/A")
-                print(f"  {idx+1}. {name} (${price})")
-        else:
-            print("❌ FAIL: No suggested accommodations were found in the state.")
+        assert accommodation, "FAIL: No accommodation was found in the state."
+        name = accommodation.get("name") or accommodation.get("details", {}).get("name", "Unknown")
+        print(f"✅ SUCCESS: Found selected accommodation: {name}")
+            
+        transit_events = [e for e in events if e.get("segment") in ["FLIGHT", "TRANSPORT"]]
+        assert transit_events, "FAIL: No transit segments were planned."
+        print(f"✅ SUCCESS: Found {len(transit_events)} transit segments!")
+        for idx, event in enumerate(transit_events):
+            name = event.get("details", {}).get("name", "Unknown")
+            print(f"  {idx+1}. {name}")
 
-async def run_full_agent_test():
+@pytest.mark.asyncio
+async def test_full_agent_orchestration():
     """
     End-to-End ADK Integration Test.
     Validates that the multi-agent orchestration (Supervisor -> Architect)
@@ -199,30 +182,24 @@ async def run_full_agent_test():
         )
         itinerary = state.state.get("final_itinerary")
         user_prefs = state.state.get("traveler_profile") or state.state.get("user_profile_data")
-        if itinerary and user_prefs:
-            print("\n--- Running Automated Validations on Agent Output ---")
-            print("\n[DEBUG] Suggested Accommodations from State:")
-            print(json.dumps(itinerary.get("suggested_accommodations", []), indent=2))
-            validate_itinerary_structure(itinerary, "relaxed", "night_owl", user_prefs)
-            validate_itinerary_budget(itinerary, user_prefs)
-        else:
-            print("FAIL: Agent did not produce a final_itinerary in the session state.")
+        
+        assert itinerary, "FAIL: Agent did not produce a final_itinerary in the session state."
+        assert user_prefs, "FAIL: Agent did not produce user_prefs in the session state."
+        
+        print("\n--- Running Automated Validations on Agent Output ---")
+        print("\n[DEBUG] Selected Accommodation from State:")
+        print(json.dumps(itinerary.get("accommodation", {}), indent=2, default=str))
+        
+        struct_errors = validate_itinerary_structure(itinerary, "relaxed", "night_owl", user_prefs)
+        _, budget_errors = validate_itinerary_budget(itinerary, user_prefs)
+        
+        assert not struct_errors, f"Structural validation failed: {struct_errors}"
+        assert not budget_errors, f"Budget validation failed: {budget_errors}"
 
 if __name__ == "__main__":
-    import asyncio
-    import sys
-
     # Ensure API keys are present
     if not os.environ.get("GOOGLE_MAPS_API_KEY") or not os.environ.get("VOYAGE_API_KEY"):
         print("Please ensure GOOGLE_MAPS_API_KEY and VOYAGE_API_KEY are set in .env")
     else:
-        mode = sys.argv[1].lower() if len(sys.argv) > 1 else "all"
-        
-        if mode in ["destination", "all"]:
-            asyncio.run(test_destination_selection_flow())
-        if mode == "all":
-            print("\n" + "="*60 + "\n")
-        if mode in ["full", "all"]:
-            asyncio.run(run_full_agent_test())
-        if mode not in ["destination", "full", "all"]:
-            print("Usage: python simulate_mission.py [destination|full|all]")
+        # Run as a pytest suite, forcing stdout (-s) and INFO logs to the terminal
+        pytest.main(["-s", "--log-cli-level=INFO", __file__])

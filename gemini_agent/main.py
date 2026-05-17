@@ -9,6 +9,9 @@ import agent_definition
 # Suppress the noisy SDK warning about non-text parts in responses
 logging.getLogger('google_genai.types').setLevel(logging.ERROR)
 
+# Suppress ADK Experimental Feature Warnings
+os.environ["ADK_SUPPRESS_EXPERIMENTAL_FEATURE_WARNINGS"] = "true"
+
 async def start_interactive_session():
     """Main async entry point for the local test session."""
     required_vars = [

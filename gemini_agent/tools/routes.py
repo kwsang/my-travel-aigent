@@ -1,10 +1,11 @@
 import os
 import json
 import asyncio
+import uuid
 import urllib.request
 import urllib.error
 from typing import Optional
-from google.adk.agents.invocation_context import InvocationContext as Context
+from google.adk.agents.invocation_context import InvocationContext
 
 def _fetch_route_sync(origin: str, destination: str, travel_mode: str) -> str:
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
@@ -47,7 +48,7 @@ def _fetch_route_sync(origin: str, destination: str, travel_mode: str) -> str:
     except Exception as e:
         return f"Exception occurred while calling Routes API: {str(e)}"
 
-async def get_route_directions(origin: str, destination: str, travel_mode: str = "DRIVE", ctx: Context = None) -> str:
+async def get_route_directions(origin: str, destination: str, tool_context: InvocationContext, travel_mode: str = "DRIVE") -> str:
     """
     Gets the route duration and distance between two locations using the Google Routes API.
     
@@ -57,21 +58,46 @@ async def get_route_directions(origin: str, destination: str, travel_mode: str =
         travel_mode: The mode of transportation. Can be 'DRIVE', 'BICYCLE', 'WALK', or 'TRANSIT'.
     """
     trip_destination = None
-    if ctx:
-        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+    starting_location = None
+    if tool_context:
+        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
         itinerary = state.get("final_itinerary") or {}
         if isinstance(itinerary, str):
             try: itinerary = json.loads(itinerary)
             except: itinerary = {}
         trip_destination = itinerary.get("destination")
+        
+        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
+        if isinstance(profile, str):
+            try: profile = json.loads(profile)
+            except: profile = {}
+        starting_location = profile.get("preferences", {}).get("starting_location")
 
     if trip_destination:
         def anchor_loc(loc: str) -> str:
             if not any(c.isalpha() for c in str(loc)): return loc # Skip coordinates (e.g. "47.6,-122.3")
             if trip_destination.lower() in str(loc).lower(): return loc # Skip already anchored strings
+            if starting_location and starting_location.split(',')[0].strip().lower() in str(loc).lower(): return loc # Skip the starting location
             return f"{loc} in {trip_destination}"
             
         origin = anchor_loc(origin)
         destination = anchor_loc(destination)
 
-    return await asyncio.to_thread(_fetch_route_sync, origin, destination, travel_mode)
+    raw_result = await asyncio.to_thread(_fetch_route_sync, origin, destination, travel_mode)
+    try:
+        res_dict = json.loads(raw_result)
+        if "polyline" in res_dict:
+            polyline = res_dict.pop("polyline")
+            route_token = f"route_{uuid.uuid4().hex[:8]}"
+            res_dict["route_token"] = route_token
+            
+            if tool_context:
+                state = tool_context.state
+                if "_route_cache" not in state:
+                    state["_route_cache"] = {}
+                state["_route_cache"][route_token] = polyline
+                
+            return json.dumps(res_dict)
+    except Exception:
+        pass
+    return raw_result

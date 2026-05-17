@@ -118,16 +118,14 @@ export default function DashboardPage() {
     }
 
     setIsEditingName(false);
-    setItinerary(prev => ({ ...prev, trip_name: newName })); // Optimistic UI update
+    const newItinerary = { ...itinerary, trip_name: newName };
+    setItinerary(newItinerary); // Optimistic UI update
 
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          trip_name: newName,
-          events: itinerary.events || []
-        }),
+        body: JSON.stringify({ ...newItinerary, traveler_profile: profile }),
       });
 
       if (response.ok) {
@@ -138,7 +136,7 @@ export default function DashboardPage() {
       }
     } catch (e) {
       console.warn("Dashboard: Failed to rename itinerary.");
-      setItinerary(prev => ({ ...prev, trip_name: itinerary.trip_name })); // Revert on failure
+      setItinerary(itinerary); // Revert on failure
     }
   };
 
@@ -315,11 +313,27 @@ export default function DashboardPage() {
           userId={visitorId}
           initialData={profile || undefined}
           onClose={() => setShowProfileModal(false)}
-          onSave={(newProfile) => {
+          onSave={async (newProfile) => {
             setProfile(newProfile);
+            let newItin = itinerary;
             if (newProfile.budget) {
-              setItinerary(prev => ({ ...prev, budget: newProfile.budget }));
+              newItin = { ...itinerary, budget: newProfile.budget };
+              setItinerary(newItin);
             }
+            
+            // Blocking save to ensure DB has the latest profile and budget before any chat interactions
+            if (currentSessionId && visitorId) {
+              try {
+                await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ...newItin, traveler_profile: newProfile }),
+                });
+              } catch (e) {
+                console.error("Failed to instantly save profile", e);
+              }
+            }
+
             refreshDashboard();
             triggerToast('Traveler profile updated successfully!');
           }}

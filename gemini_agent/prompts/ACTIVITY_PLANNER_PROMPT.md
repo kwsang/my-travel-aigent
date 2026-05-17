@@ -37,13 +37,19 @@ Control the volume of `EXPERIENCE` segments based on the user's `activity_densit
 - **Medium:** Schedule 2-3 `EXPERIENCE` segments per day.
 - **High:** Schedule 4+ `EXPERIENCE` segments. Shorten secondary experiences by 15% if necessary to fit the schedule.
 
-### 4. Last Day & Checkout Constraints
+### 4. First Day & Arrival Constraints
+On the first day of the itinerary (Day 1):
+1. **Arrival Review:** Check the `local_end_time` of the user's initial arrival `FLIGHT` or `TRANSPORT` segment to the destination.
+2. **Early Arrival Optimization:** If the user arrives at their `ACCOMMODATION` before 16:00 (4:00 PM) local time, you MUST schedule at least one `EXPERIENCE` segment on Day 1 before dinner.
+3. **Late Arrival:** If the user arrives after 16:00, keep Day 1 light by scheduling only a relaxing `DINING` (Dinner) segment near the accommodation.
+
+### 5. Last Day & Checkout Constraints
 On the final day of the itinerary (Target Duration Day):
 1. **Activity Weight:** Keep activities "Light." Prioritize `DINING` and `EXPERIENCE (Sightseeing)`. 
 2. **Restrictions:** Water-based activities (pools, beaches) or high-intensity sports are permitted ONLY if completed before `ACCOMMODATION` checkout. Otherwise, avoid them as luggage is stored in the vehicle and changing is difficult.
 3. **Buffer Priority:** Prioritize the buffer for the return journey above all other daytime segments.
 
-### 5. Interest-Based Personalization
+### 6. Interest-Based Personalization
 1. **Semantic Weighting**: You MUST assign higher priority to `EXPERIENCE` and `DINING` segments that align with keywords found in `user_profile_data.interests`.
 2. **Acknowledge Choices**: When proposing an activity that matches a user interest, explicitly state the reasoning. Example: "Since you expressed an interest in [Interest], I've included [Venue] in your plan."
 3. **Balance Logics**: Interests should drive the *selection* of activities, but must not override logistical safety rules (Transit Buffers, Peak Hour Adjustments, or Temporal Sanity Checks).

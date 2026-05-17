@@ -16,6 +16,10 @@ from gemini_agent.tools.geo_tools import search_places
 from gemini_agent.tools.discovery import save_destination_accommodations, save_destination_activities
 
 load_dotenv()
+
+# Suppress ADK Experimental Feature Warnings
+os.environ["ADK_SUPPRESS_EXPERIMENTAL_FEATURE_WARNINGS"] = "true"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s.%(msecs)03d | %(name)s | %(levelname)s | %(message)s",
@@ -49,22 +53,34 @@ async def precache_destinations_task(app: FastAPI):
 
                 if dest:
                     city = dest.get("name")
-                    logger.info(f"Autonomously pre-caching missing data for: {city}")
+                    state = dest.get("state")
+                    country = dest.get("country", "USA")
+                    
+                    location_parts = [p for p in [city, state, country] if p]
+                    full_location = ", ".join(location_parts)
+                    
+                    logger.info(f"Autonomously pre-caching missing data for: {full_location}")
 
                     if not dest.get("suggested_accommodations"):
-                        hotels_json = await search_places(query=f"best hotels and resorts in {city}", location_type="lodging")
-                        if hotels_json:
-                            await save_destination_accommodations(city, json.loads(hotels_json)[:3])
+                        hotels_json = await search_places(query=f"best hotels and resorts in {full_location}", location_type="lodging", tool_context=None)
+                        if hotels_json and not hotels_json.startswith("Error"):
+                            try:
+                                await save_destination_accommodations(full_location, json.loads(hotels_json)[:3], tool_context=None)
+                            except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse hotels JSON for {full_location}")
 
                     if not dest.get("suggested_activities"):
-                        activities_json = await search_places(query=f"top things to do and restaurants in {city}")
-                        if activities_json:
-                            await save_destination_activities(city, json.loads(activities_json)[:5])
+                        activities_json = await search_places(query=f"top things to do and restaurants in {full_location}", tool_context=None)
+                        if activities_json and not activities_json.startswith("Error"):
+                            try:
+                                await save_destination_activities(full_location, json.loads(activities_json)[:5], tool_context=None)
+                            except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse activities JSON for {full_location}")
         except Exception as e:
             logger.error(f"Error in pre-caching task: {e}")
         
-        # Wait 5 minutes between queries to stay well under rate limits and allow background processing
-        await asyncio.sleep(300)
+        # Wait 30 seconds between queries to stay well under rate limits and allow background processing
+        await asyncio.sleep(30)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

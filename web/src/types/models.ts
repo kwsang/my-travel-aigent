@@ -24,7 +24,7 @@ export interface EventDetails {
   description?: string;
   notes?: string;
   image_url?: string;
-  category: string;
+  category?: string;
   city?: string;
   travel_zone?: string;
   geo?: GeoCoordinates;
@@ -33,6 +33,7 @@ export interface EventDetails {
   user_rating_count?: number;
   is_rental: boolean;
   vehicle_count: number;
+  polyline?: string;
 }
 
 export type SegmentType =

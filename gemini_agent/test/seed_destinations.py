@@ -57,8 +57,8 @@ def get_cities_from_vibe(vibe_phrase):
     logger.info(f"Asking Gemini for cities matching vibe: '{vibe_phrase}'")
     model = GenerativeModel("gemini-2.5-flash-lite")
     prompt = (
-        f"List 10 popular or major cities in the USA that match this travel vibe: '{vibe_phrase}'. "
-        "Return only a list of cities in the format 'City, State' separated by newlines. "
+        f"List 10 popular or major destinations that match this travel vibe: '{vibe_phrase}'. "
+        "Return only a list of cities in the format 'City, State, Country' separated by newlines. "
         "Do not include any numbering or extra text."
     )
     try:
@@ -76,7 +76,7 @@ def fetch_destinations_from_google(vibe_queries: list[str]):
     # Stopwords to remove from queries when generating vibe_tags
     STOPWORDS = {"cities", "towns", "villages", "spots", "destinations", "in", "with", "a", "and", "the", "usa", "us", "major", "top", "popular", "best", "near", "spot"}
     # Field mask for the New Places API to specify required fields
-    mask = "places.displayName,places.location,places.formattedAddress,places.types"
+    mask = "places.displayName,places.location,places.formattedAddress,places.types,places.addressComponents"
 
     for vibe_phrase in vibe_queries:
         # Extract keywords for vibe_tags from the descriptive phrase
@@ -90,7 +90,7 @@ def fetch_destinations_from_google(vibe_queries: list[str]):
             try:
                 # 2. Query Google Places for specific information about the discovered city
                 request = {
-                    "text_query": f"{city_query}, USA",
+                    "text_query": city_query,
                     "included_type": "locality",
                     "strict_type_filtering": True,
                     "max_result_count": 1
@@ -104,11 +104,20 @@ def fetch_destinations_from_google(vibe_queries: list[str]):
                     if not any(t in geographic_types for t in types):
                         continue
 
+                    state = ""
+                    country = "USA"
+                    for component in place.address_components:
+                        if "administrative_area_level_1" in component.types:
+                            state = component.short_text
+                        if "country" in component.types:
+                            country = component.short_text
+
                     dest_doc = {
                         "name": place.display_name.text,
-                        "country": "USA",
+                        "state": state,
+                        "country": country,
                         # High-fidelity semantic description
-                        "description": (f"The city of {place.display_name.text}. A US destination found for its "
+                        "description": (f"The city of {place.display_name.text}. A destination found for its "
                                        f"'{vibe_phrase}' characteristics, located in "
                                        f"{place.formatted_address}."),
                         "location": {

@@ -4,7 +4,7 @@ import asyncio
 from typing import Optional
 from gemini_agent.clients import places_client, gmaps_client
 from gemini_agent.logic.cache import LRUTTLCache
-from google.adk.agents.invocation_context import InvocationContext as Context
+from google.adk.agents.invocation_context import InvocationContext
 
 logger = logging.getLogger(__name__)
 
@@ -13,23 +13,31 @@ _MATRIX_CACHE = LRUTTLCache()
 _PLACES_CACHE = LRUTTLCache()
 _GEOCODE_CACHE = LRUTTLCache()
 
-async def google_maps_matrix(origins: list[str], destinations: list[str], ctx: Context = None) -> str:
+async def google_maps_matrix(origins: list[str], destinations: list[str], tool_context: InvocationContext) -> str:
     """
     Calculates real-time driving time and distance between locations.
     """
     destination = None
-    if ctx:
-        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+    starting_location = None
+    if tool_context:
+        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
         itinerary = state.get("final_itinerary") or {}
         if isinstance(itinerary, str):
             try: itinerary = json.loads(itinerary)
             except: itinerary = {}
         destination = itinerary.get("destination")
+        
+        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
+        if isinstance(profile, str):
+            try: profile = json.loads(profile)
+            except: profile = {}
+        starting_location = profile.get("preferences", {}).get("starting_location")
 
     if destination:
         def anchor_loc(loc: str) -> str:
             if not any(c.isalpha() for c in str(loc)): return loc # Skip coordinates (e.g. "47.6,-122.3")
             if destination.lower() in str(loc).lower(): return loc # Skip already anchored strings
+            if starting_location and starting_location.split(',')[0].strip().lower() in str(loc).lower(): return loc # Skip the starting location
             return f"{loc} in {destination}"
             
         origins = [anchor_loc(o) for o in origins]
@@ -62,18 +70,18 @@ async def google_maps_matrix(origins: list[str], destinations: list[str], ctx: C
 
 async def search_places(
     query: str,
+    tool_context: InvocationContext,
     location_type: Optional[str] = None,
     location_bias: Optional[str] = None,
     interests: Optional[list[str]] = None,
-    ctx: Context = None
 ) -> str:
     """
     Searches for venues, restaurants, or activities using the Google Places API.
     Dynamically enriches the query with user interests to improve semantic relevance.
     """
     destination = None
-    if ctx:
-        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+    if tool_context:
+        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
         itinerary = state.get("final_itinerary") or {}
         if isinstance(itinerary, str):
             try: itinerary = json.loads(itinerary)
@@ -141,7 +149,10 @@ async def search_places(
         
         venues = []
         for place in response.places:
-            venues.append({
+            if not place.rating or not place.user_rating_count:
+                continue
+                
+            venue = {
                 "name": place.display_name.text,
                 "place_id": place.id,
                 "rating": place.rating,
@@ -149,26 +160,34 @@ async def search_places(
                 "price_tier": place.price_level,
                 "description": place.editorial_summary.text if place.editorial_summary else place.formatted_address,
                 "geo": {"latitude": place.location.latitude, "longitude": place.location.longitude},
-                "types": place.types,
+                "types": list(place.types),
                 "status": place.business_status.name if hasattr(place, "business_status") else "Unknown",
-                "currentOpeningHours": str(place.current_opening_hours) if place.current_opening_hours else "Not available",
-                "regularOpeningHours": str(place.regular_opening_hours) if place.regular_opening_hours else "Not available",
+                "currentOpeningHours": list(place.current_opening_hours.weekday_descriptions) if place.current_opening_hours else [],
+                "regularOpeningHours": list(place.regular_opening_hours.weekday_descriptions) if place.regular_opening_hours else [],
                 "utcOffsetMinutes": place.utc_offset_minutes
-            })
+            }
+            venues.append(venue)
+            
+            if tool_context:
+                state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
+                if "_venue_cache" not in state:
+                    state["_venue_cache"] = {}
+                state["_venue_cache"][venue["name"]] = venue
+
         result_json = json.dumps(venues, default=str)
         _PLACES_CACHE.set(cache_key, result_json)
         return result_json
     except Exception as e:
         return f"Error searching Google Places: {str(e)}"
 
-async def search_local_events(location: str, query: str = "festivals and events", ctx: Context = None) -> str:
+async def search_local_events(location: str, tool_context: InvocationContext, query: str = "festivals and events") -> str:
     """
     Searches for current local events, festivals, and happenings in a specific city.
     Useful for providing real-time value and engagement during the user intake process.
     """
     destination = None
-    if ctx:
-        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
+    if tool_context:
+        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
         itinerary = state.get("final_itinerary") or {}
         if isinstance(itinerary, str):
             try: itinerary = json.loads(itinerary)
@@ -179,4 +198,4 @@ async def search_local_events(location: str, query: str = "festivals and events"
 
     logger.info(f"Tool invoked: search_local_events in '{active_location}' with query '{query}'")
     # Leverages the robust search_places logic with a specialized event-centric query
-    return await search_places(query=query, location_bias=active_location)
+    return await search_places(query=query, tool_context=tool_context, location_bias=active_location)

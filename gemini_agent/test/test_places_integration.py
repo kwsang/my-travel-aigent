@@ -85,6 +85,10 @@ def validate_venue_availability(place_id, requested_time_str, min_rating=4.5):
         print(f"--- Validating Venue: {venue_name} ---")
         print(f"Rating: {rating} ({total_ratings} reviews)")
 
+        if not rating or not total_ratings:
+            print("STATUS: [REJECTED] - Venue has 0.0 rating or 0 reviews.")
+            return None
+
         # 1. Transparency Rule Check
         if rating < min_rating:
             print(f"STATUS: [Budget Alternative] - Rating {rating} is below preferred {min_rating}")
@@ -116,7 +120,7 @@ def validate_venue_availability(place_id, requested_time_str, min_rating=4.5):
 
 def test_integration():
     # Instead of hardcoding a brittle ID, we search for the venue name
-    venue_query = "Lo Guarracino, Positano"
+    venue_query = "New York City, NY, USA"
     # min_rating from User Profile
     user_min_rating = 4.5
     
