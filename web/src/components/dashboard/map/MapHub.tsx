@@ -11,7 +11,7 @@ import { API_CONFIG } from '@/config/constants';
 import { SegmentType, SegmentColors, SegmentIcons } from '@/components/dashboard/utils/segmentMapping';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
-const MAPS_LIBRARIES: ("marker" | "places" | "geometry")[] = ["marker", "geometry"];
+const MAPS_LIBRARIES: ("marker" | "places" | "geometry")[] = ["marker", "places", "geometry"];
 
 /**
  * MapHub Component
@@ -489,6 +489,36 @@ function MapInner() {
           mapId="DEMO_MAP_ID"
           styles={marineSunsetMapStyle}
           colorScheme={"DARK" as any}
+          onClick={(e: any) => {
+            if (e.detail?.placeId && map) {
+              e.mapEvent?.stop?.(); // Prevents default Google Maps InfoWindow from opening
+              
+              const service = new (window as any).google.maps.places.PlacesService(map);
+              service.getDetails({
+                placeId: e.detail.placeId,
+                fields: ['name', 'formatted_address', 'geometry', 'rating', 'user_ratings_count', 'price_level', 'types']
+              }, (place: any, status: any) => {
+                if (status === 'OK' && place) {
+                  setActiveSuggestion({
+                    _suggestionType: 'activity',
+                    details: {
+                      name: place.name,
+                      description: place.formatted_address,
+                      geo: {
+                        latitude: place.geometry?.location?.lat(),
+                        longitude: place.geometry?.location?.lng()
+                      },
+                      rating: place.rating,
+                      user_rating_count: place.user_ratings_count,
+                    },
+                    priceLevel: place.price_level,
+                    types: place.types || []
+                  });
+                  setActiveSegmentIndex(null as any);
+                }
+              });
+            }
+          }}
         >
           {startGeo && (
             <AdvancedMarker
@@ -625,6 +655,12 @@ function MapInner() {
             const rating = place.details?.rating || place.rating;
             const ratingCount = place.details?.user_rating_count || place.userRatingCount || place.user_rating_count;
 
+            const isDining = place.types?.some((t: string) => ['restaurant', 'cafe', 'food', 'bar', 'bakery'].includes(t));
+            const Icon = isDining ? Utensils : Sparkles;
+            const bgClass = isDining ? 'bg-amber-500' : 'bg-pink-500';
+            const borderHoverClass = isDining ? 'group-hover:border-amber-300' : 'group-hover:border-pink-300';
+            const shadowHoverClass = isDining ? 'group-hover:shadow-amber-500/30' : 'group-hover:shadow-pink-500/30';
+
             return (
                 <AdvancedMarker
                     key={`suggestion-act-${idx}`}
@@ -636,8 +672,8 @@ function MapInner() {
                     }}
                 >
                     <div className="flex flex-col items-center group animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                        <div className="relative bg-amber-500 border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-amber-300 group-hover:shadow-amber-500/30 transition-all">
-                            <Utensils size={18} className="text-white" />
+                        <div className={`relative ${bgClass} border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 ${borderHoverClass} ${shadowHoverClass} transition-all`}>
+                            <Icon size={18} className="text-white" />
                             {(price || rating) && (
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
                                     {price && (
@@ -680,7 +716,7 @@ function MapInner() {
                 position={{ lat: geo.latitude, lng: geo.longitude }} 
                 title={placeName}
                 onClick={() => {
-                  setActiveSegmentIndex(index);
+                  setActiveSegmentIndex(isActive ? null : index);
                   setActiveSuggestion(null);
                 }}
                 zIndex={isActive || isHovered ? 100 : 10}
@@ -736,6 +772,7 @@ function MapInner() {
               const notes = activeSegment.details?.notes;
               const price = activeSegment.details?.price;
               const rating = activeSegment.details?.rating;
+              const category = activeSegment.details?.category;
               const imageUrl = activeSegment.details?.image_url || (activeSegment as any).image_url || (activeSegment.details as any)?.photo_url;
               return (
                 <InfoWindow
@@ -750,6 +787,13 @@ function MapInner() {
                       </div>
                     )}
                     <h3 className="font-bold text-sm leading-tight mb-1">{placeName as React.ReactNode}</h3>
+                    {category && (
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        <span className="bg-primary/10 text-primary text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-sm">
+                          {category as React.ReactNode}
+                        </span>
+                      </div>
+                    )}
                     {description && <p className="text-xs opacity-80">{description as React.ReactNode}</p>}
                     {notes && <p className="text-xs opacity-80 italic mt-1">Note: {notes as React.ReactNode}</p>}
                     {(price || rating) && (
@@ -777,6 +821,18 @@ function MapInner() {
               const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
               const rating = place.details?.rating || place.rating;
               const imageUrl = place.details?.image_url || place.image_url || place.photo_url || place.photoUri || (place.photos && place.photos.length > 0 ? place.photos[0].photoUri || place.photos[0].name : null);
+              
+              const rawTypes = place.types || place.details?.types || [];
+              const typesArray = Array.isArray(rawTypes) ? rawTypes : (typeof rawTypes === 'string' ? rawTypes.replace(/['\[\]]/g, '').split(', ') : []);
+              const displayTypes = typesArray
+                .filter((t: string) => !['point_of_interest', 'establishment', 'food', 'service', 'premise'].includes(t.trim()))
+                .slice(0, 2)
+                .map((t: string) => t.trim().split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+              
+              if (displayTypes.length === 0 && place.details?.category) {
+                displayTypes.push(place.details.category);
+              }
+
               return (
                 <InfoWindow
                   position={{ lat: geo.latitude, lng: geo.longitude }}
@@ -790,6 +846,15 @@ function MapInner() {
                       </div>
                     )}
                     <h3 className="font-bold text-sm leading-tight mb-1">{placeName as React.ReactNode}</h3>
+                    {displayTypes.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        {displayTypes.map((type: string, idx: number) => (
+                          <span key={idx} className="bg-primary/10 text-primary text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-sm">
+                            {type as React.ReactNode}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {description && <p className="text-xs opacity-80">{description as React.ReactNode}</p>}
                     {notes && <p className="text-xs opacity-80 italic mt-1">Note: {notes as React.ReactNode}</p>}
                     {(price || rating) && (
@@ -811,9 +876,13 @@ function MapInner() {
                             accommodation: place
                           }));
                         } else {
+                          const isDining = place.types?.some((t: string) => ['restaurant', 'cafe', 'food', 'bar', 'bakery'].includes(t));
                           const newEvent = {
-                            segment: 'EXPERIENCE',
+                            segment: isDining ? 'DINING' : 'EXPERIENCE',
                             day: 1, // Add to Day 1 by default, the user can reorganize it via drag & drop
+                            schedule: {
+                              local_start_time: "12:00:00"
+                            },
                             details: {
                               ...place.details,
                               name: placeName,

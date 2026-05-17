@@ -149,6 +149,23 @@ export default function TimelineView() {
     </div>
   ) : null;
 
+  // Extract and group validation errors by day
+  const globalErrors: string[] = [];
+  const dayErrors = new Map<number, string[]>();
+
+  if (itinerary.is_conflict && itinerary.validation_errors) {
+    itinerary.validation_errors.forEach((error: string) => {
+      const match = error.match(/Day (\d+)/i);
+      if (match) {
+        const dayNum = parseInt(match[1], 10);
+        if (!dayErrors.has(dayNum)) dayErrors.set(dayNum, []);
+        dayErrors.get(dayNum)!.push(error);
+      } else {
+        globalErrors.push(error);
+      }
+    });
+  }
+
   // Memoize grouped segments to prevent O(D * S) filtering loops on every render
   const segmentsByDay = React.useMemo(() => {
     const grouped = new Map<number, { event: Event; absoluteIndex: number; time: number }[]>();
@@ -266,15 +283,15 @@ export default function TimelineView() {
       
       {dateHeader}
 
-      {/* Validation Errors / Overlap Warnings Banner */}
-      {itinerary.is_conflict && itinerary.validation_errors && itinerary.validation_errors.length > 0 && (
+      {/* Global Validation Errors / Budget Warnings Banner */}
+      {globalErrors.length > 0 && (
         <div className="flex flex-col gap-2 bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-4 -mt-4 mb-2">
           <div className="flex items-center gap-2 font-bold text-sm">
             <AlertTriangle className="w-4 h-4" />
-            <span>Schedule Conflicts Detected</span>
+            <span>Trip Warnings</span>
           </div>
           <ul className="list-disc pl-5 space-y-1 text-xs font-medium opacity-90">
-            {itinerary.validation_errors.map((error: string, idx: number) => (
+            {globalErrors.map((error: string, idx: number) => (
               <li key={idx}>{error}</li>
             ))}
           </ul>
@@ -351,6 +368,19 @@ export default function TimelineView() {
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, segments.length, day)} // Fallback drop zone at the end of the day block
               >
+                {dayErrors.has(day) && (
+                  <div className="flex flex-col gap-1.5 bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-lg shadow-sm mb-4">
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>Schedule Conflicts</span>
+                    </div>
+                    <ul className="list-disc pl-4 space-y-0.5 text-[11px] font-medium opacity-90">
+                      {dayErrors.get(day)!.map((error: string, idx: number) => (
+                        <li key={idx}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {(() => {
                   const items: { time: number, node: React.ReactNode }[] = [];
                   

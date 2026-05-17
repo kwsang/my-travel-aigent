@@ -74,7 +74,7 @@ export default function TimelineItem({
         e.stopPropagation(); // Prevent fallback drop zone from firing
         onDrop(e, absoluteIndex, day);
       }}
-      onClick={() => setActiveSegmentIndex(absoluteIndex)}
+      onClick={() => setActiveSegmentIndex(activeSegmentIndex === absoluteIndex ? null : absoluteIndex)}
       onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
       onMouseLeave={() => setHoveredSegmentIndex?.(null)}
       className={`relative rounded-xl border ${event.segment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer active:cursor-grab group ${
