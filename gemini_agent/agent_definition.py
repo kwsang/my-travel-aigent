@@ -286,12 +286,14 @@ def create_travel_agent():
                 
                 if has_lodging and has_transport and not has_activities:
                     handoff_context += f"{map_context} Initial lodging and transport are settled. You MUST invoke the 'call_activity_planner' tool to schedule daily experiences and dining."
+                elif itinerary_data.get("lodging") and not has_lodging:
+                    handoff_context += f"{map_context} The user has selected their lodging, but lodging events have not been scheduled yet. You MUST invoke the 'call_travel_pioneer' tool to schedule lodging check-in/out and any missing transit."
                 else:
                     handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
             elif itinerary_data.get("lodging"):
                 handoff_context += f"{map_context} The user has selected their lodging, but travel logistics have not been scheduled yet. You MUST invoke the 'call_travel_pioneer' tool to schedule flights, transit, and lodging check-in/out."
             elif destination:
-                handoff_context += f"{map_context} No events have been planned yet. You MUST invoke the 'call_travel_pioneer' tool to find lodging suggestions."
+                handoff_context += f"{map_context} The destination is set but events have not been fully planned yet. You MUST invoke the 'call_travel_pioneer' tool to schedule primary transit (flights/driving) and find lodging suggestions."
 
         logger.info(f"[SUPERVISOR] Handoff Context: {handoff_context}")
 

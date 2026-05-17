@@ -23,7 +23,7 @@ export const PROFILE_OPTIONS = {
   TRANSPORT_OPTIONS: [
     { value: 'public', label: 'Public Transit' },
     { value: 'rideshare', label: 'Rideshare' },
-    { value: 'rental', label: 'Rental Car' },
+    { value: 'rental', label: 'Car' },
   ],
   TRAVEL_INTERESTS: [
     'Nature', 'Culture', 'Food', 'Adventure', 'Relaxation', 'Shopping', 'History', 'Art', 'Nightlife', 'Sports'

@@ -321,7 +321,9 @@ function MapInner() {
     if (itinerary.lodging) {
       coords.push(getCoords(itinerary.lodging));
     }
-    destinationInfo?.suggested_lodging?.forEach((p: any) => coords.push(getCoords(p)));
+    if (!itinerary.lodging) {
+      destinationInfo?.suggested_lodging?.forEach((p: any) => coords.push(getCoords(p)));
+    }
     if (itinerary.lodging) {
       destinationInfo?.suggested_activities?.forEach((p: any) => coords.push(getCoords(p)));
     }

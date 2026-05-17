@@ -41,6 +41,8 @@ class Schedule(BaseModel):
 class EventDetails(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
     name: str = Field(..., description="Display name of the venue or activity.")
+    description: Optional[str] = Field(None, description="Description of the venue or event.")
+    image_url: Optional[str] = Field(None, description="Image URL for the venue.")
     category: Optional[str] = Field(None, description="Broad category (e.g., Museum, Fine Dining).")
     city: Optional[str] = Field(None, description="Primary city for clustering logic.")
     travel_zone: Optional[str] = Field(None, description="Micro-location zone within a city.")
@@ -199,6 +201,34 @@ class Itinerary(BaseModel):
         if isinstance(v, datetime):
             return v.isoformat()
         return v
+
+    @model_validator(mode='after')
+    def enrich_lodging_events(self) -> 'Itinerary':
+        if self.lodging and self.events:
+            lodging_geo = self.lodging.get("geo")
+            lodging_rating = self.lodging.get("rating")
+            lodging_reviews = self.lodging.get("user_rating_count")
+            lodging_description = self.lodging.get("description")
+            lodging_image_url = self.lodging.get("image_url") or self.lodging.get("photo_url")
+            
+            for event in self.events:
+                if event.segment == "LODGING":
+                    if lodging_geo:
+                        if not event.geo:
+                            event.geo = GeoCoordinates(**lodging_geo) if isinstance(lodging_geo, dict) else lodging_geo
+                        if not event.details.geo:
+                            event.details.geo = GeoCoordinates(**lodging_geo) if isinstance(lodging_geo, dict) else lodging_geo
+                    if lodging_rating is not None and event.details.rating is None:
+                        event.details.rating = float(lodging_rating)
+                    if lodging_reviews is not None and event.details.user_rating_count is None:
+                        event.details.user_rating_count = int(lodging_reviews)
+                    if lodging_description and not event.details.description:
+                        event.details.description = lodging_description
+                    if lodging_image_url and not event.details.image_url:
+                        event.details.image_url = lodging_image_url
+                    if self.destination and not event.details.city:
+                        event.details.city = self.destination.split(',')[0].strip()
+        return self
 
 class ItineraryPatchRequest(BaseModel):
     events: Optional[List[Event]] = Field(None, description="Updated events from the UI.")

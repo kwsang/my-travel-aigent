@@ -20,7 +20,7 @@ export function useMapClick(
       geocoder.geocode({ location: e.detail.latLng }, (results: any, status: any) => {
         if (status === 'OK' && results && results.length > 0) {
           const region = results.find((r: any) => r.types.some((t: string) => 
-            ['locality', 'administrative_area_level_3', 'administrative_area_level_2', 'administrative_area_level_1'].includes(t)
+            ['locality'].includes(t)
           ));
           
           const destName = region ? region.formatted_address : (results.find((r: any) => r.types.includes('country')) || results[0]).formatted_address;
