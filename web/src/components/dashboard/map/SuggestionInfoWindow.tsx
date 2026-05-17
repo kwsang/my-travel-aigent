@@ -1,17 +1,16 @@
 import React from 'react';
 import { InfoWindow } from '@vis.gl/react-google-maps';
 import { Star, Plus, Bed, RefreshCw } from 'lucide-react';
+import { useMapContext } from './MapContext';
 
 interface SuggestionInfoWindowProps {
   place: any;
   hasLodging?: boolean;
   onClose: () => void;
-  onAddLodging: (place: any) => void;
-  onAddActivity: (placeName: string, eventCategory: string) => void;
-  formatPrice: (p: any) => string | null;
 }
 
-export default function SuggestionInfoWindow({ place, hasLodging, onClose, onAddLodging, onAddActivity, formatPrice }: SuggestionInfoWindowProps) {
+export default function SuggestionInfoWindow({ place, hasLodging, onClose }: SuggestionInfoWindowProps) {
+  const { handleMapAddLodging, handleAddActivity, formatPrice } = useMapContext();
   const geo = place.geo || place.details?.geo || place.location;
   if (!geo) return null;
   
@@ -67,10 +66,10 @@ export default function SuggestionInfoWindow({ place, hasLodging, onClose, onAdd
             e.preventDefault();
             e.stopPropagation();
             if (place._suggestionType === 'lodging') {
-              onAddLodging(place);
+              handleMapAddLodging(place);
             } else {
               const isDining = place.types?.some((t: string) => ['restaurant', 'cafe', 'food', 'bar', 'bakery'].includes(t));
-              onAddActivity(placeName as string, isDining ? 'dining' : 'activity');
+              handleAddActivity(placeName as string, isDining ? 'dining' : 'activity');
             }
             onClose();
           }}

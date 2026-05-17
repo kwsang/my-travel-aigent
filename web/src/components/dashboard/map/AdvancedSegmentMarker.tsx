@@ -3,6 +3,7 @@ import { AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Star, Sparkles } from 'lucide-react';
 import { SegmentType, SegmentIcons, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
 import { Event } from '@/types';
+import { useMapContext } from './MapContext';
 
 interface TimelineMarkerProps {
   segment: Event;
@@ -12,10 +13,10 @@ interface TimelineMarkerProps {
   onClick: () => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-  formatPrice: (p: any) => string | null;
 }
 
-export default function TimelineMarker({ segment, index, isActive, isHovered, onClick, onMouseEnter, onMouseLeave, formatPrice }: TimelineMarkerProps) {
+export default function TimelineMarker({ segment, index, isActive, isHovered, onClick, onMouseEnter, onMouseLeave }: TimelineMarkerProps) {
+  const { formatPrice } = useMapContext();
   const geo = segment.geo || segment.details?.geo;
   if (!geo) return null;
   

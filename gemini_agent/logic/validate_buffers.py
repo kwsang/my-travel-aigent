@@ -99,7 +99,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
     if not events:
         return []
 
-    print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Vibe: {circadian_pref})...")
+    print(f"Validating Itinerary Structure (Risk: {risk_tolerance}, Sleep Type: {circadian_pref})...")
     errors = []
     
     # Use Pydantic to ensure all fallback values are populated safely

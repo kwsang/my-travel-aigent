@@ -463,7 +463,7 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
           options={PROFILE_OPTIONS.RISK_TOLERANCES}
         />
         <ThemedSelect
-          label="Vibe"
+        label="Sleep Type"
           icon={SunMoon}
           value={formData.preferences.circadian_preference}
           onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: val as 'early_bird' | 'night_owl'}})}

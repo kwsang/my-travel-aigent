@@ -1,16 +1,17 @@
 import React from 'react';
 import { AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Bed, Utensils, Sparkles, Star } from 'lucide-react';
+import { useMapContext } from './MapContext';
 
 interface SuggestionMarkerProps {
   place: any;
   idx: number;
   type: 'lodging' | 'activity';
   onClick: () => void;
-  formatPrice: (p: any) => string | null;
 }
 
-export default function SuggestionMarker({ place, idx, type, onClick, formatPrice }: SuggestionMarkerProps) {
+export default function SuggestionMarker({ place, idx, type, onClick }: SuggestionMarkerProps) {
+  const { formatPrice } = useMapContext();
   const geo = place.geo || place.details?.geo || place.location;
   if (!geo) return null;
   

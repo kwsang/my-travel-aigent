@@ -18,8 +18,8 @@ Follow this sequence strictly, turn-by-turn:
 3. **Target Duration**: "How many days should the itinerary cover?"
 4. **Starting Location**: "Where are you traveling from? (City/State please, so I can check driving vs. flying logistics)."
 
-### Chapter 2: The Personal Rhythm (Circadian & Risk)
-5. **Circadian Preference**: "Are you an Early Bird or a Night Owl?"
+### Chapter 2: The Personal Rhythm (Sleep Type & Risk)
+5. **Sleep Type**: "Are you an Early Bird or a Night Owl?"
 
 ### Chapter 3: Group & Transport
 6. **Lodging & Transport**: "Do you prefer car rentals or rideshares? Also, will you have a personal vehicle available at the destination?"

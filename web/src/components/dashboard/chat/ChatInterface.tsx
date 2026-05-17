@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, User, Bot, Loader2, MessageSquare, X, ChevronDown } from 'lucide-react';
+import { Loader2, MessageSquare, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import ReactMarkdown from 'react-markdown';
 import { API_CONFIG } from '@/config/constants';
 import { ChatMessage } from '@/types'; // Import ChatMessage from shared types
 import { useItineraryData } from '@/context/ItineraryContext';
+import { useChatEvents } from '@/hooks/useChatEvents';
+import ChatMessageItem from './ChatMessageItem';
+import ChatInput from './ChatInput';
+import ChatHeader from './ChatHeader';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -29,7 +32,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -37,7 +40,6 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const isProcessingRef = useRef(false);
   const isMessagesHoveredRef = useRef(false);
   const prevMessagesLengthRef = useRef(messages.length);
-  const profileUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch history when session changes
   useEffect(() => {
@@ -222,144 +224,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     setTimeout(scrollToBottom, 100);
   };
 
-  // Listen for manual timeline drag and drop events
-  useEffect(() => {
-    const handleTimelineDragDrop = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
-      const { item, originalDay, targetDay, updatedSegments } = customEvent.detail;
-      
-      if (!isLoading && item) {
-        const itemName = item.details?.name || item.segment || 'an event';
-        const updatedItinerary = { ...itinerary, events: updatedSegments };
-        
-        let actionText = `from Day ${originalDay} to Day ${targetDay}`;
-        if (originalDay === targetDay) {
-          actionText = `to a new time on Day ${targetDay}`;
-        }
-
-        sendMessage(
-          `I manually dragged and dropped ${itemName} ${actionText}. Please review the updated timeline for any conflicts, adjust the schedule to fit, and verify the budget.`,
-          updatedItinerary,
-          undefined,
-          `I moved ${itemName} ${actionText}.`
-        );
-      }
-    };
-
-    window.addEventListener('travel_aigent_timeline_drag_drop', handleTimelineDragDrop);
-    return () => window.removeEventListener('travel_aigent_timeline_drag_drop', handleTimelineDragDrop);
-  }, [sendMessage, isLoading, itinerary]);
-
-  // Listen for custom destination events from the map
-  useEffect(() => {
-    const handleSetDestination = (e: Event) => {
-      const customEvent = e as CustomEvent<string>;
-      const destination = customEvent.detail;
-      
-      if (destination && !isLoading) {
-        const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
-        const updatedItinerary = { 
-          ...itinerary, 
-          destination,
-          ...(isDefaultName ? { trip_name: `${destination} Trip` } : {})
-        };
-
-        sendMessage(
-          `I've selected ${destination} as my destination. Please communicate with the travel_pioneer to determine travel and lodging based on my traveler profile.`, 
-          updatedItinerary,
-          undefined,
-          `I've selected ${destination}. Can you determine travel and lodging?`
-        );
-      }
-    };
-
-    window.addEventListener('travel_aigent_set_destination', handleSetDestination);
-    return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
-  }, [sendMessage, isLoading, itinerary]);
-
-  // Listen for custom lodging events from the map
-  useEffect(() => {
-    const handleSetLodging = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
-      const lodging = customEvent.detail;
-      
-      if (lodging && !isLoading) {
-        const isReplacement = !!itinerary.lodging;
-        const updatedItinerary = { 
-          ...itinerary, 
-          lodging
-        };
-
-        const hiddenMessage = isReplacement 
-          ? `I have changed my lodging to ${lodging.name}. Please communicate with the architect and activity_planner to update any travel logistics and rearrange my daily experiences based on this new location.`
-          : `I've selected ${lodging.name} as my lodging. Please communicate with the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile.`;
-
-        const displayMessage = isReplacement
-          ? `I've changed my lodging to ${lodging.name}. Can you update my trip?`
-          : `I've selected ${lodging.name} as my lodging. Can you plan the rest of the trip?`;
-
-        sendMessage(hiddenMessage, updatedItinerary, undefined, displayMessage);
-      }
-    };
-
-    window.addEventListener('travel_aigent_set_lodging', handleSetLodging);
-    return () => window.removeEventListener('travel_aigent_set_lodging', handleSetLodging);
-  }, [sendMessage, isLoading, itinerary]);
-
-  // Listen for custom add activity events from the map
-  useEffect(() => {
-    const handleAddActivity = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
-      const { placeName, eventCategory } = customEvent.detail;
-      
-      if (placeName && !isLoading) {
-        sendMessage(
-          `I found a great ${eventCategory} option on the map called "${placeName}". Please add it to my itinerary at the most appropriate time and day based on my schedule.`, 
-          itinerary,
-          undefined,
-          `Please add ${placeName} to my itinerary.`
-        );
-      }
-    };
-
-    window.addEventListener('travel_aigent_add_activity', handleAddActivity);
-    return () => window.removeEventListener('travel_aigent_add_activity', handleAddActivity);
-  }, [sendMessage, isLoading, itinerary]);
-
-  // Listen for targeted profile update events from the profile modal
-  useEffect(() => {
-    const handleProfileUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
-      const { updatedProfile, targetAgent, changeDesc } = customEvent.detail;
-      
-      if (updatedProfile && targetAgent && !isLoading) {
-        if (profileUpdateTimerRef.current) {
-          clearTimeout(profileUpdateTimerRef.current);
-        }
-        
-        profileUpdateTimerRef.current = setTimeout(() => {
-          const updatedItinerary = {
-            ...itinerary,
-            budget: updatedProfile.budget || itinerary.budget
-          };
-          sendMessage(
-            `I've updated my ${changeDesc} in my traveler profile. Please communicate directly with the ${targetAgent} to review and adjust the itinerary if needed.`, 
-            updatedItinerary,
-            updatedProfile,
-            `I've updated my ${changeDesc}. Please review the itinerary.`
-          );
-        }, 3000); // 3-second debounce window
-      }
-    };
-
-    window.addEventListener('travel_aigent_profile_updated', handleProfileUpdated);
-    return () => {
-      window.removeEventListener('travel_aigent_profile_updated', handleProfileUpdated);
-      if (profileUpdateTimerRef.current) {
-        clearTimeout(profileUpdateTimerRef.current);
-      }
-    };
-  }, [sendMessage, isLoading, itinerary]);
+  useChatEvents(sendMessage, isLoading, itinerary);
 
   return (
     <>
@@ -377,15 +242,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
-          <h3 className="font-bold text-foreground text-sm tracking-wide">Travel AIgent</h3>
-        </div>
-        <button onClick={() => setIsOpen(false)} className="text-white hover:opacity-80 transition-opacity" title="Close Chat">
-          <X size={18} />
-        </button>
-      </div>
+      <ChatHeader onClose={() => setIsOpen(false)} />
 
       {/* Messages Area */}
       <div 
@@ -396,26 +253,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
         className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent scroll-smooth [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/20 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/40"
       >
         {messages.map((m: ChatMessage, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`flex gap-3 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                m.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-white/10 text-foreground'
-              }`}>
-                {m.role === 'user' ? <User size={14} /> : <Bot size={14} />}
-              </div>
-              <div className={`p-3 rounded-2xl text-sm shadow-sm leading-relaxed ${
-                m.role === 'user' 
-                  ? 'bg-primary text-primary-foreground rounded-tr-none font-medium' 
-                  : 'bg-white/5 border border-white/10 text-foreground rounded-tl-none backdrop-blur-sm'
-              }`}>
-                {m.role === 'agent' ? (
-                  <div className="markdown-content">
-                    <ReactMarkdown>{m.content}</ReactMarkdown>
-                  </div>
-                ) : m.content}
-              </div>
-            </div>
-          </div>
+          <ChatMessageItem key={i} message={m} />
         ))}
         {isLoading && (
           <div className="flex gap-2 items-center text-muted-foreground ml-1">
@@ -438,19 +276,12 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       )}
 
       {/* Input Area */}
-      <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-4 border-t border-white/10 bg-black/20 flex gap-2 shrink-0">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Adjust itinerary..."
-          className="flex-1 text-sm bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-          disabled={isLoading}
-        />
-        <button type="submit" disabled={isLoading || !input.trim()} className="bg-primary text-primary-foreground p-2 rounded-xl hover:brightness-110 disabled:opacity-30 transition-all active:scale-95 shadow-lg shadow-primary/20">
-          <Send size={18} />
-        </button>
-      </form>
+      <ChatInput
+        input={input}
+        setInput={setInput}
+        isLoading={isLoading}
+        onSend={handleSend}
+      />
     </div>
     </>
   );

@@ -2,14 +2,15 @@ import React from 'react';
 import { InfoWindow } from '@vis.gl/react-google-maps';
 import { Star } from 'lucide-react';
 import { Event } from '@/types';
+import { useMapContext } from './MapContext';
 
 interface SegmentInfoWindowProps {
   segment: Event;
   onClose: () => void;
-  formatPrice: (p: any) => string | null;
 }
 
-export default function SegmentInfoWindow({ segment, onClose, formatPrice }: SegmentInfoWindowProps) {
+export default function SegmentInfoWindow({ segment, onClose }: SegmentInfoWindowProps) {
+  const { formatPrice } = useMapContext();
   const geo = segment.geo || segment.details?.geo;
   if (!geo) return null;
   

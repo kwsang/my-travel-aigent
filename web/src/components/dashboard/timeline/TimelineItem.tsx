@@ -4,6 +4,7 @@ import { Sparkles, GripVertical, Star, Plane, AlertTriangle } from 'lucide-react
 import { Event } from '@/types';
 import { SegmentType, SegmentIcons, SegmentColors } from '@/components/dashboard/utils/segmentMapping';
 import { formatTime } from '@/utils/dateUtils';
+import { useTimelineItemEvents } from '@/hooks/useTimelineItemEvents';
 
 const DefaultIcon = Sparkles; // Fallback icon
 
@@ -70,28 +71,34 @@ export default function TimelineItem({
 
   const isDraggable = effectiveSegment !== 'TRANSPORT' && effectiveSegment !== 'FLIGHT';
 
+  const events = useTimelineItemEvents(
+    absoluteIndex,
+    day,
+    isDraggable,
+    activeSegmentIndex,
+    setActiveSegmentIndex,
+    setHoveredSegmentIndex,
+    onDragStart,
+    onDragEnter,
+    onDragLeave,
+    onDragEnd,
+    onDragOver,
+    onDrop
+  );
+
   return (
     <div
       id={`timeline-item-${absoluteIndex}`}
       draggable={isDraggable}
-      onDragStart={(e) => {
-        if (isDraggable) {
-          onDragStart(e, absoluteIndex);
-        } else {
-          e.preventDefault();
-        }
-      }}
-      onDragEnter={(e) => onDragEnter(e, absoluteIndex)}
-      onDragLeave={onDragLeave}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDrop={(e) => {
-        e.stopPropagation(); // Prevent fallback drop zone from firing
-        onDrop(e, absoluteIndex, day);
-      }}
-      onClick={() => setActiveSegmentIndex(activeSegmentIndex === absoluteIndex ? null : absoluteIndex)}
-      onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
-      onMouseLeave={() => setHoveredSegmentIndex?.(null)}
+      onDragStart={events.handleDragStart}
+      onDragEnter={events.handleDragEnter}
+      onDragLeave={events.handleDragLeave}
+      onDragEnd={events.handleDragEnd}
+      onDragOver={events.handleDragOver}
+      onDrop={events.handleDrop}
+      onClick={events.handleClick}
+      onMouseEnter={events.handleMouseEnter}
+      onMouseLeave={events.handleMouseLeave}
       className={`relative rounded-xl border ${effectiveSegment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer group ${isDraggable ? 'active:cursor-grab' : ''} ${
         hasConflict 
           ? 'border-destructive/60 bg-destructive/10' 
