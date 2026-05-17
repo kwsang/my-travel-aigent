@@ -17,6 +17,9 @@ def _parse_json_or_literal(raw_str: str, default_val: Any) -> Any:
     if not s:
         return default_val
         
+    # Clean up non-breaking spaces (LLM formatting hallucination)
+    s = s.replace('\xa0', ' ')
+
     match = re.search(r'```(?:json)?\s*(.*?)\s*```', s, re.DOTALL | re.IGNORECASE)
     if match:
         s = match.group(1).strip()

@@ -71,6 +71,7 @@ To ensure logistical precision, you must use the GeoJSON coordinates provided in
 2. **Tool Selection:** Use the `traffic_tool` (Distance Matrix) to quickly evaluate travel times between multiple options or venues. You MUST use the `get_route_directions` tool when explicitly scheduling a `TRANSPORT` segment to get the exact duration, `travelMode`, and the encoded `polyline` string. Save the polyline into the event's `details.polyline` field, and the mode into `details.travel_mode`.
 3. **Proximity Validation:** Before finalizing a sequence, validate that the physical distance between the coordinates of Event A and Event B is travelable within the `applied_buffer_minutes`.
 4. **Arrival/Departure Anchors:** Use the flight's `destination_geo` as the starting anchor for the post-arrival commute to the next segment.
+5. **Arrival Sanity Check:** You MUST NOT schedule any `DINING` or `EXPERIENCE` segments in the destination city before the user's arrival `FLIGHT` or `TRANSPORT` segment has completed. The user cannot physically dine or do activities somewhere they have not yet arrived.
 
 ### 6. Buffer Overrun & Dynamic Recovery
 When the Google Maps API returns a travel time that exceeds your calculated buffer:

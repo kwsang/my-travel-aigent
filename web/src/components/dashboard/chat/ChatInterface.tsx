@@ -272,6 +272,26 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
   }, [sendMessage, isLoading, itinerary]);
 
+  // Listen for custom add activity events from the map
+  useEffect(() => {
+    const handleAddActivity = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      const { placeName, eventCategory } = customEvent.detail;
+      
+      if (placeName && !isLoading) {
+        sendMessage(
+          `I found a great ${eventCategory} option on the map called "${placeName}". Please add it to my itinerary at the most appropriate time and day based on my schedule.`, 
+          itinerary,
+          undefined,
+          `Please add ${placeName} to my itinerary.`
+        );
+      }
+    };
+
+    window.addEventListener('travel_aigent_add_activity', handleAddActivity);
+    return () => window.removeEventListener('travel_aigent_add_activity', handleAddActivity);
+  }, [sendMessage, isLoading, itinerary]);
+
   // Listen for targeted profile update events from the profile modal
   useEffect(() => {
     const handleProfileUpdated = (e: Event) => {

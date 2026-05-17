@@ -19,9 +19,26 @@ def _fetch_route_sync(origin: str, destination: str, travel_mode: str) -> str:
         "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline"
     }
     
+    def _build_waypoint(loc_str: str) -> dict:
+        if not any(c.isalpha() for c in str(loc_str)):
+            parts = str(loc_str).split(',')
+            if len(parts) == 2:
+                try:
+                    return {
+                        "location": {
+                            "latLng": {
+                                "latitude": float(parts[0].strip()),
+                                "longitude": float(parts[1].strip())
+                            }
+                        }
+                    }
+                except ValueError:
+                    pass
+        return {"address": str(loc_str)}
+
     payload = {
-        "origin": {"address": origin},
-        "destination": {"address": destination},
+        "origin": _build_waypoint(origin),
+        "destination": _build_waypoint(destination),
         "travelMode": travel_mode.upper()
     }
 

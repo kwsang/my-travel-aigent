@@ -1,14 +1,19 @@
 'use client';
 
 import React from 'react';
-import { Map as MapIcon, MapPin, Navigation, AlertTriangle, Home, Bed, Utensils, Star, Sparkles, Plus } from 'lucide-react';
+import { Map as MapIcon, AlertTriangle, Home } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { APIProvider, Map, useMap, useApiIsLoaded, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
 import RoutePolyline from './RoutePolyline';
 import { marineSunsetMapStyle } from '@/config/mapStyles';
 import { Event } from '@/types';
 import { API_CONFIG } from '@/config/constants';
-import { SegmentType, SegmentColors, SegmentIcons } from '@/components/dashboard/utils/segmentMapping';
+import MapOverlay from './MapOverlay';
+import SegmentInfoWindow from './SegmentInfoWindow';
+import SuggestionInfoWindow from './SuggestionInfoWindow';
+import PopularDestinationMarker from './PopularDestinationMarker';
+import SuggestionMarker from './SuggestionMarker';
+import TimelineMarker from './AdvancedSegmentMarker';
 
 // Extracted outside the component to prevent infinite re-renders in useJsApiLoader
 const MAPS_LIBRARIES: ("marker" | "places" | "geometry")[] = ["marker", "places", "geometry"];
@@ -489,34 +494,42 @@ function MapInner() {
           mapId="DEMO_MAP_ID"
           styles={marineSunsetMapStyle}
           colorScheme={"DARK" as any}
-          onClick={(e: any) => {
+          onClick={async (e: any) => {
             if (e.detail?.placeId && map) {
-              e.mapEvent?.stop?.(); // Prevents default Google Maps InfoWindow from opening
+              // Prevent the default Google Maps POI InfoWindow from opening
+              if (typeof e.stop === 'function') {
+                e.stop(); 
+              } else {
+                e.mapEvent?.stop?.(); // Fallback for older vis.gl versions
+              }
               
-              const service = new (window as any).google.maps.places.PlacesService(map);
-              service.getDetails({
-                placeId: e.detail.placeId,
-                fields: ['name', 'formatted_address', 'geometry', 'rating', 'user_ratings_count', 'price_level', 'types']
-              }, (place: any, status: any) => {
-                if (status === 'OK' && place) {
-                  setActiveSuggestion({
-                    _suggestionType: 'activity',
-                    details: {
-                      name: place.name,
-                      description: place.formatted_address,
-                      geo: {
-                        latitude: place.geometry?.location?.lat(),
-                        longitude: place.geometry?.location?.lng()
-                      },
-                      rating: place.rating,
-                      user_rating_count: place.user_ratings_count,
+              const Place = (window as any).google.maps.places.Place;
+              const place = new Place({ id: e.detail.placeId });
+              
+              try {
+                await place.fetchFields({
+                  fields: ['displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount', 'priceLevel', 'types']
+                });
+                
+                setActiveSuggestion({
+                  _suggestionType: 'activity',
+                  details: {
+                    name: place.displayName,
+                    description: place.formattedAddress,
+                    geo: {
+                      latitude: place.location?.lat(),
+                      longitude: place.location?.lng()
                     },
-                    priceLevel: place.price_level,
-                    types: place.types || []
-                  });
-                  setActiveSegmentIndex(null as any);
-                }
-              });
+                    rating: place.rating,
+                    user_rating_count: place.userRatingCount,
+                  },
+                  priceLevel: place.priceLevel,
+                  types: place.types || []
+                });
+                setActiveSegmentIndex(null as any);
+              } catch (err) {
+                console.error("Error fetching place details:", err);
+              }
             }
           }}
         >
@@ -538,10 +551,12 @@ function MapInner() {
 
           {/* Popular Destinations Markers */}
           {segments.length === 0 && !itinerary.destination && popularDestinations.map((dest, idx) => (
-            <AdvancedMarker
+            <PopularDestinationMarker
               key={`popular-${dest.name}-${idx}`}
-              position={{ lat: dest.lat, lng: dest.lng }}
-              title={dest.name}
+              dest={dest}
+              idx={idx}
+              isHovered={hoveredPopularIndex === idx}
+              onHover={setHoveredPopularIndex}
               onClick={async () => {
                 console.log(`[MapHub] Popular destination clicked: ${dest.name}`);
                 const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
@@ -566,19 +581,7 @@ function MapInner() {
                 console.log(`[MapHub] Dispatching 'travel_aigent_set_destination' event...`);
                 window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: dest.name }));
               }}
-              onMouseEnter={() => setHoveredPopularIndex(idx)}
-              onMouseLeave={() => setHoveredPopularIndex(null)}
-              zIndex={hoveredPopularIndex === idx ? 100 : 1}
-            >
-              <div className="flex flex-col items-center group transition-transform hover:scale-110 animate-in fade-in zoom-in duration-500 cursor-pointer">
-                <div className="bg-card border border-white/20 shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-primary group-hover:shadow-primary/20 transition-colors">
-                  {dest.emoji}
-                </div>
-                <div className="bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase text-foreground/80 border border-white/10 whitespace-nowrap pointer-events-none shadow-lg">
-                  {dest.name}
-                </div>
-              </div>
-            </AdvancedMarker>
+            />
           ))}
 
           {/* Selected Destination Marker */}
@@ -599,158 +602,52 @@ function MapInner() {
           )}
 
           {/* Suggested Accommodations */}
-          {!!itinerary.destination && !itinerary.accommodation && destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => {
-            const geo = place.geo || place.details?.geo || place.location;
-            if (!geo) return null;
-            
-            const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Place';
-            const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
-            const rating = place.details?.rating || place.rating;
-            const ratingCount = place.details?.user_rating_count || place.userRatingCount || place.user_rating_count;
-
-            return (
-                <AdvancedMarker
-                    key={`suggestion-acc-${idx}`}
-                    position={{ lat: geo.latitude, lng: geo.longitude }}
-                    title={placeName}
-                    onClick={() => {
-                        setActiveSuggestion({ ...place, _suggestionType: 'accommodation' });
-                        setActiveSegmentIndex(null as any);
-                    }}
-                >
-                    <div className="flex flex-col items-center group animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                        <div className="relative bg-violet-500 border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 group-hover:border-violet-300 group-hover:shadow-violet-500/30 transition-all">
-                            <Bed size={18} className="text-white" />
-                            {(price || rating) && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
-                                    {price && (
-                                        <span>{formatPrice(price)}</span>
-                                    )}
-                                    {price && rating && <span className="opacity-70">•</span>}
-                                    {rating && (
-                                        <span className="flex items-center gap-0.5">
-                                            <Star size={9} className="fill-white" /> 
-                                            {rating}
-                                            {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <div className="bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-foreground/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                            {placeName}
-                        </div>
-                    </div>
-                </AdvancedMarker>
-            );
-          })}
+          {!!itinerary.destination && !itinerary.accommodation && destinationInfo?.suggested_accommodations?.map((place: any, idx: number) => (
+            <SuggestionMarker
+              key={`suggestion-acc-${idx}`}
+              place={place}
+              idx={idx}
+              type="accommodation"
+              onClick={() => {
+                setActiveSuggestion({ ...place, _suggestionType: 'accommodation' });
+                setActiveSegmentIndex(null as any);
+              }}
+              formatPrice={formatPrice}
+            />
+          ))}
 
           {/* Suggested Activities */}
-          {!!itinerary.destination && destinationInfo?.suggested_activities?.map((place: any, idx: number) => {
-            const geo = place.geo || place.details?.geo || place.location;
-            if (!geo) return null;
-            
-            const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Activity';
-            const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
-            const rating = place.details?.rating || place.rating;
-            const ratingCount = place.details?.user_rating_count || place.userRatingCount || place.user_rating_count;
-
-            const isDining = place.types?.some((t: string) => ['restaurant', 'cafe', 'food', 'bar', 'bakery'].includes(t));
-            const Icon = isDining ? Utensils : Sparkles;
-            const bgClass = isDining ? 'bg-amber-500' : 'bg-pink-500';
-            const borderHoverClass = isDining ? 'group-hover:border-amber-300' : 'group-hover:border-pink-300';
-            const shadowHoverClass = isDining ? 'group-hover:shadow-amber-500/30' : 'group-hover:shadow-pink-500/30';
-
-            return (
-                <AdvancedMarker
-                    key={`suggestion-act-${idx}`}
-                    position={{ lat: geo.latitude, lng: geo.longitude }}
-                    title={placeName}
-                    onClick={() => {
-                        setActiveSuggestion({ ...place, _suggestionType: 'activity' });
-                        setActiveSegmentIndex(null as any);
-                    }}
-                >
-                    <div className="flex flex-col items-center group animate-in fade-in zoom-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                        <div className={`relative ${bgClass} border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 ${borderHoverClass} ${shadowHoverClass} transition-all`}>
-                            <Icon size={18} className="text-white" />
-                            {(price || rating) && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
-                                    {price && (
-                                        <span>{formatPrice(price)}</span>
-                                    )}
-                                    {price && rating && <span className="opacity-70">•</span>}
-                                    {rating && (
-                                        <span className="flex items-center gap-0.5">
-                                            <Star size={9} className="fill-white" /> 
-                                            {rating}
-                                            {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <div className="bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-foreground/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                            {placeName}
-                        </div>
-                    </div>
-                </AdvancedMarker>
-            );
-          })}
+          {!!itinerary.destination && destinationInfo?.suggested_activities?.map((place: any, idx: number) => (
+            <SuggestionMarker
+              key={`suggestion-act-${idx}`}
+              place={place}
+              idx={idx}
+              type="activity"
+              onClick={() => {
+                setActiveSuggestion({ ...place, _suggestionType: 'activity' });
+                setActiveSegmentIndex(null as any);
+              }}
+              formatPrice={formatPrice}
+            />
+          ))}
 
           {/* Timeline Segments */}
-          {segments.map((segment: Event, index: number) => {
-            const geo = segment.geo || segment.details?.geo;
-            if (!geo) return null;
-            
-            const placeName = segment.details?.name || 'Unnamed Event';
-            const price = segment.details?.price;
-            const rating = segment.details?.rating;
-            const ratingCount = segment.details?.user_rating_count;
-            const isHovered = hoveredSegmentIndex === index;
-            const isActive = activeSegmentIndex === index;
-
-            return (
-              <AdvancedMarker
-                key={`${segment.day}-${index}`} 
-                position={{ lat: geo.latitude, lng: geo.longitude }} 
-                title={placeName}
-                onClick={() => {
-                  setActiveSegmentIndex(isActive ? null : index);
-                  setActiveSuggestion(null);
-                }}
-                zIndex={isActive || isHovered ? 100 : 10}
-              >
-                <div 
-                  className="flex flex-col items-center group cursor-pointer"
-                  onMouseEnter={() => setHoveredSegmentIndex?.(index)}
-                  onMouseLeave={() => setHoveredSegmentIndex?.(null)}
-                >
-                  <div className="relative border-2 border-white shadow-xl rounded-full w-10 h-10 flex items-center justify-center text-xl mb-1 transition-all" style={{ backgroundColor: SegmentColors[segment.segment as SegmentType]?.bg || '#fdb833' }}>
-                    <div className="text-white scale-75">
-                      {React.createElement(SegmentIcons[segment.segment as SegmentType] || Sparkles, { className: 'w-6 h-6' })}
-                    </div>
-                    {(price || rating) && (
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-emerald-400 whitespace-nowrap">
-                            {price && <span>{formatPrice(price)}</span>}
-                            {price && rating && <span className="opacity-70">•</span>}
-                            {rating && (
-                                <span className="flex items-center gap-0.5">
-                                    <Star size={9} className="fill-white" /> 
-                                    {rating}
-                                    {ratingCount && <span className="text-[8px] font-medium opacity-80">({ratingCount})</span>}
-                                </span>
-                            )}
-                        </div>
-                    )}
-                  </div>
-                  <div className={`bg-background/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold tracking-wider text-foreground/80 border border-white/10 whitespace-nowrap shadow-lg transition-opacity ${isActive || isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                    {placeName}
-                  </div>
-                </div>
-              </AdvancedMarker>
-            );
-          })}
+          {segments.map((segment: Event, index: number) => (
+            <TimelineMarker
+              key={`${segment.day}-${index}`}
+              segment={segment}
+              index={index}
+              isActive={activeSegmentIndex === index}
+              isHovered={hoveredSegmentIndex === index}
+              onClick={() => {
+                setActiveSegmentIndex(activeSegmentIndex === index ? null : index);
+                setActiveSuggestion(null);
+              }}
+              onMouseEnter={() => setHoveredSegmentIndex?.(index)}
+              onMouseLeave={() => setHoveredSegmentIndex?.(null)}
+              formatPrice={formatPrice}
+            />
+          ))}
 
           {/* Polyline Routes */}
           {routeEdges.map((edge, index) => (
@@ -763,152 +660,22 @@ function MapInner() {
 
           {/* Active Segment Info Window */}
           {activeSegmentIndex !== null && segments[activeSegmentIndex] && (
-            (() => {
-              const activeSegment = segments[activeSegmentIndex];
-              const geo = activeSegment.geo || activeSegment.details?.geo;
-              if (!geo) return null;
-              const placeName = activeSegment.details?.name || 'Unnamed Event';
-              const description = activeSegment.details?.description;
-              const notes = activeSegment.details?.notes;
-              const price = activeSegment.details?.price;
-              const rating = activeSegment.details?.rating;
-              const category = activeSegment.details?.category;
-              const imageUrl = activeSegment.details?.image_url || (activeSegment as any).image_url || (activeSegment.details as any)?.photo_url;
-              return (
-                <InfoWindow
-                  position={{ lat: geo.latitude, lng: geo.longitude }}
-                  onCloseClick={() => setActiveSegmentIndex(null as any)}
-                >
-                  <div className="flex flex-col gap-1 p-1 max-w-[200px] text-gray-900">
-                    {imageUrl && (
-                      <div className="w-full h-24 mb-1 rounded-sm overflow-hidden bg-muted relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={imageUrl as string} alt={placeName as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </div>
-                    )}
-                    <h3 className="font-bold text-sm leading-tight mb-1">{placeName as React.ReactNode}</h3>
-                    {category && (
-                      <div className="flex flex-wrap gap-1 mb-1.5">
-                        <span className="bg-primary/10 text-primary text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-sm">
-                          {category as React.ReactNode}
-                        </span>
-                      </div>
-                    )}
-                    {description && <p className="text-xs opacity-80">{description as React.ReactNode}</p>}
-                    {notes && <p className="text-xs opacity-80 italic mt-1">Note: {notes as React.ReactNode}</p>}
-                    {(price || rating) && (
-                      <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 text-xs font-semibold">
-                        {price && <span>{formatPrice(price)}</span>}
-                        {price && rating && <span className="opacity-50">•</span>}
-                        {rating && <span className="flex items-center gap-0.5"><Star size={10} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
-                      </div>
-                    )}
-                  </div>
-                </InfoWindow>
-              );
-            })()
+            <SegmentInfoWindow 
+              segment={segments[activeSegmentIndex]} 
+              onClose={() => setActiveSegmentIndex(null as any)}
+              formatPrice={formatPrice}
+            />
           )}
 
           {/* Active Suggestion Info Window */}
           {activeSuggestion && (
-            (() => {
-              const place = activeSuggestion;
-              const geo = place.geo || place.details?.geo || place.location;
-              if (!geo) return null;
-              const placeName = place.details?.name || place.displayName?.text || place.name || 'Suggested Place';
-              const description = place.details?.description;
-              const notes = place.details?.notes;
-              const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
-              const rating = place.details?.rating || place.rating;
-              const imageUrl = place.details?.image_url || place.image_url || place.photo_url || place.photoUri || (place.photos && place.photos.length > 0 ? place.photos[0].photoUri || place.photos[0].name : null);
-              
-              const rawTypes = place.types || place.details?.types || [];
-              const typesArray = Array.isArray(rawTypes) ? rawTypes : (typeof rawTypes === 'string' ? rawTypes.replace(/['\[\]]/g, '').split(', ') : []);
-              const displayTypes = typesArray
-                .filter((t: string) => !['point_of_interest', 'establishment', 'food', 'service', 'premise'].includes(t.trim()))
-                .slice(0, 2)
-                .map((t: string) => t.trim().split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
-              
-              if (displayTypes.length === 0 && place.details?.category) {
-                displayTypes.push(place.details.category);
-              }
-
-              return (
-                <InfoWindow
-                  position={{ lat: geo.latitude, lng: geo.longitude }}
-                  onCloseClick={() => setActiveSuggestion(null)}
-                >
-                  <div className="flex flex-col gap-1 p-1 max-w-[200px] text-gray-900">
-                    {imageUrl && (
-                      <div className="w-full h-24 mb-1 rounded-sm overflow-hidden bg-muted relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={imageUrl as string} alt={placeName as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </div>
-                    )}
-                    <h3 className="font-bold text-sm leading-tight mb-1">{placeName as React.ReactNode}</h3>
-                    {displayTypes.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1.5">
-                        {displayTypes.map((type: string, idx: number) => (
-                          <span key={idx} className="bg-primary/10 text-primary text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-sm">
-                            {type as React.ReactNode}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {description && <p className="text-xs opacity-80">{description as React.ReactNode}</p>}
-                    {notes && <p className="text-xs opacity-80 italic mt-1">Note: {notes as React.ReactNode}</p>}
-                    {(price || rating) && (
-                      <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 text-xs font-semibold">
-                        {price && <span>{formatPrice(price)}</span>}
-                        {price && rating && <span className="opacity-50">•</span>}
-                        {rating && <span className="flex items-center gap-0.5"><Star size={10} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
-                      </div>
-                    )}
-                    <button
-                      className="mt-2 w-full flex items-center justify-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold py-1.5 px-3 rounded-md hover:bg-primary/90 transition-colors"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        if (place._suggestionType === 'accommodation') {
-                          setItinerary?.((prev: any) => ({
-                            ...prev,
-                            accommodation: place
-                          }));
-                        } else {
-                          const isDining = place.types?.some((t: string) => ['restaurant', 'cafe', 'food', 'bar', 'bakery'].includes(t));
-                          const newEvent = {
-                            segment: isDining ? 'DINING' : 'EXPERIENCE',
-                            day: 1, // Add to Day 1 by default, the user can reorganize it via drag & drop
-                            schedule: {
-                              local_start_time: "12:00:00"
-                            },
-                            details: {
-                              ...place.details,
-                              name: placeName,
-                              description: description,
-                              notes: notes,
-                              image_url: imageUrl,
-                              geo: geo,
-                              price: price,
-                              rating: rating,
-                            }
-                          };
-                          setItinerary?.((prev: any) => ({
-                            ...prev,
-                            events: [...(prev.events || []), newEvent]
-                          }));
-                        }
-                        
-                        setActiveSuggestion(null);
-                      }}
-                    >
-                      <Plus size={14} /> Add to Itinerary
-                    </button>
-                  </div>
-                </InfoWindow>
-              );
-            })()
+            <SuggestionInfoWindow
+              place={activeSuggestion}
+              onClose={() => setActiveSuggestion(null)}
+              onAddAccommodation={(place) => setItinerary?.((prev: any) => ({ ...prev, accommodation: place }))}
+              onAddActivity={(placeName, eventCategory) => window.dispatchEvent(new CustomEvent('travel_aigent_add_activity', { detail: { placeName, eventCategory } }))}
+              formatPrice={formatPrice}
+            />
           )}
         </Map>
       ) : (
@@ -922,26 +689,7 @@ function MapInner() {
       )}
 
       {/* Location Overlay */}
-      <div className="absolute top-6 left-6 z-20 flex flex-col items-start gap-2 pointer-events-none animate-in fade-in slide-in-from-left-4 duration-500">
-        <div className="flex items-center gap-3 bg-card/90 backdrop-blur-xl border border-white/10 px-4 py-3 rounded-2xl shadow-xl ring-1 ring-black/5">
-          <div className="bg-primary/20 p-2 rounded-full">
-            <MapPin className="w-4 h-4 text-primary drop-shadow-sm" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none mb-1">Destination</span>
-            <span className="text-base font-black text-foreground tracking-tight leading-none hover:bg-accent hover:text-accent-foreground px-1.5 py-0.5 -ml-1.5 rounded-md transition-colors duration-200 cursor-default pointer-events-auto">{primaryDestination as React.ReactNode}</span>
-          </div>
-        </div>
-        
-        {startingLocation && (
-          <div className="flex items-center gap-2 bg-card/60 backdrop-blur-md border border-white/5 px-3 py-1.5 rounded-xl ml-2 shadow-sm">
-            <Navigation className="w-3 h-3 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">
-              Starting from <span className="text-foreground font-bold">{startingLocation as React.ReactNode}</span>
-            </span>
-          </div>
-        )}
-      </div>
+      <MapOverlay primaryDestination={primaryDestination} startingLocation={startingLocation} />
 
       {/* Loading State / Fallback UI */}
       {!isLoaded && (

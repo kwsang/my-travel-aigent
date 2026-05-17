@@ -40,8 +40,9 @@ Control the volume of `EXPERIENCE` segments based on the user's `activity_densit
 ### 4. First Day & Arrival Constraints
 On the first day of the itinerary (Day 1):
 1. **Arrival Review:** Check the `local_end_time` of the user's initial arrival `FLIGHT` or `TRANSPORT` segment to the destination.
-2. **Early Arrival Optimization:** If the user arrives at their `ACCOMMODATION` before 16:00 (4:00 PM) local time, you MUST schedule at least one `EXPERIENCE` segment on Day 1 before dinner.
-3. **Late Arrival:** If the user arrives after 16:00, keep Day 1 light by scheduling only a relaxing `DINING` (Dinner) segment near the accommodation.
+2. **Arrival Sanity Check:** You MUST NOT schedule any `DINING` or `EXPERIENCE` segments in the destination city before the user's initial arrival `FLIGHT` or `TRANSPORT` segment has completed. They cannot dine or do activities somewhere they have not arrived yet!
+3. **Early Arrival Optimization:** If the user arrives at their `ACCOMMODATION` before 16:00 (4:00 PM) local time, you MUST schedule at least one `EXPERIENCE` segment on Day 1 before dinner.
+4. **Late Arrival:** If the user arrives after 16:00, keep Day 1 light by scheduling only a relaxing `DINING` (Dinner) segment near the accommodation.
 
 ### 5. Last Day & Checkout Constraints
 On the final day of the itinerary (Target Duration Day):
