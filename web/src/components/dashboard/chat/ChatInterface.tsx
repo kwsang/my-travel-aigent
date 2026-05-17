@@ -128,6 +128,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const sendMessage = useCallback(async (userMessage: string, overrideItinerary?: any, overrideProfile?: any, displayMessage?: string) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
+    window.dispatchEvent(new CustomEvent('travel_aigent_generation_start'));
 
     // Add user message to UI (using the friendly display message if provided)
     const contentToShow = displayMessage !== undefined ? displayMessage : userMessage;
@@ -209,6 +210,7 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     } finally {
       setIsLoading(false);
       isProcessingRef.current = false;
+      window.dispatchEvent(new CustomEvent('travel_aigent_generation_end'));
     }
   }, [sessionId, userId, profile, itinerary, onMessageReceived]);
 
@@ -273,6 +275,35 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
 
     window.addEventListener('travel_aigent_set_destination', handleSetDestination);
     return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
+  }, [sendMessage, isLoading, itinerary]);
+
+  // Listen for custom lodging events from the map
+  useEffect(() => {
+    const handleSetLodging = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      const lodging = customEvent.detail;
+      
+      if (lodging && !isLoading) {
+        const isReplacement = !!itinerary.lodging;
+        const updatedItinerary = { 
+          ...itinerary, 
+          lodging
+        };
+
+        const hiddenMessage = isReplacement 
+          ? `I have changed my lodging to ${lodging.name}. Please communicate with the architect and activity_planner to update any travel logistics and rearrange my daily experiences based on this new location.`
+          : `I've selected ${lodging.name} as my lodging. Please communicate with the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile.`;
+
+        const displayMessage = isReplacement
+          ? `I've changed my lodging to ${lodging.name}. Can you update my trip?`
+          : `I've selected ${lodging.name} as my lodging. Can you plan the rest of the trip?`;
+
+        sendMessage(hiddenMessage, updatedItinerary, undefined, displayMessage);
+      }
+    };
+
+    window.addEventListener('travel_aigent_set_lodging', handleSetLodging);
+    return () => window.removeEventListener('travel_aigent_set_lodging', handleSetLodging);
   }, [sendMessage, isLoading, itinerary]);
 
   // Listen for custom add activity events from the map

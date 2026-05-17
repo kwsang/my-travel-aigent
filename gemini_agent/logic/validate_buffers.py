@@ -75,6 +75,11 @@ def check_event_overlap(current_event: dict, next_event: dict):
         return True, overlap_delta, "overlap"
     
     # 4. Check for Minimum Ad-Hoc Transit Buffer (15 mins)
+    current_segment = current_event.get("segment")
+    next_segment = next_event.get("segment")
+    if current_segment in ["TRANSPORT", "FLIGHT"] or next_segment in ["TRANSPORT", "FLIGHT"]:
+        return False, 0, "ok"
+        
     gap_minutes = (next_start - current_end).total_seconds() / 60
     current_name = current_event.get("details", {}).get("name", "")
     next_name = next_event.get("details", {}).get("name", "")

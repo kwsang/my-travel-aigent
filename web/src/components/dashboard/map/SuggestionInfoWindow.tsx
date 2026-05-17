@@ -1,16 +1,17 @@
 import React from 'react';
 import { InfoWindow } from '@vis.gl/react-google-maps';
-import { Star, Plus } from 'lucide-react';
+import { Star, Plus, Bed, RefreshCw } from 'lucide-react';
 
 interface SuggestionInfoWindowProps {
   place: any;
+  hasLodging?: boolean;
   onClose: () => void;
   onAddLodging: (place: any) => void;
   onAddActivity: (placeName: string, eventCategory: string) => void;
   formatPrice: (p: any) => string | null;
 }
 
-export default function SuggestionInfoWindow({ place, onClose, onAddLodging, onAddActivity, formatPrice }: SuggestionInfoWindowProps) {
+export default function SuggestionInfoWindow({ place, hasLodging, onClose, onAddLodging, onAddActivity, formatPrice }: SuggestionInfoWindowProps) {
   const geo = place.geo || place.details?.geo || place.location;
   if (!geo) return null;
   
@@ -74,7 +75,16 @@ export default function SuggestionInfoWindow({ place, onClose, onAddLodging, onA
             onClose();
           }}
         >
-          <Plus size={14} /> Add to Itinerary
+          {place._suggestionType === 'lodging' ? (
+            hasLodging ? <RefreshCw size={14} /> : <Bed size={14} />
+          ) : (
+            <Plus size={14} />
+          )} 
+          {place._suggestionType === 'lodging' ? (
+            hasLodging ? 'Replace Lodging' : 'Select As Lodging'
+          ) : (
+            'Add to Itinerary'
+          )}
         </button>
       </div>
     </InfoWindow>

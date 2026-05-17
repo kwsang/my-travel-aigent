@@ -63,11 +63,13 @@ export default function DashboardPage() {
     const handleStop = () => setIsGenerating(false);
 
     window.addEventListener('travel_aigent_set_destination', handleStart);
+    window.addEventListener('travel_aigent_set_lodging', handleStart);
     window.addEventListener('travel_aigent_generation_start', handleStart);
     window.addEventListener('travel_aigent_generation_end', handleStop);
 
     return () => {
       window.removeEventListener('travel_aigent_set_destination', handleStart);
+      window.removeEventListener('travel_aigent_set_lodging', handleStart);
       window.removeEventListener('travel_aigent_generation_start', handleStart);
       window.removeEventListener('travel_aigent_generation_end', handleStop);
     };
@@ -295,7 +297,7 @@ export default function DashboardPage() {
             </ErrorBoundary>
           </div>
           <ErrorBoundary fallbackMessage="Failed to load timeline.">
-        <SkeletonWrapper isLoading={isLoading || isGenerating} fallback={<TimelineSkeleton />}>
+        <SkeletonWrapper isLoading={isLoading} fallback={<TimelineSkeleton />}>
               <TimelineView />
             </SkeletonWrapper>
           </ErrorBoundary>

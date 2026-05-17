@@ -10,6 +10,7 @@ import { formatTime } from '@/utils/dateUtils';
 import { Event } from '@/types';
 import { recalculateTimelineCascade } from './timelineUtils';
 import { useTimelineSync } from '@/hooks/useTimelineSync';
+import TimelineSkeleton from './TimelineSkeleton';
 
 /**
  * TimelineView Component
@@ -23,6 +24,21 @@ export default function TimelineView() {
   
   const activeDay = activeSegmentIndex !== null ? segments[activeSegmentIndex]?.day : null;
   const { isSyncing, syncItinerary } = useTimelineSync(sessionId, userId, setItinerary);
+
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  React.useEffect(() => {
+    const handleStart = () => setIsGenerating(true);
+    const handleStop = () => setIsGenerating(false);
+
+    window.addEventListener('travel_aigent_generation_start', handleStart);
+    window.addEventListener('travel_aigent_generation_end', handleStop);
+
+    return () => {
+      window.removeEventListener('travel_aigent_generation_start', handleStart);
+      window.removeEventListener('travel_aigent_generation_end', handleStop);
+    };
+  }, []);
 
   // Auto-scroll the timeline to the focused segment when a map marker is clicked
   React.useEffect(() => {
@@ -205,6 +221,14 @@ export default function TimelineView() {
   }, [segments]);
 
   if (segments.length === 0 && days.length === 0) {
+    if (isGenerating) {
+      return (
+        <div className="py-4">
+          {dateHeader}
+          <TimelineSkeleton />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col gap-4 py-4">
         {dateHeader}

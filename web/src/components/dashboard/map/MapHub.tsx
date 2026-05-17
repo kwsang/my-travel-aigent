@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Map as MapIcon, AlertTriangle, Home } from 'lucide-react';
+import { Map as MapIcon, AlertTriangle, Home, Search } from 'lucide-react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { APIProvider, Map, useMap, useApiIsLoaded, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
 import RoutePolyline from './RoutePolyline';
@@ -80,6 +80,11 @@ function MapInner() {
   React.useEffect(() => {
     hoveredPopularIndexRef.current = hoveredPopularIndex;
   }, [hoveredPopularIndex]);
+
+  const currentItineraryRef = React.useRef(itinerary);
+  React.useEffect(() => {
+    currentItineraryRef.current = itinerary;
+  }, [itinerary]);
 
   const [actionToast, setActionToast] = React.useState<{title: string, desc: string} | null>(null);
   const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -240,6 +245,104 @@ function MapInner() {
     // Sort to ensure order doesn't matter, then stringify for a stable dependency.
     return JSON.stringify(coords.filter(Boolean).sort());
   }, [segments, itinerary.lodging, destinationInfo, startGeo]);
+
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const lodgingSearchInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (!isLoaded || !searchInputRef.current || itinerary.destination) return;
+
+    const autocomplete = new (window as any).google.maps.places.Autocomplete(searchInputRef.current, {
+      types: ['(regions)'], // Restrict autocomplete specifically to geographical regions/cities
+    });
+
+    const listener = autocomplete.addListener('place_changed', async () => {
+      const place = autocomplete.getPlace();
+      if (place && (place.formatted_address || place.name)) {
+        const destName = place.formatted_address || place.name;
+        console.log(`[MapHub] Search bar destination selected: ${destName}`);
+        
+        const currentItinerary = currentItineraryRef.current;
+        const isDefaultName = !currentItinerary.trip_name || currentItinerary.trip_name === 'New Trip';
+        const newItinerary = { 
+          ...currentItinerary, 
+          destination: destName,
+          ...(isDefaultName ? { trip_name: `${destName} Trip` } : {})
+        };
+        setItinerary?.(newItinerary);
+        
+        if (sessionId && userId) {
+          try {
+            await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessionId}?user_id=${userId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newItinerary),
+            });
+          } catch (e) {
+            console.error("Failed to instantly save destination", e);
+          }
+        }
+        
+        showToast(`Destination set to ${destName}`, 'Finding transport and lodging...');
+        window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: destName }));
+      }
+    });
+
+    return () => {
+      (window as any).google.maps.event.removeListener(listener);
+    };
+  }, [isLoaded, itinerary.destination, sessionId, userId, setItinerary, showToast]);
+
+  React.useEffect(() => {
+    if (!isLoaded || !lodgingSearchInputRef.current || itinerary.lodging || !itinerary.destination) return;
+
+    const autocomplete = new (window as any).google.maps.places.Autocomplete(lodgingSearchInputRef.current, {
+      types: ['establishment'], // Restrict to establishments (hotels, bnbs, etc)
+    });
+
+    const listener = autocomplete.addListener('place_changed', async () => {
+      const place = autocomplete.getPlace();
+      if (place && (place.formatted_address || place.name)) {
+        const placeData = {
+          name: place.name,
+          description: place.formatted_address,
+          geo: {
+            latitude: place.geometry?.location?.lat(),
+            longitude: place.geometry?.location?.lng()
+          },
+          rating: place.rating,
+          user_rating_count: place.user_ratings_total,
+          priceLevel: place.price_level,
+          types: place.types || []
+        };
+
+        console.log(`[MapHub] Lodging search bar selected: ${placeData.name}`);
+        
+        const currentItinerary = currentItineraryRef.current;
+        const newItinerary = { ...currentItinerary, lodging: placeData };
+        setItinerary?.(newItinerary);
+        
+        if (sessionId && userId) {
+          try {
+            await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessionId}?user_id=${userId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newItinerary),
+            });
+          } catch (e) {
+            console.error("Failed to instantly save lodging", e);
+          }
+        }
+        
+        showToast(`Lodging set to ${placeData.name}`, 'Finding transport and activities...');
+        window.dispatchEvent(new CustomEvent('travel_aigent_set_lodging', { detail: placeData }));
+      }
+    });
+
+    return () => {
+      (window as any).google.maps.event.removeListener(listener);
+    };
+  }, [isLoaded, itinerary.lodging, itinerary.destination, sessionId, userId, setItinerary, showToast]);
 
   // Generate individual edges for the polyline to style flights differently
   const routeEdges = React.useMemo(() => {
@@ -545,12 +648,22 @@ function MapInner() {
                   fields: ['displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount', 'priceLevel', 'types']
                 });
                 
-                if (!itinerary.destination) {
+                if (!currentItineraryRef.current.destination) {
+                  // Restrict map clicks to geographic regions when setting a destination
+                  const isRegion = place.types?.some((t: string) => 
+                    ['locality', 'sublocality', 'administrative_area_level_3', 'administrative_area_level_2', 'administrative_area_level_1', 'country', 'political'].includes(t)
+                  );
+                  if (!isRegion) {
+                    showToast('Invalid Destination', 'Please click a city, town, or region label on the map.');
+                    return;
+                  }
+
                   const destName = place.displayName;
                   console.log(`[MapHub] Map POI clicked as destination: ${destName}`);
-                  const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
+                  const currentItinerary = currentItineraryRef.current;
+                  const isDefaultName = !currentItinerary.trip_name || currentItinerary.trip_name === 'New Trip';
                   const newItinerary = { 
-                    ...itinerary, 
+                    ...currentItinerary, 
                     destination: destName,
                     ...(isDefaultName ? { trip_name: `${destName} Trip` } : {})
                   };
@@ -621,9 +734,10 @@ function MapInner() {
               onHover={setHoveredPopularIndex}
               onClick={async () => {
                 console.log(`[MapHub] Popular destination clicked: ${dest.name}`);
-                const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
+                const currentItinerary = currentItineraryRef.current;
+                const isDefaultName = !currentItinerary.trip_name || currentItinerary.trip_name === 'New Trip';
                 const newItinerary = { 
-                  ...itinerary, 
+                  ...currentItinerary, 
                   destination: dest.name,
                   ...(isDefaultName ? { trip_name: `${dest.name} Trip` } : {})
                 };
@@ -666,7 +780,7 @@ function MapInner() {
           )}
 
           {/* Suggested Lodgings */}
-          {!!itinerary.destination && !itinerary.lodging && destinationInfo?.suggested_lodging?.map((place: any, idx: number) => (
+          {!!itinerary.destination && destinationInfo?.suggested_lodging?.filter((p: any) => p.name !== itinerary.lodging?.name).map((place: any, idx: number) => (
             <SuggestionMarker
               key={`suggestion-acc-${idx}`}
               place={place}
@@ -739,8 +853,41 @@ function MapInner() {
           {activeSuggestion && (
             <SuggestionInfoWindow
               place={activeSuggestion}
+              hasLodging={!!itinerary.lodging}
               onClose={() => setActiveSuggestion(null)}
-              onAddLodging={(place) => setItinerary?.((prev: any) => ({ ...prev, lodging: place }))}
+              onAddLodging={async (place) => {
+                const placeData = {
+                  name: place.details?.name || place.displayName?.text || place.name || 'Selected Lodging',
+                  description: place.details?.description || place.formattedAddress,
+                  geo: place.geo || place.details?.geo || place.location,
+                  rating: place.details?.rating || place.rating,
+                  user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count,
+                  priceLevel: place.priceLevel || place.details?.priceLevel,
+                  types: place.types || place.details?.types || []
+                };
+                
+                const newItinerary = { ...currentItineraryRef.current, lodging: placeData };
+                setItinerary?.(newItinerary);
+
+                if (sessionId && userId) {
+                  try {
+                    await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessionId}?user_id=${userId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(newItinerary),
+                    });
+                  } catch (e) {
+                    console.error("Failed to instantly save lodging", e);
+                  }
+                }
+                
+        const isReplacement = !!currentItineraryRef.current.lodging;
+        showToast(
+          isReplacement ? `Lodging replaced with ${placeData.name}` : `Lodging set to ${placeData.name}`, 
+          isReplacement ? 'Updating itinerary...' : 'Finding transport and activities...'
+        );
+                window.dispatchEvent(new CustomEvent('travel_aigent_set_lodging', { detail: placeData }));
+              }}
               onAddActivity={(placeName, eventCategory) => window.dispatchEvent(new CustomEvent('travel_aigent_add_activity', { detail: { placeName, eventCategory } }))}
               formatPrice={formatPrice}
             />
@@ -758,6 +905,40 @@ function MapInner() {
 
       {/* Location Overlay */}
       <MapOverlay primaryDestination={primaryDestination} startingLocation={startingLocation} />
+
+      {/* Search Bar for selecting a destination */}
+      {!itinerary.destination && isLoaded && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 pointer-events-auto animate-in fade-in slide-in-from-top-4">
+          <div className="relative flex items-center bg-card text-card-foreground shadow-2xl rounded-full border border-border/50 overflow-hidden ring-1 ring-black/5">
+            <div className="pl-4 pr-2 text-muted-foreground">
+              <Search size={18} />
+            </div>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Where do you want to go?"
+              className="w-full bg-transparent border-none focus:outline-none py-3 pr-4 text-sm font-medium placeholder:text-muted-foreground/70"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Search Bar for selecting a lodging */}
+      {!!itinerary.destination && !itinerary.lodging && isLoaded && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 pointer-events-auto animate-in fade-in slide-in-from-top-4">
+          <div className="relative flex items-center bg-card text-card-foreground shadow-2xl rounded-full border border-border/50 overflow-hidden ring-1 ring-black/5">
+            <div className="pl-4 pr-2 text-muted-foreground">
+              <Search size={18} />
+            </div>
+            <input
+              ref={lodgingSearchInputRef}
+              type="text"
+              placeholder="Search for a hotel or lodging..."
+              className="w-full bg-transparent border-none focus:outline-none py-3 pr-4 text-sm font-medium placeholder:text-muted-foreground/70"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Loading State / Fallback UI */}
       {!isLoaded && (
