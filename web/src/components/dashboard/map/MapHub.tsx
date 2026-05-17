@@ -356,9 +356,14 @@ function MapInner() {
     return edges;
       }, [segments, activeSegmentIndex]);
 
+  const prevGeoSignatureRef = React.useRef<string | null>(null);
+
   // Automatically fit bounds or pan to active segment
   React.useEffect(() => {
     if (!map || !isLoaded) return;
+
+    const isGeoSignatureChanged = prevGeoSignatureRef.current !== geoSignature;
+    prevGeoSignatureRef.current = geoSignature;
 
     if (activeSegmentIndex !== null && segments[activeSegmentIndex]) {
       const activeSegment = segments[activeSegmentIndex];
@@ -411,35 +416,47 @@ function MapInner() {
         map.panTo({ lat: nextGeo!.latitude, lng: nextGeo!.longitude });
         map.setZoom(15);
       }
-    } else if (segments.length > 0 || itinerary.lodging || (!itinerary.lodging && destinationInfo?.suggested_lodging?.length) || destinationInfo?.suggested_activities?.length || (itinerary.destination && destinationInfo?.location?.coordinates)) {
-      // Zoom to fit all segments and suggestions if no active segment is selected
-      const bounds = new (window as any).google.maps.LatLngBounds();
-      let pointCount = 0;
-      let lastPoint: { lat: number; lng: number } | null = null;
-
-      segments.forEach((segment: Event) => {
-        if (['FLIGHT', 'TRANSPORT'].includes(segment.segment)) return; // Exclude transit segments from general overview bounds
-        const geo = segment.geo || segment.details?.geo;
-        if (geo) {
-          const pos = { lat: geo.latitude, lng: geo.longitude };
-          bounds.extend(pos);
-          pointCount++;
-          lastPoint = pos;
+    } else if (isGeoSignatureChanged) {
+      if (segments.length > 0 || itinerary.lodging || (!itinerary.lodging && destinationInfo?.suggested_lodging?.length) || destinationInfo?.suggested_activities?.length || (itinerary.destination && destinationInfo?.location?.coordinates)) {
+        // Zoom to fit all segments and suggestions if no active segment is selected
+        const bounds = new (window as any).google.maps.LatLngBounds();
+        let pointCount = 0;
+        let lastPoint: { lat: number; lng: number } | null = null;
+  
+        segments.forEach((segment: Event) => {
+          if (['FLIGHT', 'TRANSPORT'].includes(segment.segment)) return; // Exclude transit segments from general overview bounds
+          const geo = segment.geo || segment.details?.geo;
+          if (geo) {
+            const pos = { lat: geo.latitude, lng: geo.longitude };
+            bounds.extend(pos);
+            pointCount++;
+            lastPoint = pos;
+          }
+        });
+  
+        if (itinerary.lodging) {
+          const geo = itinerary.lodging.geo || itinerary.lodging.details?.geo || itinerary.lodging.location;
+          if (geo) {
+            const pos = { lat: geo.latitude, lng: geo.longitude };
+            bounds.extend(pos);
+            pointCount++;
+            lastPoint = pos;
+          }
         }
-      });
-
-      if (itinerary.lodging) {
-        const geo = itinerary.lodging.geo || itinerary.lodging.details?.geo || itinerary.lodging.location;
-        if (geo) {
-          const pos = { lat: geo.latitude, lng: geo.longitude };
-          bounds.extend(pos);
-          pointCount++;
-          lastPoint = pos;
+  
+        if (!itinerary.lodging) {
+          destinationInfo?.suggested_lodging?.forEach((place: any) => {
+            const geo = place.geo || place.details?.geo || place.location;
+            if (geo) {
+              const pos = { lat: geo.latitude, lng: geo.longitude };
+              bounds.extend(pos);
+              pointCount++;
+              lastPoint = pos;
+            }
+          });
         }
-      }
-
-      if (!itinerary.lodging) {
-        destinationInfo?.suggested_lodging?.forEach((place: any) => {
+  
+        destinationInfo?.suggested_activities?.forEach((place: any) => {
           const geo = place.geo || place.details?.geo || place.location;
           if (geo) {
             const pos = { lat: geo.latitude, lng: geo.longitude };
@@ -448,39 +465,29 @@ function MapInner() {
             lastPoint = pos;
           }
         });
-      }
-
-      destinationInfo?.suggested_activities?.forEach((place: any) => {
-        const geo = place.geo || place.details?.geo || place.location;
-        if (geo) {
-          const pos = { lat: geo.latitude, lng: geo.longitude };
+  
+        if (itinerary.destination && destinationInfo?.location?.coordinates) {
+          const pos = { lat: destinationInfo.location.coordinates[1], lng: destinationInfo.location.coordinates[0] };
           bounds.extend(pos);
           pointCount++;
           lastPoint = pos;
         }
-      });
-
-      if (itinerary.destination && destinationInfo?.location?.coordinates) {
-        const pos = { lat: destinationInfo.location.coordinates[1], lng: destinationInfo.location.coordinates[0] };
-        bounds.extend(pos);
-        pointCount++;
-        lastPoint = pos;
-      }
-
-      if (pointCount === 1 && lastPoint) {
-        map.panTo(lastPoint);
-        map.setZoom(14); // Sensible default zoom for a single marker
-      } else if (pointCount > 1) {
-        map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
-      }
-    } else if (segments.length === 0 && !itinerary.lodging) {
-      const dest = popularDestinations.find(d => d.name === itinerary.destination);
-      if (dest) {
-        map.panTo({ lat: dest.lat, lng: dest.lng });
-        map.setZoom(11);
-      } else {
-        map.setZoom(4);
-        map.panTo({ lat: 39.8283, lng: -98.5795 });
+  
+        if (pointCount === 1 && lastPoint) {
+          map.panTo(lastPoint);
+          map.setZoom(14); // Sensible default zoom for a single marker
+        } else if (pointCount > 1) {
+          map.fitBounds(bounds, { top: 100, bottom: 50, left: 50, right: 420 }); 
+        }
+      } else if (segments.length === 0 && !itinerary.lodging) {
+        const dest = popularDestinations.find(d => d.name === itinerary.destination);
+        if (dest) {
+          map.panTo({ lat: dest.lat, lng: dest.lng });
+          map.setZoom(11);
+        } else {
+          map.setZoom(4);
+          map.panTo({ lat: 39.8283, lng: -98.5795 });
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

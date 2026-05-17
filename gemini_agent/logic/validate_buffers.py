@@ -326,25 +326,32 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                 
                 if segment in ["FLIGHT", "TRANSPORT"]:
                     # Update current location to the destination of this transit
+                    name_desc = details.get("name", "").lower()
+                    to_dest = details.get("to", "").split(',')[0].strip().lower() if "to" in details else ""
+                    
                     if event_city and (event_city == dest_city or dest_city in event_city):
                         current_city = dest_city
-                    else:
-                        to_dest = details.get("to", "").split(',')[0].strip().lower()
-                        name_desc = details.get("name", "").lower()
-                        if to_dest == dest_city or dest_city in name_desc:
+                    elif to_dest == dest_city or dest_city in name_desc:
+                        current_city = dest_city
+                    elif segment == "FLIGHT":
+                        if "return" in name_desc or "back" in name_desc:
+                            current_city = starting_location.split(',')[0].strip().lower()
+                        else:
+                            # Assume outbound flights take them to the destination
                             current_city = dest_city
-                        elif event_city:
-                            current_city = event_city
+                    elif event_city:
+                        current_city = event_city
                             
                 elif segment in ["DINING", "EXPERIENCE", "LODGING"]:
-                    # If the event requires them to be at the destination but they haven't arrived
-                    if event_city == dest_city and current_city != dest_city:
+                    # If the event requires them to be at the destination but they haven't departed
+                    starting_city = starting_location.split(',')[0].strip().lower()
+                    if event_city == dest_city and current_city == starting_city and current_city != dest_city:
                         start_time_str = e.get("schedule", {}).get("local_start_time", "Unknown Time")
                         if "T" in start_time_str:
                             start_time_str = start_time_str.split("T")[1][:5]
                         errors.append(
                             f"FAIL: Arrival Sanity Check. '{details.get('name')}' is scheduled at {start_time_str} in {raw_event_city or destination}, "
-                            f"but the user has not arrived there yet according to the timeline. "
+                            f"but the user has not departed their starting location yet according to the timeline. "
                             f"(Current tracked location: {starting_location.split(',')[0].strip()})"
                         )
                         # Update current_city to avoid cascading the exact same error for subsequent events

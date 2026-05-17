@@ -18,6 +18,7 @@ class Destination(BaseModel):
     description: str
     location: GeoPoint
     vibe_tags: List[str]
+    price_rating: Optional[int] = Field(None, description="Average price rating for the destination (1-4).")
     suggested_lodging: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     suggested_activities: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
 
