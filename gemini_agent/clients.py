@@ -2,8 +2,7 @@ import os
 import logging
 import voyageai
 import googlemaps
-import vertexai
-from vertexai.generative_models import GenerativeModel
+from google import genai
 from google.cloud import secretmanager
 from motor.motor_asyncio import AsyncIOMotorClient
 from google.maps import places_v1
@@ -47,16 +46,13 @@ MONGODB_URI = get_secret("MONGODB_URI")
 if not MONGODB_URI:
     logger.error("MONGODB_URI could not be resolved from Secret Manager or Environment.")
 
-# Initialize Vertex AI context
-try:
-    vertexai.init(project=PROJECT_ID, location=LOCATION)
-    logger.info("Vertex AI initialized (Project: %s, Location: %s)", PROJECT_ID, LOCATION)
-except Exception:
-    logger.exception("Failed to initialize Vertex AI context")
-
 # Initialize clients globally
 try:
-    voyage_client = voyageai.Client(api_key=os.environ.get("VOYAGE_API_KEY"))
+    voyage_client = voyageai.Client(
+        api_key=os.environ.get("VOYAGE_API_KEY"),
+        max_retries=3,
+        timeout=15.0
+    )
     logger.info("Voyage AI client initialized.")
 except Exception:
     logger.exception("Failed to initialize Voyage AI client")
@@ -80,8 +76,8 @@ except Exception:
     places_client = gmaps_client = None
 
 try:
-    discovery_model = GenerativeModel("gemini-2.5-flash")
-    logger.info("Discovery model (gemini-2.5-flash) initialized.")
+    discovery_client = genai.Client()
+    logger.info("Discovery client (google.genai) initialized.")
 except Exception:
-    logger.exception("Failed to initialize discovery model (gemini-2.5-flash)")
-    discovery_model = None
+    logger.exception("Failed to initialize discovery client")
+    discovery_client = None

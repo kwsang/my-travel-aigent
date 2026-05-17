@@ -106,28 +106,31 @@ function MapInner() {
 
   React.useEffect(() => {
     let intervalId: NodeJS.Timeout;
+    let isFetching = false;
     
     const fetchDestInfo = () => {
-      if (itinerary.destination) {
+      if (itinerary.destination && !isFetching) {
+        isFetching = true;
         fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
           .then(res => res.ok ? res.json() : null)
           .then(data => setDestinationInfo(data))
-          .catch(err => console.error("Failed to load destination info", err));
-      } else {
+          .catch(err => console.error("Failed to load destination info", err))
+          .finally(() => { isFetching = false; });
+      } else if (!itinerary.destination) {
         setDestinationInfo(null);
       }
     };
 
     fetchDestInfo();
 
-    // Poll every 5 seconds if a destination is set but lodging hasn't been chosen yet, 
+    // Poll every 10 seconds if a destination is set but lodging hasn't been chosen yet, 
     // so we can dynamically show the new suggested lodgings if the agent updates them.
     if (itinerary.destination && !itinerary.lodging) {
       intervalId = setInterval(() => {
         if (document.visibilityState === 'visible') {
           fetchDestInfo();
         }
-      }, 5000);
+      }, 10000);
     }
 
     return () => {
@@ -258,7 +261,10 @@ function MapInner() {
   // Memoize the map center so it doesn't cause the map to re-pan on every context render
   const mapCenter = React.useMemo(() => {
     const defaultCenter = { lat: 39.8283, lng: -98.5795 }; // Center on continental US
-    const centerSegment = segments.find((s: Event) => s.geo || s.details?.geo);
+    const centerSegment = segments.find((s: Event) => {
+      if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(s.segment)) return false;
+      return s.geo || s.details?.geo;
+    });
     const geo = centerSegment?.geo || centerSegment?.details?.geo || itinerary.lodging?.geo || itinerary.lodging?.details?.geo || itinerary.lodging?.location;
     if (geo) {
       return { lat: geo.latitude, lng: geo.longitude };
@@ -272,7 +278,7 @@ function MapInner() {
       }
     }
 
-    if (destinationInfo?.suggested_activities && destinationInfo.suggested_activities.length > 0) {
+    if (itinerary.lodging && destinationInfo?.suggested_activities && destinationInfo.suggested_activities.length > 0) {
       const firstSugg = destinationInfo.suggested_activities[0];
       const suggGeo = firstSugg.geo || firstSugg.details?.geo || firstSugg.location;
       if (suggGeo) {
@@ -305,6 +311,7 @@ function MapInner() {
 
     // Add coordinates from all potential marker sources
     segments.forEach(s => {
+      if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(s.segment)) return;
       coords.push(getCoords(s));
       const details = s.details as typeof s.details & { polyline?: string };
       if ((s.segment === 'FLIGHT' || s.segment === 'TRANSPORT') && details?.polyline) {
@@ -315,7 +322,9 @@ function MapInner() {
       coords.push(getCoords(itinerary.lodging));
     }
     destinationInfo?.suggested_lodging?.forEach((p: any) => coords.push(getCoords(p)));
-    destinationInfo?.suggested_activities?.forEach((p: any) => coords.push(getCoords(p)));
+    if (itinerary.lodging) {
+      destinationInfo?.suggested_activities?.forEach((p: any) => coords.push(getCoords(p)));
+    }
 
     if (startGeo) {
       coords.push(`${startGeo.lat.toFixed(5)},${startGeo.lng.toFixed(5)}`);
@@ -441,6 +450,29 @@ function MapInner() {
           type="establishment"
           placeholder="Search for a hotel or lodging..."
           onPlaceSelected={handleMapAddLodging}
+        />
+      )}
+
+      {/* Search Bar for adding an activity */}
+      {!!itinerary.destination && !!itinerary.lodging && isLoaded && (
+        <MapSearchBar
+          type="establishment"
+          placeholder="Search for an activity or dining venue..."
+          onPlaceSelected={(place) => {
+            setActiveSuggestion({
+              _suggestionType: 'activity',
+              details: {
+                name: place.details?.name || place.displayName?.text || place.name || 'Selected Venue',
+                description: place.details?.description || place.formattedAddress || place.formatted_address,
+                geo: place.geo || place.details?.geo || (place.geometry?.location ? { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() } : place.location),
+                rating: place.details?.rating || place.rating,
+                user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count || place.user_ratings_total,
+              },
+              priceLevel: place.priceLevel || place.details?.priceLevel || place.price_level,
+              types: place.types || place.details?.types || []
+            });
+            setActiveSegmentIndex(null as any);
+          }}
         />
       )}
 

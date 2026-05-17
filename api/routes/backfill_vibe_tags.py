@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-from gemini_agent.clients import destinations_collection, discovery_model
+from gemini_agent.clients import destinations_collection, discovery_client
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("backfill_vibes")
@@ -17,7 +17,7 @@ VALID_VIBES = [
 ]
 
 async def backfill_vibes():
-    if destinations_collection is None or discovery_model is None:
+    if destinations_collection is None or discovery_client is None:
         logger.error("Database or discovery model is not initialized. Check your credentials.")
         return
 
@@ -40,7 +40,10 @@ async def backfill_vibes():
         )
 
         try:
-            response = await discovery_model.generate_content_async(prompt)
+            response = await discovery_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
             suggested_tags = [t.strip().lower() for t in response.text.split(',')]
             valid_tags = [t for t in suggested_tags if t in VALID_VIBES]
             

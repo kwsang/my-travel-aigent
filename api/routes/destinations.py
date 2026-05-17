@@ -2,6 +2,7 @@ import random
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from api.dependencies import get_db
+from gemini_agent.tools.discovery import discover_new_destination, _build_destination_query
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -72,16 +73,18 @@ async def get_destinations_by_vibe(vibe: str, skip: int = 0, limit: int = 20, db
 @router.get("/{name}")
 async def get_destination(name: str, db: AsyncIOMotorDatabase = Depends(get_db)):
     """Fetch a specific destination by name."""
-    search_name = name.split(',')[0].strip()
-    
-    # Case-insensitive exact match using collation
-    dest = await db.destinations.find_one(
-        {"name": search_name}, 
-        collation={"locale": "en", "strength": 2}
-    )
+    dest = await db.destinations.find_one(_build_destination_query(name))
     
     if not dest:
-        raise HTTPException(status_code=404, detail="Destination not found")
+        print(f"[API] Destination '{name}' not found. Attempting to auto-seed...")
+        seed_result = await discover_new_destination(name)
+        print(f"[API] Seed result for '{name}': {seed_result}")
+        
+        if "SUCCESS" in seed_result or "already in the atlas" in seed_result:
+            dest = await db.destinations.find_one(_build_destination_query(name))
+    
+    if not dest:
+        raise HTTPException(status_code=404, detail=f"Destination '{name}' not found and could not be auto-seeded. Result: {seed_result if 'seed_result' in locals() else 'None'}")
         
     dest["_id"] = str(dest["_id"])
     return dest

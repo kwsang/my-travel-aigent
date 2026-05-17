@@ -93,7 +93,7 @@ export default function MapMarkers({
       ))}
 
       {/* Suggested Activities */}
-      {!!itinerary.destination && destinationInfo?.suggested_activities?.map((place: any, idx: number) => (
+      {!!itinerary.destination && !!itinerary.lodging && destinationInfo?.suggested_activities?.map((place: any, idx: number) => (
         <SuggestionMarker
           key={`suggestion-act-${idx}`}
           place={place}
@@ -109,6 +109,7 @@ export default function MapMarkers({
       {/* Timeline Segments */}
       {segments.map((segment: Event, index: number) => {
         if (['TRANSPORT', 'FLIGHT', 'LOGISTICS'].includes(segment.segment)) return null;
+        if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(segment.segment)) return null;
         
         return (
           <TimelineMarker

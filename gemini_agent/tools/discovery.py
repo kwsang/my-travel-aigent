@@ -1,11 +1,14 @@
 import json
-from gemini_agent.clients import voyage_client, destinations_collection, places_client, discovery_model
+import logging
+from gemini_agent.clients import voyage_client, destinations_collection, places_client, discovery_client
 from gemini_agent.logic.models import Destination
 import asyncio
 import re
 import ast
 from typing import Optional, Any
 from google.adk.agents.invocation_context import InvocationContext
+
+logger = logging.getLogger(__name__)
 
 def _get_active_destination(provided_name: str, tool_context: InvocationContext) -> str:
     if tool_context:
@@ -19,12 +22,13 @@ def _get_active_destination(provided_name: str, tool_context: InvocationContext)
     return provided_name
 
 def _build_destination_query(dest_str: str) -> dict:
-    parts = [p.strip() for p in dest_str.split(',')]
-    query = {"name": {"$regex": f"^{parts[0]}", "$options": "i"}}
+    clean_str = dest_str.replace("`", "").replace("*", "").strip()
+    parts = [p.strip() for p in clean_str.split(',')]
+    safe_name = re.escape(parts[0])
+    query = {"name": {"$regex": f"^{safe_name}", "$options": "i"}}
     if len(parts) > 1:
-        query["state"] = {"$regex": f"^{parts[1][:2]}", "$options": "i"}
-    if len(parts) > 2:
-        query["country"] = {"$regex": f"^{parts[2][:2]}", "$options": "i"}
+        safe_state = re.escape(parts[1][:2])
+        query["state"] = {"$regex": f"^{safe_state}", "$options": "i"}
     return query
 
 def _parse_json_or_literal(raw_str: str, default_val: Any) -> Any:
@@ -77,9 +81,26 @@ VALID_ACTIVITY_TAGS = [
     "nature", "adventure", "relaxing", "family", "tour", "museum"
 ]
 
+async def _get_embedding_with_retry(text: str, input_type: str, max_retries: int = 4) -> list[float]:
+    """Fetches Voyage AI embeddings with an async exponential backoff to handle rate limits without blocking threads."""
+    for attempt in range(max_retries):
+        try:
+            embed_resp = await asyncio.to_thread(
+                voyage_client.embed, [text], model="voyage-4", input_type=input_type
+            )
+            return embed_resp.embeddings[0]
+        except Exception as e:
+            is_rate_limit = "429" in str(e) or "rate limit" in str(e).lower() or "too many" in str(e).lower()
+            if is_rate_limit and attempt < max_retries - 1:
+                sleep_time = 2 ** attempt
+                logger.warning(f"Voyage AI rate limit hit. Retrying in {sleep_time}s... (Attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(sleep_time)
+            else:
+                raise e
+
 async def _generate_item_tags(item: dict, valid_tags: list, item_type: str):
     """Helper to auto-generate tags for a given item using the discovery model."""
-    if not discovery_model:
+    if not discovery_client:
         item["vibe_tags"] = []
         return
     name = item.get("name", "Unknown")
@@ -90,7 +111,10 @@ async def _generate_item_tags(item: dict, valid_tags: list, item_type: str):
         f"Return ONLY the tags as a comma-separated list, nothing else."
     )
     try:
-        resp = await discovery_model.generate_content_async(prompt)
+        resp = await discovery_client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
         suggested = [t.strip().lower() for t in resp.text.split(',')]
         item["vibe_tags"] = [t for t in suggested if t in valid_tags]
     except Exception:
@@ -118,8 +142,7 @@ async def search_destinations(query: str, tool_context: InvocationContext) -> st
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
             
-        embed_resp = await asyncio.to_thread(voyage_client.embed, [enhanced_query], model="voyage-4", input_type="query")
-        embedding = embed_resp.embeddings[0]
+        embedding = await _get_embedding_with_retry(enhanced_query, "query")
         pipeline = [
             {
                 "$vectorSearch": {
@@ -146,7 +169,7 @@ async def discover_new_destination(vibe_or_city: str) -> str:
     Autonomous Producer Tool: Discovers and seeds a new city destination into MongoDB.
     """
     try:
-        if discovery_model is None:
+        if discovery_client is None:
             return "Error: Discovery model service is currently unavailable."
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
@@ -159,14 +182,18 @@ async def discover_new_destination(vibe_or_city: str) -> str:
             f"Based on the input '{vibe_or_city}', identify the single most relevant major or popular "
             "destination. Return only the name in 'City, State, Country' format."
         )
-        response = await discovery_model.generate_content_async(prompt)
-        candidate = response.text.strip()
+        response = await discovery_client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
+        candidate = response.text.replace("`", "").replace("*", "").strip()
+        logger.info(f"Auto-seeding destination: '{vibe_or_city}'. LLM suggested: '{candidate}'")
 
         if await destinations_collection.find_one(_build_destination_query(candidate)):
             return f"Destination '{candidate}' is already in the atlas."
 
         mask = "places.displayName,places.location,places.formattedAddress,places.types,places.addressComponents"
-        request = {"text_query": candidate, "included_type": "locality", "max_result_count": 1}
+        request = {"text_query": candidate, "max_result_count": 1}
         
         response = await asyncio.to_thread(
             places_client.search_text,
@@ -175,7 +202,7 @@ async def discover_new_destination(vibe_or_city: str) -> str:
         )
         
         if not response.places:
-            return f"Google Maps could not verify '{candidate}' as a valid locality."
+            return f"Google Maps could not verify '{candidate}' as a valid destination."
 
         place = response.places[0]
         description = (f"The city of {place.display_name.text}. A destination discovered for its "
@@ -195,7 +222,10 @@ async def discover_new_destination(vibe_or_city: str) -> str:
             f"Return ONLY the tags as a comma-separated list, nothing else."
         )
         try:
-            vibe_response = await discovery_model.generate_content_async(vibe_prompt)
+            vibe_response = await discovery_client.aio.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=vibe_prompt
+            )
             suggested_tags = [t.strip().lower() for t in vibe_response.text.split(',')]
             vibe_tags = [t for t in suggested_tags if t in VALID_VIBES]
         except Exception:
@@ -204,8 +234,7 @@ async def discover_new_destination(vibe_or_city: str) -> str:
         if not vibe_tags:
             vibe_tags = vibe_or_city.lower().split()
 
-        embed_resp = await asyncio.to_thread(voyage_client.embed, [description], model="voyage-4", input_type="document")
-        embedding = embed_resp.embeddings[0]
+        embedding = await _get_embedding_with_retry(description, "document")
         new_dest = {
             "name": place.display_name.text,
             "state": state,
@@ -328,6 +357,13 @@ async def get_cached_lodging(destination_name: str, tool_context: InvocationCont
             
         dest = await destinations_collection.find_one(_build_destination_query(active_dest))
         
+        if not dest:
+            logger.info(f"Destination '{active_dest}' not found for lodging. Attempting to auto-seed...")
+            seed_result = await discover_new_destination(active_dest)
+            if "SUCCESS" not in seed_result and "already in the atlas" not in seed_result:
+                return f"Error: Destination '{active_dest}' not found and could not be seeded. Seed result: {seed_result}"
+            dest = await destinations_collection.find_one(_build_destination_query(active_dest))
+            
         if dest and dest.get("suggested_lodging"):
             accs = dest["suggested_lodging"]
             if tool_context:
@@ -354,6 +390,13 @@ async def get_cached_activities(destination_name: str, tool_context: InvocationC
             
         dest = await destinations_collection.find_one(_build_destination_query(active_dest))
         
+        if not dest:
+            logger.info(f"Destination '{active_dest}' not found for activities. Attempting to auto-seed...")
+            seed_result = await discover_new_destination(active_dest)
+            if "SUCCESS" not in seed_result and "already in the atlas" not in seed_result:
+                return f"Error: Destination '{active_dest}' not found and could not be seeded. Seed result: {seed_result}"
+            dest = await destinations_collection.find_one(_build_destination_query(active_dest))
+
         if dest and dest.get("suggested_activities"):
             acts = dest["suggested_activities"]
             if tool_context:

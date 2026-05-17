@@ -80,6 +80,7 @@ export function useMapBounds(
   
         segments.forEach((segment: Event) => {
           if (['FLIGHT', 'TRANSPORT', 'LOGISTICS'].includes(segment.segment)) return; // Exclude transit and logistics segments from general overview bounds
+          if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(segment.segment)) return; // Exclude activities if lodging isn't set
           const geo = segment.geo || segment.details?.geo;
           if (geo) {
             const pos = { lat: geo.latitude, lng: geo.longitude };
@@ -111,15 +112,17 @@ export function useMapBounds(
           });
         }
   
-        destinationInfo?.suggested_activities?.forEach((place: any) => {
-          const geo = place.geo || place.details?.geo || place.location;
-          if (geo) {
-            const pos = { lat: geo.latitude, lng: geo.longitude };
-            bounds.extend(pos);
-            pointCount++;
-            lastPoint = pos;
-          }
-        });
+        if (itinerary.lodging) {
+          destinationInfo?.suggested_activities?.forEach((place: any) => {
+            const geo = place.geo || place.details?.geo || place.location;
+            if (geo) {
+              const pos = { lat: geo.latitude, lng: geo.longitude };
+              bounds.extend(pos);
+              pointCount++;
+              lastPoint = pos;
+            }
+          });
+        }
   
         if (itinerary.destination && destinationInfo?.location?.coordinates) {
           const pos = { lat: destinationInfo.location.coordinates[1], lng: destinationInfo.location.coordinates[0] };

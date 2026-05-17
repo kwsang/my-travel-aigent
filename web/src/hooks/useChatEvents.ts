@@ -76,8 +76,8 @@ export function useChatEvents(
         };
 
         const hiddenMessage = isReplacement 
-          ? `I have changed my lodging to ${lodging.name}. Please communicate with the travel_pioneer to update any travel logistics and the activity_planner to rearrange my daily experiences based on this new location.`
-          : `I've selected ${lodging.name} as my lodging. Please communicate with the travel_pioneer to schedule my flights and transit, and the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile.`;
+          ? `I have changed my lodging to ${lodging.name}. Please communicate with the travel_pioneer to update any travel logistics and the activity_planner to rearrange my daily experiences based on this new location. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`
+          : `I've selected ${lodging.name} as my lodging. Please communicate with the travel_pioneer to schedule my flights and transit, and the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`;
 
         const displayMessage = isReplacement
           ? `I've changed my lodging to ${lodging.name}. Can you update my trip?`
@@ -99,7 +99,7 @@ export function useChatEvents(
       
       if (placeName && !isLoading) {
         sendMessage(
-          `I found a great ${eventCategory} option on the map called "${placeName}". Please add it to my itinerary at the most appropriate time and day based on my schedule.`, 
+          `I found a great ${eventCategory} option on the map called "${placeName}". Please add it to my itinerary at the most appropriate time and day based on my schedule. You MUST also use the save_destination_activities tool to permanently save this venue to the destination's atlas so it is cached for the future.`, 
           itinerary,
           undefined,
           `Please add ${placeName} to my itinerary.`
