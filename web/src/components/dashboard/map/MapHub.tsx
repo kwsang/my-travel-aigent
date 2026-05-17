@@ -196,7 +196,9 @@ function MapInner() {
     segments.forEach(s => {
       coords.push(getCoords(s));
       const details = s.details as typeof s.details & { polyline?: string };
-      if (details?.polyline) coords.push(details.polyline);
+      if ((s.segment === 'FLIGHT' || s.segment === 'TRANSPORT') && details?.polyline) {
+        coords.push(details.polyline);
+      }
     });
     if (itinerary.accommodation) {
       coords.push(getCoords(itinerary.accommodation));
@@ -277,6 +279,7 @@ function MapInner() {
         
         let path: { lat: number; lng: number }[] = [];
 
+        if (curr.segment === 'TRANSPORT' || curr.segment === 'FLIGHT') {
         if (currDetails?.polyline && (window as any).google?.maps?.geometry?.encoding) {
           try {
             const decoded = (window as any).google.maps.geometry.encoding.decodePath(currDetails.polyline);
@@ -334,6 +337,7 @@ function MapInner() {
             lastValidGeo,
             { lat: currGeo.latitude, lng: currGeo.longitude }
           ];
+        }
         }
 
       if (path.length > 0) {

@@ -24,8 +24,15 @@ export default function TimelineMarker({ segment, index, isActive, isHovered, on
   const rating = segment.details?.rating;
   const ratingCount = segment.details?.user_rating_count;
 
-  const Icon = SegmentIcons[segment.segment as SegmentType] || Sparkles;
-  const bgColor = SegmentColors[segment.segment as SegmentType]?.bg || '#fdb833';
+  let effectiveSegment = segment.segment as string;
+  if (effectiveSegment.includes('DINING') || (effectiveSegment === 'EXPERIENCE' && segment.details?.category && ['lunch', 'dinner', 'breakfast', 'brunch', 'dining', 'food', 'meal', 'restaurant', 'cafe'].some(c => segment.details!.category!.toLowerCase().includes(c)))) {
+    effectiveSegment = 'DINING';
+  } else if (effectiveSegment.includes('EXPERIENCE')) {
+    effectiveSegment = 'EXPERIENCE';
+  }
+
+  const Icon = SegmentIcons[effectiveSegment as SegmentType] || Sparkles;
+  const bgColor = SegmentColors[effectiveSegment as SegmentType]?.bg || '#fdb833';
 
   return (
     <AdvancedMarker

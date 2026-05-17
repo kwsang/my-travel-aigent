@@ -56,12 +56,19 @@ export default function TimelineItem({
     airline?: string;
   };
 
+  let effectiveSegment = event.segment as string;
+  if (effectiveSegment.includes('DINING') || (effectiveSegment === 'EXPERIENCE' && event.details?.category && ['lunch', 'dinner', 'breakfast', 'brunch', 'dining', 'food', 'meal', 'restaurant', 'cafe'].some(c => event.details!.category!.toLowerCase().includes(c)))) {
+    effectiveSegment = 'DINING';
+  } else if (effectiveSegment.includes('EXPERIENCE')) {
+    effectiveSegment = 'EXPERIENCE';
+  }
+
   const hasConflict = React.useMemo(() => {
     if (!event.details?.name || !itineraryData.itinerary.validation_errors) return false;
     return itineraryData.itinerary.validation_errors.some(err => err.includes(`'${event.details?.name}'`));
   }, [event.details?.name, itineraryData.itinerary.validation_errors]);
 
-  const isDraggable = event.segment !== 'TRANSPORT' && event.segment !== 'FLIGHT';
+  const isDraggable = effectiveSegment !== 'TRANSPORT' && effectiveSegment !== 'FLIGHT';
 
   return (
     <div
@@ -85,10 +92,10 @@ export default function TimelineItem({
       onClick={() => setActiveSegmentIndex(activeSegmentIndex === absoluteIndex ? null : absoluteIndex)}
       onMouseEnter={() => setHoveredSegmentIndex?.(absoluteIndex)}
       onMouseLeave={() => setHoveredSegmentIndex?.(null)}
-      className={`relative rounded-xl border ${event.segment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer group ${isDraggable ? 'active:cursor-grab' : ''} ${
+      className={`relative rounded-xl border ${effectiveSegment === 'LOGISTICS' ? 'p-2.5' : 'p-4'} shadow-sm transition-all cursor-pointer group ${isDraggable ? 'active:cursor-grab' : ''} ${
         hasConflict 
           ? 'border-destructive/60 bg-destructive/10' 
-          : (event.segment === 'FLIGHT' ? 'border-sky-500/30 bg-sky-500/5' : 'border-border bg-card/50')
+          : (effectiveSegment === 'FLIGHT' ? 'border-sky-500/30 bg-sky-500/5' : 'border-border bg-card/50')
       } ${
         draggedIndex === absoluteIndex ? 'opacity-40 scale-[0.98] border-primary/50' : ''
       } ${
@@ -111,13 +118,18 @@ export default function TimelineItem({
         </div>
       )}
       <div className="flex items-start justify-between">
-      <div className={`flex flex-col ${event.segment === 'LOGISTICS' ? 'gap-0.5' : 'gap-1'}`}>
+      <div className={`flex flex-col ${effectiveSegment === 'LOGISTICS' ? 'gap-0.5' : 'gap-1'}`}>
           <span 
-          className={`flex items-center gap-1 font-bold uppercase tracking-wider text-muted-foreground ${event.segment === 'LOGISTICS' ? 'text-[10px]' : 'text-xs'}`}
-            style={{ color: SegmentColors[event.segment as SegmentType]?.bg }}
+          className={`flex items-center gap-1 font-bold uppercase tracking-wider text-muted-foreground ${effectiveSegment === 'LOGISTICS' ? 'text-[10px]' : 'text-xs'}`}
+            style={{ color: SegmentColors[effectiveSegment as SegmentType]?.bg }}
           >
-            {React.createElement(SegmentIcons[event.segment as SegmentType] || DefaultIcon, { className: 'w-3 h-3' })}
-            {event.segment.replace('_', ' ')}
+            {React.createElement(SegmentIcons[effectiveSegment as SegmentType] || DefaultIcon, { className: 'w-3 h-3' })}
+            {effectiveSegment.replace('_', ' ')}
+            {event.details?.category && (
+              <span className="capitalize normal-case tracking-normal opacity-90 ml-0.5">
+                ({event.details.category})
+              </span>
+            )}
           </span>
             <div className="flex items-center gap-2 mt-0.5">
               {event.details?.rating && (
@@ -129,29 +141,31 @@ export default function TimelineItem({
                   )}
                 </div>
               )}
-              {event.segment === 'FLIGHT' && flightDetails?.from && flightDetails?.to ? (
+              {effectiveSegment === 'FLIGHT' && flightDetails?.from && flightDetails?.to ? (
                 <h4 className="font-semibold text-foreground leading-tight flex items-center gap-2">
                   {flightDetails.from} <Plane size={14} className="text-muted-foreground" /> {flightDetails.to}
                 </h4>
               ) : (
-            <h4 className={`font-semibold text-foreground leading-tight ${event.segment === 'LOGISTICS' ? 'text-sm' : ''}`}>{event.details?.name || (event.segment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')}</h4>
+            <h4 className={`font-semibold text-foreground leading-tight ${effectiveSegment === 'LOGISTICS' ? 'text-sm' : ''}`}>{event.details?.name || (effectiveSegment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')}</h4>
               )}
             </div>
-            {event.segment === 'FLIGHT' && flightDetails?.airline ? (
+            {effectiveSegment === 'FLIGHT' && flightDetails?.airline ? (
               <p className="text-sm font-medium text-sky-500/80">{flightDetails.airline}</p>
             ) : (
-          <p className={`${event.segment === 'LOGISTICS' ? 'text-xs' : 'text-sm'} text-muted-foreground`}>{event.details?.category} {event.details?.city ? `• ${event.details.city}` : ''}</p>
+              <p className={`${effectiveSegment === 'LOGISTICS' ? 'text-xs' : 'text-sm'} text-muted-foreground line-clamp-2`}>
+                {event.details?.description || event.details?.notes || (event.details?.city ? `Located in ${event.details.city}` : '')}
+              </p>
             )}
           </div>
           <div className="text-right flex flex-col items-end gap-1 shrink-0">
         <div className="flex flex-col items-end">
           <time className={`font-semibold ${
-            (event.segment === 'FLIGHT' || event.segment === 'TRANSPORT' || event.segment === 'EXPERIENCE') && event.schedule?.local_end_time 
+            (effectiveSegment === 'FLIGHT' || effectiveSegment === 'TRANSPORT' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && event.schedule?.local_end_time 
               ? 'text-foreground/70 text-xs' 
               : 'text-foreground/90 text-sm'
-          } ${event.segment === 'LOGISTICS' ? '!text-xs' : ''}`}>
+          } ${effectiveSegment === 'LOGISTICS' ? '!text-xs' : ''}`}>
             {formatTime(event.schedule?.local_start_time)}
-            {(event.segment === 'FLIGHT' || event.segment === 'TRANSPORT' || event.segment === 'EXPERIENCE') && event.schedule?.timezone && (
+            {(effectiveSegment === 'FLIGHT' || effectiveSegment === 'TRANSPORT' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && event.schedule?.timezone && (
               <span className="text-[10px] ml-1 font-normal tracking-wide opacity-80">
                 {(() => {
                   try {
@@ -165,7 +179,7 @@ export default function TimelineItem({
               </span>
             )}
           </time>
-          {(event.segment === 'FLIGHT' || event.segment === 'TRANSPORT' || event.segment === 'EXPERIENCE') && event.schedule?.local_end_time && (
+          {(effectiveSegment === 'FLIGHT' || effectiveSegment === 'TRANSPORT' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && event.schedule?.local_end_time && (
             <>
               <time className="font-bold text-foreground mt-0.5 flex items-center gap-1 text-sm">
                 <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">to</span>
@@ -205,7 +219,7 @@ export default function TimelineItem({
             </>
           )}
         </div>
-            {event.details?.price && event.segment !== 'LOGISTICS' && event.segment !== 'TRANSPORT' && (
+            {event.details?.price && effectiveSegment !== 'LOGISTICS' && effectiveSegment !== 'TRANSPORT' && (
               <p className="text-sm font-bold text-emerald-600 mt-0.5">
                 {typeof event.details.price === 'object' ? (
                   <>
@@ -219,7 +233,7 @@ export default function TimelineItem({
                 )}
               </p>
             )}
-            {(event.segment === 'ACCOMMODATION' || event.segment === 'EXPERIENCE' || event.segment === 'DINING') && event.details?.city && (
+            {(effectiveSegment === 'ACCOMMODATION' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && event.details?.city && (
               <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 mt-1">
                 {event.details.city.split(',').slice(0, 2).join(',').trim()}
               </p>

@@ -17,7 +17,7 @@ When available, the state contains two primary objects:
 - `is_conflict` (bool) and `validation_errors` (list of strings).
 - `events` (list of objects), where each event has:
   - `day` (int, 1-indexed) and `segment` ('TRANSPORT', 'DINING', 'EXPERIENCE', 'ACCOMMODATION', 'LOGISTICS', 'FLIGHT').
-  - `schedule`: `local_start_time` and `local_end_time` (ISO 8601 strings. MUST include both date and time, e.g., `2026-10-27T10:00:00`. Use a future placeholder date if unknown), `estimated_traffic_minutes` (int), `applied_buffer_minutes` (int).
+  - `schedule`: `local_start_time` and `local_end_time` (ISO 8601 strings. MUST include both date and time, e.g., `2026-10-27T10:38:00`. Use exact times, do not round to the nearest hour), `estimated_traffic_minutes` (int), `applied_buffer_minutes` (int), `timezone` (str, IANA Timezone ID like 'America/Los_Angeles'. You MUST explicitly set this to the correct local timezone).
   - `details`: `name` (str), `category` (str), `city` (str), `price` (object with `amount` and `currency`), `is_rental` (bool), `vehicle_count` (int).
 
 2. `{state.user_profile_data}`: The traveler's persistent preferences.

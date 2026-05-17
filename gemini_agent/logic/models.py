@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator, ValidationInfo
+from pydantic import BaseModel, Field, ConfigDict, field_validator, ValidationInfo, model_validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timezone, timedelta
 
@@ -33,7 +33,7 @@ class Schedule(BaseModel):
     local_end_time: Optional[str] = Field(None, description="ISO 8601 datetime string for local end time.")
     start_time_utc: Optional[str] = Field(None, description="UTC normalized start time.")
     end_time_utc: Optional[str] = Field(None, description="UTC normalized end time.")
-    timezone: str = Field(default="America/New_York", description="IANA Timezone ID.")
+    timezone: str = Field(default="America/New_York", description="IANA Timezone ID (e.g., 'America/Los_Angeles'). You MUST explicitly provide the correct timezone.")
     estimated_traffic_minutes: Optional[int] = Field(None, description="Raw traffic data from Maps API.")
     applied_buffer_minutes: Optional[int] = Field(None, description="Buffer calculated by validation logic.")
 
@@ -100,6 +100,25 @@ class Event(BaseModel):
     geo: Optional[GeoCoordinates] = Field(None, description="Optional root-level coordinates for transit origins/destinations.")
     details: EventDetails
 
+    @field_validator('segment', mode='before')
+    @classmethod
+    def sanitize_segment(cls, v):
+        if isinstance(v, str):
+            v_upper = v.upper()
+            if "DINING" in v_upper or "LUNCH" in v_upper or "DINNER" in v_upper or "BREAKFAST" in v_upper or "BRUNCH" in v_upper:
+                return "DINING"
+            if "EXPERIENCE" in v_upper or "ACTIVITY" in v_upper:
+                return "EXPERIENCE"
+            if "ACCOMMODATION" in v_upper or "HOTEL" in v_upper:
+                return "ACCOMMODATION"
+            if "FLIGHT" in v_upper:
+                return "FLIGHT"
+            if "TRANSPORT" in v_upper or "DRIVE" in v_upper:
+                return "TRANSPORT"
+            if "LOGISTIC" in v_upper:
+                return "LOGISTICS"
+        return v
+
     @field_validator('schedule', mode='before')
     @classmethod
     def enforce_datetime_format(cls, v, info: ValidationInfo):
@@ -147,6 +166,14 @@ class Event(BaseModel):
                 pass
                 
         return v
+        
+    @model_validator(mode='after')
+    def correct_dining_segment(self) -> 'Event':
+        if self.segment == "EXPERIENCE" and self.details and self.details.category:
+            cat = self.details.category.lower()
+            if any(word in cat for word in ['lunch', 'dinner', 'breakfast', 'brunch', 'dining', 'food', 'meal', 'restaurant']):
+                self.segment = "DINING"
+        return self
 
 class Itinerary(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
