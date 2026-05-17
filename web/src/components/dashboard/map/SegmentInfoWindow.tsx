@@ -24,28 +24,28 @@ export default function SegmentInfoWindow({ segment, onClose }: SegmentInfoWindo
   
   return (
     <InfoWindow position={{ lat: geo.latitude, lng: geo.longitude }} onCloseClick={onClose}>
-      <div className="flex flex-col gap-1 p-1 max-w-[200px] text-gray-900">
+      <div className="flex flex-col p-2 max-w-[240px] text-slate-900">
         {imageUrl && (
-          <div className="w-full h-24 mb-1 rounded-sm overflow-hidden bg-muted relative">
+          <div className="w-full h-32 mb-3 rounded-xl overflow-hidden bg-slate-100 relative shadow-inner">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={imageUrl as string} alt={placeName as string} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
         )}
-        <h3 className="font-bold text-sm leading-tight mb-1">{placeName as React.ReactNode}</h3>
+        <h3 className="font-bold text-base leading-tight mb-1.5">{placeName as React.ReactNode}</h3>
         {category && (
-          <div className="flex flex-wrap gap-1 mb-1.5">
-            <span className="bg-primary/10 text-primary text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-sm">
+          <div className="flex flex-wrap gap-1 mb-2">
+            <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border border-primary/20">
               {category as React.ReactNode}
             </span>
           </div>
         )}
-        {description && <p className="text-xs opacity-80">{description as React.ReactNode}</p>}
-        {notes && <p className="text-xs opacity-80 italic mt-1">Note: {notes as React.ReactNode}</p>}
+        {description && <p className="text-xs text-slate-600 font-medium leading-relaxed">{description as React.ReactNode}</p>}
+        {notes && <p className="text-xs text-amber-800 bg-amber-100/50 p-2 rounded-lg font-medium italic mt-2 border border-amber-200/50">Note: {notes as React.ReactNode}</p>}
         {(price || rating) && (
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 text-xs font-semibold">
-            {price && <span>{formatPrice(price)}</span>}
-            {price && rating && <span className="opacity-50">•</span>}
-            {rating && <span className="flex items-center gap-0.5"><Star size={10} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-xs font-bold text-slate-700">
+            {price && <span className="text-emerald-700 bg-emerald-100/50 px-1.5 py-0.5 rounded-md border border-emerald-200/50">{formatPrice(price)}</span>}
+            {price && rating && <span className="opacity-30">•</span>}
+            {rating && <span className="flex items-center gap-1 bg-amber-100/50 text-amber-700 px-1.5 py-0.5 rounded-md border border-amber-200/50"><Star size={12} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
           </div>
         )}
       </div>

@@ -9,6 +9,7 @@ interface TripSelectorProps {
   onSelectTrip: (session_id: string, itinerary: Itinerary) => void;
   onNewTrip: () => void;
   onDeleteTrip: (e: React.MouseEvent, session_id: string) => void;
+  onDeleteAllTrips: (e: React.MouseEvent) => void;
   isEditingName: boolean;
   setIsEditingName: (val: boolean) => void;
   editedName: string;
@@ -23,6 +24,7 @@ export default function TripSelector({
   onSelectTrip,
   onNewTrip,
   onDeleteTrip,
+  onDeleteAllTrips,
   isEditingName,
   setIsEditingName,
   editedName,
@@ -129,6 +131,11 @@ export default function TripSelector({
             <button className="w-full flex items-center gap-2 p-2.5 hover:bg-primary/20 bg-primary/10 text-primary rounded-xl text-sm font-semibold transition-colors" onClick={() => { onNewTrip(); setShowTripDropdown(false); }}>
               <Plus size={16} /> Start New Trip
             </button>
+            {itineraries.length > 0 && (
+              <button className="w-full flex items-center gap-2 p-2.5 hover:bg-destructive/20 bg-destructive/10 text-destructive rounded-xl text-sm font-semibold transition-colors" onClick={(e) => { onDeleteAllTrips(e); setShowTripDropdown(false); }}>
+                <Trash2 size={16} /> Delete All Trips
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -185,6 +185,22 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDeleteAllTrips = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete all trips? This action cannot be undone.")) {
+      try {
+        await Promise.all(itineraries.map(trip => 
+          fetch(`${API_CONFIG.BASE_URL}/itinerary/${trip.session_id}?user_id=${visitorId}`, { method: 'DELETE' })
+        ));
+        fetchList();
+        handleNewTrip();
+        triggerToast('All trips deleted successfully.');
+      } catch (error) {
+        console.error("Dashboard: Delete all failed", error);
+      }
+    }
+  };
+
   const handleNewTrip = async () => {
     const newSessionId = uuidv4();
     setCurrentSessionId(newSessionId);
@@ -230,6 +246,7 @@ export default function DashboardPage() {
         }}
         onNewTrip={handleNewTrip}
         onDeleteTrip={handleDeleteTrip}
+        onDeleteAllTrips={handleDeleteAllTrips}
         isEditingName={isEditingName}
         setIsEditingName={setIsEditingName}
         editedName={editedName}

@@ -76,8 +76,8 @@ export function useChatEvents(
         };
 
         const hiddenMessage = isReplacement 
-          ? `I have changed my lodging to ${lodging.name}. Please communicate with the architect and activity_planner to update any travel logistics and rearrange my daily experiences based on this new location.`
-          : `I've selected ${lodging.name} as my lodging. Please communicate with the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile.`;
+          ? `I have changed my lodging to ${lodging.name}. Please communicate with the travel_pioneer to update any travel logistics and the activity_planner to rearrange my daily experiences based on this new location.`
+          : `I've selected ${lodging.name} as my lodging. Please communicate with the travel_pioneer to schedule my flights and transit, and the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile.`;
 
         const displayMessage = isReplacement
           ? `I've changed my lodging to ${lodging.name}. Can you update my trip?`

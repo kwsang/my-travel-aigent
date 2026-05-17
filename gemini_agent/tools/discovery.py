@@ -245,13 +245,24 @@ async def save_destination_lodging(destination_name: str, lodging: str, tool_con
         tasks = [_generate_item_tags(acc, VALID_LODGING_TAGS, "lodging") for acc in parsed_lodging]
         await asyncio.gather(*tasks)
             
-        result = await destinations_collection.update_one(
-            _build_destination_query(active_dest),
-            {"$set": {"suggested_lodging": parsed_lodging}}
-        )
+        dest = await destinations_collection.find_one(_build_destination_query(active_dest))
+        if not dest:
+            seed_result = await discover_new_destination(active_dest)
+            if "SUCCESS" not in seed_result and "already in the atlas" not in seed_result:
+                return f"Error: Destination '{active_dest}' not found and could not be seeded. Seed result: {seed_result}"
+            dest = await destinations_collection.find_one(_build_destination_query(active_dest))
+            if not dest:
+                return f"Error: Destination '{active_dest}' not found in the atlas after seeding."
+            
+        existing = dest.get("suggested_lodging") or []
+        existing_names = {item.get("name") for item in existing if "name" in item}
+        to_add = [item for item in parsed_lodging if item.get("name") not in existing_names]
         
-        if result.matched_count == 0:
-            return f"Error: Destination '{active_dest}' not found in the atlas. Use discover_new_destination first."
+        if to_add:
+            await destinations_collection.update_one(
+                {"_id": dest["_id"]},
+                {"$push": {"suggested_lodging": {"$each": to_add}}}
+            )
             
         return f"SUCCESS: Lodgings saved to destination '{active_dest}'."
     except Exception as e:
@@ -282,13 +293,24 @@ async def save_destination_activities(destination_name: str, activities: str, to
         tasks = [_generate_item_tags(act, VALID_ACTIVITY_TAGS, "activity") for act in parsed_activities]
         await asyncio.gather(*tasks)
             
-        result = await destinations_collection.update_one(
-            _build_destination_query(active_dest),
-            {"$set": {"suggested_activities": parsed_activities}}
-        )
+        dest = await destinations_collection.find_one(_build_destination_query(active_dest))
+        if not dest:
+            seed_result = await discover_new_destination(active_dest)
+            if "SUCCESS" not in seed_result and "already in the atlas" not in seed_result:
+                return f"Error: Destination '{active_dest}' not found and could not be seeded. Seed result: {seed_result}"
+            dest = await destinations_collection.find_one(_build_destination_query(active_dest))
+            if not dest:
+                return f"Error: Destination '{active_dest}' not found in the atlas after seeding."
+            
+        existing = dest.get("suggested_activities") or []
+        existing_names = {item.get("name") for item in existing if "name" in item}
+        to_add = [item for item in parsed_activities if item.get("name") not in existing_names]
         
-        if result.matched_count == 0:
-            return f"Error: Destination '{active_dest}' not found in the atlas. Use discover_new_destination first."
+        if to_add:
+            await destinations_collection.update_one(
+                {"_id": dest["_id"]},
+                {"$push": {"suggested_activities": {"$each": to_add}}}
+            )
             
         return f"SUCCESS: Activities saved to destination '{active_dest}'."
     except Exception as e:

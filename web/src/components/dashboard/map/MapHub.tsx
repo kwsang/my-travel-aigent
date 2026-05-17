@@ -105,15 +105,35 @@ function MapInner() {
   const [activeSuggestion, setActiveSuggestion] = React.useState<any>(null);
 
   React.useEffect(() => {
-    if (itinerary.destination) {
-      fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
-        .then(res => res.ok ? res.json() : null)
-        .then(data => setDestinationInfo(data))
-        .catch(err => console.error("Failed to load destination info", err));
-    } else {
-      setDestinationInfo(null);
+    let intervalId: NodeJS.Timeout;
+    
+    const fetchDestInfo = () => {
+      if (itinerary.destination) {
+        fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => setDestinationInfo(data))
+          .catch(err => console.error("Failed to load destination info", err));
+      } else {
+        setDestinationInfo(null);
+      }
+    };
+
+    fetchDestInfo();
+
+    // Poll every 5 seconds if a destination is set but lodging hasn't been chosen yet, 
+    // so we can dynamically show the new suggested lodgings if the agent updates them.
+    if (itinerary.destination && !itinerary.lodging) {
+      intervalId = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchDestInfo();
+        }
+      }, 5000);
     }
-  }, [itinerary.destination]);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [itinerary.destination, itinerary.lodging]);
 
   const fetchPopular = React.useCallback(() => {
     fetch(`${API_CONFIG.BASE_URL}/destinations/popular`)
