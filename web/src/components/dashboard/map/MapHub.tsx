@@ -81,6 +81,29 @@ function MapInner() {
     hoveredPopularIndexRef.current = hoveredPopularIndex;
   }, [hoveredPopularIndex]);
 
+  const [actionToast, setActionToast] = React.useState<{title: string, desc: string} | null>(null);
+  const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  const showToast = React.useCallback((title: string, desc: string) => {
+    setActionToast({ title, desc });
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setActionToast(null), 4000);
+  }, []);
+
+  React.useEffect(() => {
+    const handleAgentToast = (e: CustomEvent<{title: string; desc: string}>) => {
+      if (e.detail?.title) {
+        showToast(e.detail.title, e.detail.desc || '');
+      }
+    };
+    window.addEventListener('travel_aigent_show_toast', handleAgentToast as EventListener);
+    return () => window.removeEventListener('travel_aigent_show_toast', handleAgentToast as EventListener);
+  }, [showToast]);
+
+  React.useEffect(() => {
+    return () => { if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current); };
+  }, []);
+
   const [activeSuggestion, setActiveSuggestion] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -424,7 +447,7 @@ function MapInner() {
         let lastPoint: { lat: number; lng: number } | null = null;
   
         segments.forEach((segment: Event) => {
-          if (['FLIGHT', 'TRANSPORT'].includes(segment.segment)) return; // Exclude transit segments from general overview bounds
+          if (['FLIGHT', 'TRANSPORT', 'LOGISTICS'].includes(segment.segment)) return; // Exclude transit and logistics segments from general overview bounds
           const geo = segment.geo || segment.details?.geo;
           if (geo) {
             const pos = { lat: geo.latitude, lng: geo.longitude };
@@ -522,6 +545,34 @@ function MapInner() {
                   fields: ['displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount', 'priceLevel', 'types']
                 });
                 
+                if (!itinerary.destination) {
+                  const destName = place.displayName;
+                  console.log(`[MapHub] Map POI clicked as destination: ${destName}`);
+                  const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
+                  const newItinerary = { 
+                    ...itinerary, 
+                    destination: destName,
+                    ...(isDefaultName ? { trip_name: `${destName} Trip` } : {})
+                  };
+                  setItinerary?.(newItinerary);
+                  
+                  if (sessionId && userId) {
+                    try {
+                      await fetch(`${API_CONFIG.BASE_URL}/itinerary/${sessionId}?user_id=${userId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newItinerary),
+                      });
+                    } catch (err) {
+                      console.error("Failed to instantly save destination", err);
+                    }
+                  }
+                  
+                  showToast(`Destination set to ${destName}`, 'Finding transport and lodging...');
+                  window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: destName }));
+                  return;
+                }
+
                 setActiveSuggestion({
                   _suggestionType: 'activity',
                   details: {
@@ -589,6 +640,8 @@ function MapInner() {
                     console.error("Failed to instantly save destination", e);
                   }
                 }
+                
+                showToast(`Destination set to ${dest.name}`, 'Finding transport and lodging...');
                 console.log(`[MapHub] Dispatching 'travel_aigent_set_destination' event...`);
                 window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: dest.name }));
               }}
@@ -715,6 +768,22 @@ function MapInner() {
             </div>
             <div className="text-center">
               <h3 className="font-bold text-foreground/60 uppercase tracking-widest text-xs">Loading Workspace...</h3>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subtle Action Toast */}
+      {actionToast && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-300">
+          <div className="flex items-center gap-3 bg-foreground text-background px-4 py-3 rounded-full shadow-2xl">
+            <div className="relative flex h-3 w-3 items-center justify-center">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </div>
+            <div className="flex flex-col pr-2">
+              <span className="text-sm font-bold leading-none mb-1">{actionToast.title}</span>
+              <span className="text-[10px] font-medium opacity-80 leading-none">{actionToast.desc}</span>
             </div>
           </div>
         </div>

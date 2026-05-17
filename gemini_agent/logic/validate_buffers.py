@@ -50,7 +50,7 @@ def to_utc_aware(ts):
 
 def check_event_overlap(current_event: dict, next_event: dict):
     """
-    Determines if two events overlap.
+    Determines if two events overlap or lack sufficient ad-hoc transit buffer.
     """
     # 1. Determine End Time of Current Event
     current_schedule = current_event.get("schedule", {})
@@ -59,22 +59,31 @@ def check_event_overlap(current_event: dict, next_event: dict):
                        current_schedule.get("local_start_time") or 
                        current_schedule.get("end_time_utc") or 
                        current_schedule.get("start_time_utc"))
-    if not current_end_str: return False, 0
+    if not current_end_str: return False, 0, "ok"
     current_end = to_utc_aware(current_end_str)
 
     # 2. Determine Start Time of Next Event
     next_schedule = next_event.get("schedule", {})
     next_start_str = next_schedule.get("local_start_time") or next_schedule.get("start_time_utc")
-    if not next_start_str: return False, 0
+    if not next_start_str: return False, 0, "ok"
     next_start = to_utc_aware(next_start_str)
 
     # 3. Check for Collision
     if current_end > next_start:
         # Calculate the collision duration for a better error message
         overlap_delta = (current_end - next_start).total_seconds() / 60
-        return True, overlap_delta
+        return True, overlap_delta, "overlap"
     
-    return False, 0
+    # 4. Check for Minimum Ad-Hoc Transit Buffer (15 mins)
+    gap_minutes = (next_start - current_end).total_seconds() / 60
+    current_name = current_event.get("details", {}).get("name", "")
+    next_name = next_event.get("details", {}).get("name", "")
+    
+    # Require at least a 15-minute gap if they are not the same venue
+    if gap_minutes < 15 and current_name != next_name:
+        return True, 15 - gap_minutes, "buffer"
+        
+    return False, 0, "ok"
 
 def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian_pref: str, user_prefs: dict = None):
     """
@@ -146,7 +155,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
             "1970-01-01T00:00:00Z" # Fallback for events missing schedule
         ))
 
-        # 1.5 Overlap Check
+        # 1.5 Overlap & Buffer Check
         overlap_check_events = [
             e for e in day_events 
             if e.get("segment") not in ["LOGISTICS", "LODGING"]
@@ -156,12 +165,19 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
             current_event = overlap_check_events[i]
             next_event = overlap_check_events[i+1]
             
-            is_overlapping, minutes = check_event_overlap(current_event, next_event)
+            is_overlapping, minutes, issue_type = check_event_overlap(current_event, next_event)
             if is_overlapping:
-                errors.append(
-                    f"FAIL: Overlap on {day}. '{current_event.get('details', {}).get('name')}' overlaps with "
-                    f"'{next_event.get('details', {}).get('name')}' by {minutes:.0f} minutes."
-                )
+                if issue_type == "overlap":
+                    errors.append(
+                        f"FAIL: Overlap on {day}. '{current_event.get('details', {}).get('name')}' overlaps with "
+                        f"'{next_event.get('details', {}).get('name')}' by {minutes:.0f} minutes."
+                    )
+                elif issue_type == "buffer":
+                    errors.append(
+                        f"FAIL: Insufficient Transit Gap on {day}. Leave at least 15 minutes between "
+                        f"'{current_event.get('details', {}).get('name')}' and '{next_event.get('details', {}).get('name')}' "
+                        f"for ad-hoc local transit."
+                    )
 
         # 2. Night Owl Check
         if circadian_pref.lower() == "night_owl":
@@ -504,7 +520,78 @@ def run_buffer_test_suite():
                 print(f"  !!! Test Failed for {scenario['name']} ({risk_type.capitalize()}) !!!")
                 # Optionally, you could raise an exception here to stop on first failure
                 
-    print("Buffer Test Suite Finished.")
+    print("Buffer Test Suite Finished.\n")
+
+    print("Running Ad-Hoc Transit Buffer Test Suite...\n")
+    
+    overlap_scenarios = [
+        {
+            "name": "Scenario 1: Same Venue, No Gap",
+            "current_event": {
+                "schedule": {"local_end_time": "2026-01-01T12:00:00Z"},
+                "details": {"name": "Museum of Art"}
+            },
+            "next_event": {
+                "schedule": {"local_start_time": "2026-01-01T12:00:00Z"},
+                "details": {"name": "Museum of Art"}
+            },
+            "expected": (False, 0, "ok")
+        },
+        {
+            "name": "Scenario 2: Distinct Venues, 10 min Gap (Fails Buffer)",
+            "current_event": {
+                "schedule": {"local_end_time": "2026-01-01T12:00:00Z"},
+                "details": {"name": "Museum of Art"}
+            },
+            "next_event": {
+                "schedule": {"local_start_time": "2026-01-01T12:10:00Z"},
+                "details": {"name": "Local Cafe"}
+            },
+            "expected": (True, 5.0, "buffer")
+        },
+        {
+            "name": "Scenario 3: Distinct Venues, 20 min Gap (Passes)",
+            "current_event": {
+                "schedule": {"local_end_time": "2026-01-01T12:00:00Z"},
+                "details": {"name": "Museum of Art"}
+            },
+            "next_event": {
+                "schedule": {"local_start_time": "2026-01-01T12:20:00Z"},
+                "details": {"name": "Local Cafe"}
+            },
+            "expected": (False, 0, "ok")
+        },
+        {
+            "name": "Scenario 4: Distinct Venues, Overlapping (Fails Overlap)",
+            "current_event": {
+                "schedule": {"local_end_time": "2026-01-01T12:30:00Z"},
+                "details": {"name": "Museum of Art"}
+            },
+            "next_event": {
+                "schedule": {"local_start_time": "2026-01-01T12:00:00Z"},
+                "details": {"name": "Local Cafe"}
+            },
+            "expected": (True, 30.0, "overlap")
+        }
+    ]
+    
+    for scenario in overlap_scenarios:
+        print(f"--- {scenario['name']} ---")
+        is_invalid, minutes, issue_type = check_event_overlap(scenario['current_event'], scenario['next_event'])
+        
+        expected = scenario['expected']
+        
+        status = "PASS" if (is_invalid, minutes, issue_type) == expected else "FAIL"
+        print(f"  Current Event End: {scenario['current_event']['schedule']['local_end_time']} ({scenario['current_event']['details']['name']})")
+        print(f"  Next Event Start:  {scenario['next_event']['schedule']['local_start_time']} ({scenario['next_event']['details']['name']})")
+        print(f"  Expected Output: {expected}")
+        print(f"  Actual Output:   {(is_invalid, minutes, issue_type)}")
+        print(f"  Result: {status}\n")
+        
+        if status == "FAIL":
+            print(f"  !!! Test Failed for {scenario['name']} !!!")
+            
+    print("Ad-Hoc Transit Buffer Test Suite Finished.")
 
 def run_scenario_5_validation():
     """

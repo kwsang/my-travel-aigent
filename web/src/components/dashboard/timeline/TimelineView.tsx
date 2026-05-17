@@ -189,6 +189,14 @@ export default function TimelineView() {
   const segmentsByDay = React.useMemo(() => {
     const grouped = new Map<number, { event: Event; absoluteIndex: number; time: number }[]>();
     segments.forEach((event, absoluteIndex) => {
+      // Hide transfer transports entirely, except for rentals and airport transfers
+      const isTransport = event.segment === 'TRANSPORT';
+      const isRental = event.details?.is_rental;
+      const isAirportTransfer = event.details?.name?.toLowerCase().includes('airport') || 
+                                event.details?.description?.toLowerCase().includes('airport');
+
+      if (isTransport && !isRental && !isAirportTransfer) return;
+
       if (!grouped.has(event.day)) grouped.set(event.day, []);
       const time = event.schedule?.local_start_time ? new Date(event.schedule.local_start_time).getTime() : 0;
       grouped.get(event.day)!.push({ event, absoluteIndex, time });

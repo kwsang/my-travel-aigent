@@ -198,6 +198,8 @@ def create_travel_agent():
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST span exactly {duration} Days."
             
+        prompt += "\n\n[TRANSIT RULE]\nDo NOT generate or schedule `TRANSPORT` segments for commuting between activities or dining. Only schedule the actual `EXPERIENCE` and `DINING` events. Assume the user will handle point-to-point local transit ad-hoc."
+
         prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."
 
         return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"

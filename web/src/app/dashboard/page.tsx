@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useLocalStorage<'total' | 'per_person'>('travel_aigent_view_mode', 'total');
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [visitorId, setVisitorId] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Initialize and persist Visitor and Session IDs safely on the client
   useEffect(() => {
@@ -55,6 +56,22 @@ export default function DashboardPage() {
       localStorage.setItem('travel_aigent_last_session_id', currentSessionId);
     }
   }, [currentSessionId]);
+
+  // Listen for agent generation events to show loading skeletons
+  useEffect(() => {
+    const handleStart = () => setIsGenerating(true);
+    const handleStop = () => setIsGenerating(false);
+
+    window.addEventListener('travel_aigent_set_destination', handleStart);
+    window.addEventListener('travel_aigent_generation_start', handleStart);
+    window.addEventListener('travel_aigent_generation_end', handleStop);
+
+    return () => {
+      window.removeEventListener('travel_aigent_set_destination', handleStart);
+      window.removeEventListener('travel_aigent_generation_start', handleStart);
+      window.removeEventListener('travel_aigent_generation_end', handleStop);
+    };
+  }, []);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
@@ -170,6 +187,7 @@ export default function DashboardPage() {
     const newSessionId = uuidv4();
     setCurrentSessionId(newSessionId);
     setIsEditingName(false);
+    setIsGenerating(false);
     
     const newItinerary = { 
       trip_name: 'New Trip',
@@ -206,6 +224,7 @@ export default function DashboardPage() {
         onSelectTrip={(sessId, item) => {
           setCurrentSessionId(sessId);
           setItinerary(item);
+          setIsGenerating(false);
         }}
         onNewTrip={handleNewTrip}
         onDeleteTrip={handleDeleteTrip}
@@ -270,13 +289,13 @@ export default function DashboardPage() {
               </button>
             </div>
             <ErrorBoundary fallbackMessage="Failed to load budget panel.">
-              <SkeletonWrapper isLoading={isLoading} fallback={<BudgetSkeleton />}>
+          <SkeletonWrapper isLoading={isLoading || isGenerating} fallback={<BudgetSkeleton />}>
                 <BudgetPanel />
               </SkeletonWrapper>
             </ErrorBoundary>
           </div>
           <ErrorBoundary fallbackMessage="Failed to load timeline.">
-            <SkeletonWrapper isLoading={isLoading} fallback={<TimelineSkeleton />}>
+        <SkeletonWrapper isLoading={isLoading || isGenerating} fallback={<TimelineSkeleton />}>
               <TimelineView />
             </SkeletonWrapper>
           </ErrorBoundary>
@@ -301,7 +320,10 @@ export default function DashboardPage() {
             <ChatInterface 
               sessionId={currentSessionId}
               userId={visitorId}
-              onMessageReceived={refreshDashboard} 
+            onMessageReceived={() => {
+              setIsGenerating(false);
+              refreshDashboard();
+            }} 
             />
           </ErrorBoundary>
         </div>
