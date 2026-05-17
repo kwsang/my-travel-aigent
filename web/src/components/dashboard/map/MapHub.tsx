@@ -329,7 +329,6 @@ function MapInner() {
     map,
     currentItineraryRef,
     showToast,
-    handleSelectDestination,
     setActiveSuggestion,
     setActiveSegmentIndex as any
   );

@@ -1,6 +1,6 @@
 import React from 'react';
 import { InfoWindow } from '@vis.gl/react-google-maps';
-import { Star, Plus, Bed, RefreshCw } from 'lucide-react';
+import { Star, Plus, Bed, RefreshCw, MapPin } from 'lucide-react';
 import { useMapContext } from './MapContext';
 
 interface SuggestionInfoWindowProps {
@@ -10,7 +10,7 @@ interface SuggestionInfoWindowProps {
 }
 
 export default function SuggestionInfoWindow({ place, hasLodging, onClose }: SuggestionInfoWindowProps) {
-  const { handleMapAddLodging, handleAddActivity, formatPrice } = useMapContext();
+  const { handleSelectDestination, handleMapAddLodging, handleAddActivity, formatPrice } = useMapContext();
   const geo = place.geo || place.details?.geo || place.location;
   if (!geo) return null;
   
@@ -65,7 +65,9 @@ export default function SuggestionInfoWindow({ place, hasLodging, onClose }: Sug
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (place._suggestionType === 'lodging') {
+            if (place._suggestionType === 'destination') {
+              handleSelectDestination(placeName as string);
+            } else if (place._suggestionType === 'lodging') {
               handleMapAddLodging(place);
             } else {
               const isDining = place.types?.some((t: string) => ['restaurant', 'cafe', 'food', 'bar', 'bakery'].includes(t));
@@ -74,12 +76,16 @@ export default function SuggestionInfoWindow({ place, hasLodging, onClose }: Sug
             onClose();
           }}
         >
-          {place._suggestionType === 'lodging' ? (
+          {place._suggestionType === 'destination' ? (
+            <MapPin size={14} />
+          ) : place._suggestionType === 'lodging' ? (
             hasLodging ? <RefreshCw size={14} /> : <Bed size={14} />
           ) : (
             <Plus size={14} />
           )} 
-          {place._suggestionType === 'lodging' ? (
+          {place._suggestionType === 'destination' ? (
+            'Set as Destination'
+          ) : place._suggestionType === 'lodging' ? (
             hasLodging ? 'Replace Lodging' : 'Select As Lodging'
           ) : (
             'Add to Itinerary'
