@@ -21,6 +21,7 @@ export default function SegmentInfoWindow({ segment, onClose }: SegmentInfoWindo
   const rating = segment.details?.rating;
   const category = segment.details?.category;
   const imageUrl = segment.details?.image_url || (segment as any).image_url || (segment.details as any)?.photo_url;
+  const googleMapsUri = segment.details?.google_maps_uri || (segment as any).google_maps_uri;
   
   return (
     <InfoWindow position={{ lat: geo.latitude, lng: geo.longitude }} onCloseClick={onClose}>
@@ -47,6 +48,16 @@ export default function SegmentInfoWindow({ segment, onClose }: SegmentInfoWindo
             {price && rating && <span className="opacity-30">•</span>}
             {rating && <span className="flex items-center gap-1 bg-amber-100/50 text-amber-700 px-1.5 py-0.5 rounded-md border border-amber-200/50"><Star size={12} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
           </div>
+        )}
+        {googleMapsUri && (
+          <a 
+            href={googleMapsUri as string} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-primary hover:underline text-xs mt-2 inline-block font-medium"
+          >
+            View on Google Maps
+          </a>
         )}
       </div>
     </InfoWindow>

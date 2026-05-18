@@ -60,6 +60,16 @@ async def save_itinerary(
 
         route_cache = tool_context.state.get("_route_cache", {})
         venue_cache = tool_context.state.get("_venue_cache", {})
+        
+        if parsed_lodging:
+            lodging_name = parsed_lodging.get("name")
+            if lodging_name and lodging_name in venue_cache:
+                for k, v in venue_cache[lodging_name].items():
+                    if k not in parsed_lodging:
+                        parsed_lodging[k] = v
+                        
+        active_lodging = parsed_lodging or existing_state.get("lodging")
+
         existing_events = existing_state.get("events", [])
         for new_ev in parsed_events:
             if not isinstance(new_ev, dict): continue
@@ -67,6 +77,15 @@ async def save_itinerary(
             if not isinstance(details, dict): continue
             
             name = details.get("name")
+            
+            if active_lodging:
+                lodging_name = active_lodging.get("name")
+                if new_ev.get("segment") == "LODGING" or (lodging_name and name and lodging_name.lower() in name.lower()):
+                    new_ev["segment"] = "LODGING"
+                    for k, v in active_lodging.items():
+                        details[k] = v
+                    name = details.get("name")
+
             if name and name in venue_cache:
                 cached_venue = venue_cache[name]
                 for k, v in cached_venue.items():
@@ -84,13 +103,6 @@ async def save_itinerary(
                     if old_details.get("name") == details.get("name") and "polyline" in old_details:
                         details["polyline"] = old_details["polyline"]
                         break
-
-        if parsed_lodging:
-            name = parsed_lodging.get("name")
-            if name and name in venue_cache:
-                for k, v in venue_cache[name].items():
-                    if k not in parsed_lodging:
-                        parsed_lodging[k] = v
 
         # Deep equality check to prevent redundant saves from the LLM
         has_changes = False

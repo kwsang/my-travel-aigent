@@ -9,7 +9,7 @@ export default function TimelineGlobalErrors({ errors }: TimelineGlobalErrorsPro
   if (!errors || errors.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2 bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-4 -mt-4 mb-2">
+    <div className="flex flex-col gap-2 bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl shadow-sm animate-in fade-in slide-in-from-bottom-4 mt-2">
       <div className="flex items-center gap-2 font-bold text-sm">
         <AlertTriangle className="w-4 h-4" />
         <span>Trip Warnings</span>

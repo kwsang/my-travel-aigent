@@ -235,9 +235,6 @@ export default function TimelineView() {
         </div>
       )}
 
-      {/* Global Validation Errors / Budget Warnings Banner */}
-      <TimelineGlobalErrors errors={globalErrors} />
-
       {/* Expand / Collapse All */}
       {days.length > 1 && (
         <div className="flex justify-end -mb-6 z-10 relative">
@@ -283,6 +280,9 @@ export default function TimelineView() {
           />
         );
       })}
+
+      {/* Global Validation Errors / Budget Warnings Banner */}
+      <TimelineGlobalErrors errors={globalErrors} />
     </div>
   );
 }

@@ -215,7 +215,8 @@ function MapInner() {
       rating: place.details?.rating || place.rating,
       user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count || place.user_ratings_total,
       priceLevel: place.priceLevel || place.details?.priceLevel || place.price_level,
-      types: place.types || place.details?.types || []
+      types: place.types || place.details?.types || [],
+      google_maps_uri: place.google_maps_uri || place.details?.google_maps_uri
     });
   }, [handleSelectLodging]);
 
@@ -262,10 +263,31 @@ function MapInner() {
     });
   }, [isLoaded, startingLocation]);
 
+  // Enhance segments with synthetic flight polylines if missing
+  const enhancedSegments = React.useMemo(() => {
+    if (!isLoaded || !(window as any).google?.maps?.geometry?.encoding) return segments;
+
+    return segments.map((s: Event) => {
+      const details = s.details as any;
+      if (s.segment === 'FLIGHT' && !details?.polyline && details?.origin_geo?.coordinates && details?.destination_geo?.coordinates) {
+        try {
+          const path = [
+            { lat: details.origin_geo.coordinates[1], lng: details.origin_geo.coordinates[0] },
+            { lat: details.destination_geo.coordinates[1], lng: details.destination_geo.coordinates[0] }
+          ];
+          return { ...s, details: { ...details, polyline: (window as any).google.maps.geometry.encoding.encodePath(path) } };
+        } catch (e) {
+          // Ignore encoding errors
+        }
+      }
+      return s;
+    });
+  }, [segments, isLoaded]);
+
   // Memoize the map center so it doesn't cause the map to re-pan on every context render
   const mapCenter = React.useMemo(() => {
     const defaultCenter = { lat: 39.8283, lng: -98.5795 }; // Center on continental US
-    const centerSegment = segments.find((s: Event) => {
+    const centerSegment = enhancedSegments.find((s: Event) => {
       if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(s.segment)) return false;
       return s.geo || s.details?.geo;
     });
@@ -299,7 +321,7 @@ function MapInner() {
       return { lat: dest.lat, lng: dest.lng };
     }
     return defaultCenter;
-  }, [segments, itinerary.destination, itinerary.lodging, popularDestinations, destinationInfo?.suggested_lodging, destinationInfo?.suggested_activities]);
+  }, [enhancedSegments, itinerary.destination, itinerary.lodging, popularDestinations, destinationInfo?.suggested_lodging, destinationInfo?.suggested_activities]);
 
   // Create a stable signature of all geographic points to display on the map.
   // This prevents the map from re-fitting its bounds unless the actual coordinates of markers change.
@@ -314,7 +336,7 @@ function MapInner() {
     const coords: (string | null)[] = [];
 
     // Add coordinates from all potential marker sources
-    segments.forEach(s => {
+    enhancedSegments.forEach(s => {
       if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(s.segment)) return;
       coords.push(getCoords(s));
       const details = s.details as typeof s.details & { polyline?: string };
@@ -342,10 +364,10 @@ function MapInner() {
 
     // Sort to ensure order doesn't matter, then stringify for a stable dependency.
     return JSON.stringify(coords.filter(Boolean).sort());
-  }, [segments, itinerary.lodging, destinationInfo, startGeo]);
+  }, [enhancedSegments, itinerary.lodging, destinationInfo, startGeo]);
 
   // Custom hook to generate individual edges for the polyline
-  const routeEdges = useRouteEdges(segments, activeSegmentIndex, startGeo, itinerary, destinationInfo);
+  const routeEdges = useRouteEdges(enhancedSegments, activeSegmentIndex, startGeo, itinerary, destinationInfo);
 
   // Automatically fit bounds or pan to active segment
   useMapBounds(
@@ -353,7 +375,7 @@ function MapInner() {
     isLoaded,
     activeSegmentIndex,
     geoSignature,
-    segments,
+    enhancedSegments,
     itinerary,
     destinationInfo,
     popularDestinations,
@@ -478,7 +500,8 @@ function MapInner() {
                 user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count || place.user_ratings_total,
               },
               priceLevel: place.priceLevel || place.details?.priceLevel || place.price_level,
-              types: place.types || place.details?.types || []
+              types: place.types || place.details?.types || [],
+              google_maps_uri: place.google_maps_uri || place.details?.google_maps_uri
             });
             setActiveSegmentIndex(null as any);
           }}

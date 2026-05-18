@@ -20,6 +20,7 @@ export default function SuggestionInfoWindow({ place, hasLodging, onClose }: Sug
   const price = place.details?.price || place.priceLevel || place.price_tier || place.price;
   const rating = place.details?.rating || place.rating;
   const imageUrl = place.details?.image_url || place.image_url || place.photo_url || place.photoUri || (place.photos && place.photos.length > 0 ? place.photos[0].photoUri || place.photos[0].name : null);
+  const googleMapsUri = place.details?.google_maps_uri || place.google_maps_uri;
   
   const rawTypes = place.types || place.details?.types || [];
   const typesArray = Array.isArray(rawTypes) ? rawTypes : (typeof rawTypes === 'string' ? rawTypes.replace(/['\[\]]/g, '').split(', ') : []);
@@ -59,6 +60,16 @@ export default function SuggestionInfoWindow({ place, hasLodging, onClose }: Sug
             {price && rating && <span className="opacity-30">•</span>}
             {rating && <span className="flex items-center gap-1 bg-amber-100/50 text-amber-700 px-1.5 py-0.5 rounded-md border border-amber-200/50"><Star size={12} className="fill-amber-500 text-amber-500" /> {rating as React.ReactNode}</span>}
           </div>
+        )}
+        {googleMapsUri && (
+          <a 
+            href={googleMapsUri as string} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-primary hover:underline text-xs mt-2 inline-block font-medium"
+          >
+            View on Google Maps
+          </a>
         )}
         <button
           className="mt-3 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground text-xs font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-primary/30 hover:brightness-110 active:scale-95 transition-all"

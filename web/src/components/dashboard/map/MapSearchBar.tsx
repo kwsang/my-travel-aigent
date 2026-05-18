@@ -30,7 +30,7 @@ export default function MapSearchBar({ type, placeholder, instruction, onPlaceSe
       if (!place) return;
       
       place.fetchFields({
-        fields: ['displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount', 'priceLevel', 'types']
+        fields: ['displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount', 'priceLevel', 'types', 'googleMapsURI']
       }).then(() => {
         onPlaceSelected({
           name: place.displayName,
@@ -44,7 +44,8 @@ export default function MapSearchBar({ type, placeholder, instruction, onPlaceSe
           rating: place.rating,
           user_ratings_total: place.userRatingCount,
           price_level: place.priceLevel,
-          types: place.types || []
+          types: place.types || [],
+          google_maps_uri: place.googleMapsURI
         });
       });
     };

@@ -165,7 +165,8 @@ async def search_places(
                 "places.servesBreakfast,places.servesLunch,places.servesDinner,"
                 "places.servesBeer,places.servesWine,places.servesVegetarianFood,places.currentOpeningHours,"
                 "places.goodForChildren,places.accessibilityOptions,places.businessStatus,"
-                "places.regularOpeningHours,places.utcOffsetMinutes,places.userRatingCount")
+                "places.regularOpeningHours,places.utcOffsetMinutes,places.userRatingCount,"
+                "places.googleMapsUri")
         request = {"text_query": enhanced_query, "max_result_count": 8}
         if location_type: request["included_type"] = location_type
         if location_bias_dict: request["location_bias"] = location_bias_dict
@@ -196,7 +197,8 @@ async def search_places(
                 "status": place.business_status.name if hasattr(place, "business_status") else "Unknown",
                 "currentOpeningHours": list(place.current_opening_hours.weekday_descriptions) if place.current_opening_hours else [],
                 "regularOpeningHours": list(place.regular_opening_hours.weekday_descriptions) if place.regular_opening_hours else [],
-                "utcOffsetMinutes": place.utc_offset_minutes
+                "utcOffsetMinutes": place.utc_offset_minutes,
+                "google_maps_uri": place.google_maps_uri
             }
             venues.append(venue)
             
