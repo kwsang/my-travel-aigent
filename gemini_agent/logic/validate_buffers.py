@@ -93,7 +93,7 @@ def check_event_overlap(current_event: dict, next_event: dict):
 def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian_pref: str, user_prefs: dict = None):
     """
     Validates the high-level structure of an itinerary based on Scenario 5 requirements:
-    Clustering, Night Owl hours, and the Retreat Rule.
+    Night Owl hours, and the Retreat Rule.
     """
     events = itinerary.get("events", [])
     if not events:
@@ -207,15 +207,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                     if not (datetime.time(20, 0) <= dinner_time <= datetime.time(23, 0)):
                         errors.append(f"FAIL: Night Owl dinner violation on {day}. Dinner at {dinner_time} (expected 20:00-23:00).")
 
-        # 3. Location Clustering Check (Relaxed)
-        if risk_tolerance.lower() == "relaxed":
-            # Clustering refers to the city or travel zone, not individual venues
-            zones = {e.get("details", {}).get("city") or e.get("details", {}).get("travel_zone") 
-                     for e in day_events if e.get("details", {}).get("city") or e.get("details", {}).get("travel_zone")}
-            if len(zones) > 1:
-                errors.append(f"FAIL: Clustering violation on {day}. Found multiple zones: {zones}")
-
-        # 4. The "Retreat" Rule Check (Relaxed)
+        # 3. The "Retreat" Rule Check (Relaxed)
         if risk_tolerance.lower() == "relaxed":
             dinner_idx = next((i for i, e in enumerate(day_events) 
                              if e.get("segment") == "DINING" and e.get("details", {}).get("category") == "Dinner"), -1)
@@ -379,7 +371,7 @@ def validate_itinerary_structure(itinerary: dict, risk_tolerance: str, circadian
                         current_city = dest_city
 
     if not errors:
-        print("  Result: PASS - Structure adheres to clustering and temporal rules.\n")
+        print("  Result: PASS - Structure adheres to temporal rules.\n")
     else:
         for err in errors:
             print(f"  {err}")

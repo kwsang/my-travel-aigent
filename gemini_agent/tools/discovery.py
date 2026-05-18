@@ -7,18 +7,16 @@ import re
 import ast
 from typing import Optional, Any
 from google.adk.agents.invocation_context import InvocationContext
+from gemini_agent.logic.utils import _parse_json_or_literal, _extract_list_from_payload, get_state_context
 
 logger = logging.getLogger(__name__)
 
+_IN_FLIGHT_DISCOVERY = {}
+
 def _get_active_destination(provided_name: str, tool_context: InvocationContext) -> str:
-    if tool_context:
-        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
-        itinerary = state.get("final_itinerary") or {}
-        if isinstance(itinerary, str):
-            try: itinerary = json.loads(itinerary)
-            except: itinerary = {}
-        if itinerary.get("destination"):
-            return itinerary.get("destination")
+    itinerary, _ = get_state_context(tool_context)
+    if itinerary.get("destination"):
+        return itinerary.get("destination")
     return provided_name
 
 def _build_destination_query(dest_str: str) -> dict:
@@ -26,44 +24,9 @@ def _build_destination_query(dest_str: str) -> dict:
     parts = [p.strip() for p in clean_str.split(',')]
     safe_name = re.escape(parts[0])
     query = {"name": {"$regex": f"^{safe_name}", "$options": "i"}}
-    if len(parts) > 1:
-        safe_state = re.escape(parts[1][:2])
-        query["state"] = {"$regex": f"^{safe_state}", "$options": "i"}
+    # State abbreviations (e.g., 'VA' vs 'Virginia') frequently cause MongoDB cache misses.
+    # Relying exclusively on the city name prevents the UI poller from erroneously triggering duplicate seeds.
     return query
-
-def _parse_json_or_literal(raw_str: str, default_val: Any) -> Any:
-    if not isinstance(raw_str, str):
-        return raw_str
-    s = raw_str.strip()
-    if not s:
-        return default_val
-        
-    # Clean up non-breaking spaces (LLM formatting hallucination)
-    s = s.replace('\xa0', ' ')
-
-    match = re.search(r'```(?:json)?\s*(.*?)\s*```', s, re.DOTALL | re.IGNORECASE)
-    if match:
-        s = match.group(1).strip()
-        
-    # Auto-fix truncated JSON arrays common in LLM outputs
-    if s.startswith('[') and not s.endswith(']'):
-        s += ']'
-    elif s.startswith('{') and not s.endswith('}'):
-        s += '}'
-
-    # 1. Try JSON parsing. Replace invalid single-quote escapes first.
-    try:
-        s_json = s.replace("\\'", "'")
-        return json.loads(s_json, strict=False)
-    except json.JSONDecodeError:
-        # 2. Fallback to Python literal evaluation
-        try:
-            s_py = re.sub(r'\btrue\b', 'True', s)
-            s_py = re.sub(r'\bfalse\b', 'False', s_py)
-            s_py = re.sub(r'\bnull\b', 'None', s_py)
-            return ast.literal_eval(s_py)
-        except Exception:
-            raise ValueError(f"Could not parse string as JSON or Python literal. String was: {s[:100]}...")
 
 VALID_VIBES = [
     "historic", "coastal", "romantic", "city", "urban", "mountain", 
@@ -115,8 +78,7 @@ async def _generate_item_tags(item: dict, valid_tags: list, item_type: str):
             model='gemini-2.5-flash',
             contents=prompt
         )
-        suggested = [t.strip().lower() for t in resp.text.split(',')]
-        item["vibe_tags"] = [t for t in suggested if t in valid_tags]
+        item["vibe_tags"] = [t for t in valid_tags if t in resp.text.lower()]
     except Exception:
         item["vibe_tags"] = []
 
@@ -125,16 +87,10 @@ async def search_destinations(query: str, tool_context: InvocationContext) -> st
     Performs a semantic search for travel destinations (strictly cities and towns).
     """
     enhanced_query = query
-    if tool_context:
-        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
-        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
-        if isinstance(profile, str):
-            try: profile = json.loads(profile)
-            except: profile = {}
-            
-        interests = profile.get("interests", [])
-        if interests:
-            enhanced_query += f" matching interests: {', '.join(interests)}"
+    _, profile = get_state_context(tool_context)
+    interests = profile.get("interests", [])
+    if interests:
+        enhanced_query += f" matching interests: {', '.join(interests)}"
 
     try:
         if voyage_client is None:
@@ -164,10 +120,7 @@ async def search_destinations(query: str, tool_context: InvocationContext) -> st
     except Exception as e:
         return f"Error during semantic search: {str(e)}"
 
-async def discover_new_destination(vibe_or_city: str) -> str:
-    """
-    Autonomous Producer Tool: Discovers and seeds a new city destination into MongoDB.
-    """
+async def _discover_new_destination_impl(vibe_or_city: str) -> str:
     try:
         if discovery_client is None:
             return "Error: Discovery model service is currently unavailable."
@@ -179,8 +132,10 @@ async def discover_new_destination(vibe_or_city: str) -> str:
             return "Error: Voyage AI service is currently unavailable."
 
         prompt = (
-            f"Based on the input '{vibe_or_city}', identify the single most relevant major or popular "
-            "destination. Return only the name in 'City, State, Country' format."
+            f"Based on the input '{vibe_or_city}', identify the target city. "
+            "If the input is already a specific city, return that exact city. "
+            "If the input is a vague vibe or region, identify the single most relevant major or popular destination. "
+            "Return only the name in 'City, State, Country' format."
         )
         response = await discovery_client.aio.models.generate_content(
             model='gemini-2.5-flash',
@@ -226,8 +181,7 @@ async def discover_new_destination(vibe_or_city: str) -> str:
                 model='gemini-2.5-flash',
                 contents=vibe_prompt
             )
-            suggested_tags = [t.strip().lower() for t in vibe_response.text.split(',')]
-            vibe_tags = [t for t in suggested_tags if t in VALID_VIBES]
+            vibe_tags = [t for t in VALID_VIBES if t in vibe_response.text.lower()]
         except Exception:
             vibe_tags = []
             
@@ -249,6 +203,38 @@ async def discover_new_destination(vibe_or_city: str) -> str:
     except Exception as e:
         return f"Discovery failed: {str(e)}"
 
+async def discover_new_destination(vibe_or_city: str) -> str:
+    """
+    Autonomous Producer Tool: Discovers and seeds a new city destination into MongoDB.
+    """
+    key = vibe_or_city.lower().strip()
+    if key in _IN_FLIGHT_DISCOVERY:
+        logger.info(f"Auto-seeding for '{vibe_or_city}' is already in progress. Waiting for it to finish to prevent duplicates...")
+        try:
+            return await asyncio.wait_for(_IN_FLIGHT_DISCOVERY[key], timeout=60.0)
+        except asyncio.TimeoutError:
+            return "Discovery failed: Request timed out waiting for in-flight operation."
+        except Exception as e:
+            return f"Discovery failed: {str(e)}"
+
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    _IN_FLIGHT_DISCOVERY[key] = future
+
+    try:
+        result = await asyncio.wait_for(_discover_new_destination_impl(vibe_or_city), timeout=60.0)
+        future.set_result(result)
+        return result
+    except asyncio.TimeoutError:
+        err = TimeoutError("Destination discovery process timed out.")
+        future.set_exception(err)
+        return f"Discovery failed: {str(err)}"
+    except Exception as e:
+        future.set_exception(e)
+        return f"Discovery failed: {str(e)}"
+    finally:
+        _IN_FLIGHT_DISCOVERY.pop(key, None)
+
 async def save_destination_lodging(destination_name: str, lodging: str, tool_context: InvocationContext) -> str:
     """
     Saves a list of suggested lodging to a specific destination in the atlas.
@@ -263,12 +249,28 @@ async def save_destination_lodging(destination_name: str, lodging: str, tool_con
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
             
-        parsed_lodging = []
-        if isinstance(lodging, str):
-            try: parsed_lodging = _parse_json_or_literal(lodging, [])
-            except Exception as e: return f"Error parsing 'lodging' JSON: {str(e)}"
-        elif isinstance(lodging, list):
-            parsed_lodging = lodging
+        parsed_lodging = _extract_list_from_payload(lodging)
+        if not parsed_lodging:
+            logger.warning(f"save_destination_lodging received empty or unparseable lodging data: {lodging}")
+            return "Error: No valid lodging data provided to save. Ensure you pass a JSON list."
+
+        # Hydrate missing fields (like 'geo' coordinates) from the in-memory venue cache
+        if tool_context:
+            state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
+            venue_cache = state.get("_venue_cache", {})
+            for acc in parsed_lodging:
+                name = acc.get("name")
+                if name:
+                    cached = venue_cache.get(name)
+                    if not cached: # Fallback to fuzzy case-insensitive match
+                        for c_name, c_data in venue_cache.items():
+                            if name.lower() in c_name.lower() or c_name.lower() in name.lower():
+                                cached = c_data
+                                break
+                    if cached:
+                        for k, v in cached.items():
+                            if k not in acc:
+                                acc[k] = v
 
         # Concurrently generate vibe tags for all incoming lodging
         tasks = [_generate_item_tags(acc, VALID_LODGING_TAGS, "lodging") for acc in parsed_lodging]
@@ -311,12 +313,28 @@ async def save_destination_activities(destination_name: str, activities: str, to
         if destinations_collection is None:
             return "Error: Destination database connection is currently unavailable."
             
-        parsed_activities = []
-        if isinstance(activities, str):
-            try: parsed_activities = _parse_json_or_literal(activities, [])
-            except Exception as e: return f"Error parsing 'activities' JSON: {str(e)}"
-        elif isinstance(activities, list):
-            parsed_activities = activities
+        parsed_activities = _extract_list_from_payload(activities)
+        if not parsed_activities:
+            logger.warning(f"save_destination_activities received empty or unparseable activities data: {activities}")
+            return "Error: No valid activities data provided to save. Ensure you pass a JSON list."
+
+        # Hydrate missing fields (like 'geo' coordinates) from the in-memory venue cache
+        if tool_context:
+            state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
+            venue_cache = state.get("_venue_cache", {})
+            for act in parsed_activities:
+                name = act.get("name")
+                if name:
+                    cached = venue_cache.get(name)
+                    if not cached: # Fallback to fuzzy case-insensitive match
+                        for c_name, c_data in venue_cache.items():
+                            if name.lower() in c_name.lower() or c_name.lower() in name.lower():
+                                cached = c_data
+                                break
+                    if cached:
+                        for k, v in cached.items():
+                            if k not in act:
+                                act[k] = v
 
         # Concurrently generate vibe tags for all incoming activities
         tasks = [_generate_item_tags(act, VALID_ACTIVITY_TAGS, "activity") for act in parsed_activities]

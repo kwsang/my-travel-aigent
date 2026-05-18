@@ -95,6 +95,7 @@ async def chat(
             queue = asyncio.Queue()
 
             async def run_agent():
+                agent_error = None
                 try:
                     # 1. Process Message via Runner
                     async for event in runner.run_async(
@@ -124,6 +125,11 @@ async def chat(
                                 "itinerary": intermediate_doc
                             }, default=str) + "\n")
 
+                except Exception as e:
+                    logger.exception("CRITICAL: Error in agent runner task")
+                    agent_error = e
+
+                try:
                     # 2. Retrieve the updated session state to extract the final response and check conflicts
                     session = await runner.session_service.get_session(
                         app_name="my_travel_aigent",
@@ -144,7 +150,9 @@ async def chat(
                                     break
 
                     # Fallback if the agent executed a tool but didn't generate conversational text
-                    if not agent_text.strip():
+                    if agent_error:
+                        agent_text = "I hit an unexpected snag while planning (likely a network timeout or token limit), but I safely saved my progress up to this point! Just tell me to 'continue' and I'll pick up exactly where I left off."
+                    elif not agent_text.strip():
                         agent_text = "I have updated your itinerary based on your request! What would you like to adjust next?"
 
                     logger.info(f"Agent response for session {request.session_id}: {agent_text}")
@@ -240,11 +248,11 @@ async def chat(
                         "traveler_profile": user_profile if isinstance(user_profile, dict) else None
                     }, default=str) + "\n")
 
-                except Exception as e:
-                    logger.exception("CRITICAL: Error in agent runner task")
+                except Exception as e2:
+                    logger.exception("CRITICAL: Error during session finalization")
                     queue.put_nowait(json.dumps({
                         "type": "error",
-                        "message": f"Agent execution error: {str(e)}"
+                        "message": f"Agent execution error: {str(e2)}"
                     }) + "\n")
                 finally:
                     queue.put_nowait(None)  # Sentinel to end the stream

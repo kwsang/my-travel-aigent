@@ -7,42 +7,9 @@ from typing import Any, Optional
 from gemini_agent.clients import destinations_collection
 from gemini_agent.logic.models import Itinerary
 from google.adk.agents.invocation_context import InvocationContext
+from gemini_agent.logic.utils import _parse_json_or_literal, _extract_list_from_payload
 
 logger = logging.getLogger(__name__)
-
-def _parse_json_or_literal(raw_str: str, default_val: Any) -> Any:
-    if not isinstance(raw_str, str):
-        return raw_str
-    s = raw_str.strip()
-    if not s:
-        return default_val
-        
-    # Clean up non-breaking spaces (LLM formatting hallucination)
-    s = s.replace('\xa0', ' ')
-
-    match = re.search(r'```(?:json)?\s*(.*?)\s*```', s, re.DOTALL | re.IGNORECASE)
-    if match:
-        s = match.group(1).strip()
-        
-    # Auto-fix truncated JSON arrays common in LLM outputs
-    if s.startswith('[') and not s.endswith(']'):
-        s += ']'
-    elif s.startswith('{') and not s.endswith('}'):
-        s += '}'
-
-    # 1. Try JSON parsing. Replace invalid single-quote escapes first.
-    try:
-        s_json = s.replace("\\'", "'")
-        return json.loads(s_json, strict=False)
-    except json.JSONDecodeError:
-        # 2. Fallback to Python literal evaluation
-        try:
-            s_py = re.sub(r'\btrue\b', 'True', s)
-            s_py = re.sub(r'\bfalse\b', 'False', s_py)
-            s_py = re.sub(r'\bnull\b', 'None', s_py)
-            return ast.literal_eval(s_py)
-        except Exception:
-            raise ValueError(f"Could not parse string as JSON or Python literal. String was: {s[:100]}...")
 
 async def save_itinerary(
     events: str,
@@ -77,15 +44,9 @@ async def save_itinerary(
         if not existing_state:
             existing_state = {}
 
-        parsed_events = []
-        if isinstance(events, str):
-            try: 
-                parsed_events = _parse_json_or_literal(events, [])
-            except Exception as e:
-                logger.error(f"Error parsing 'events' JSON: {str(e)}")
-                return f"Error parsing 'events' JSON: {str(e)}"
-        elif isinstance(events, list):
-            parsed_events = events
+        parsed_events = _extract_list_from_payload(events)
+        if events and not parsed_events:
+            logger.warning(f"save_itinerary received unparseable events data: {events}")
             
         parsed_lodging = None
         if isinstance(lodging, str):

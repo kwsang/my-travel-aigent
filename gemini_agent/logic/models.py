@@ -44,7 +44,7 @@ class EventDetails(BaseModel):
     description: Optional[str] = Field(None, description="Description of the venue or event.")
     image_url: Optional[str] = Field(None, description="Image URL for the venue.")
     category: Optional[str] = Field(None, description="Broad category (e.g., Museum, Fine Dining).")
-    city: Optional[str] = Field(None, description="Primary city for clustering logic.")
+    city: Optional[str] = Field(None, description="Primary city.")
     travel_zone: Optional[str] = Field(None, description="Micro-location zone within a city.")
     geo: Optional[GeoCoordinates] = Field(None, description="Geographic coordinates of the venue or location.")
     price: Optional[Price] = None

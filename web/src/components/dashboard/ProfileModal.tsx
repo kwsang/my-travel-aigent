@@ -509,6 +509,12 @@ function LocationAutocomplete({ value, onChange }: { value: string, onChange: (v
 
     containerRef.current.innerHTML = '';
     const autocomplete = new (places as any).PlaceAutocompleteElement();
+
+    const inputElement = document.createElement('input');
+    inputElement.type = 'text';
+    inputElement.placeholder = 'e.g. New York, USA';
+    autocomplete.appendChild(inputElement);
+
     containerRef.current.appendChild(autocomplete);
 
     const listener = (e: any) => {

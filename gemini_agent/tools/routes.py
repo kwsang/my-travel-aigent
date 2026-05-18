@@ -4,8 +4,16 @@ import asyncio
 import uuid
 import urllib.request
 import urllib.error
+import logging
 from typing import Optional
 from google.adk.agents.invocation_context import InvocationContext
+from gemini_agent.logic.utils import get_state_context, anchor_location
+from gemini_agent.logic.cache import LRUTTLCache
+
+logger = logging.getLogger(__name__)
+
+_ROUTES_CACHE = LRUTTLCache()
+_IN_FLIGHT_ROUTES = {}
 
 def _fetch_route_sync(origin: str, destination: str, travel_mode: str) -> str:
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
@@ -74,33 +82,48 @@ async def get_route_directions(origin: str, destination: str, tool_context: Invo
         destination: The ending location address or place name.
         travel_mode: The mode of transportation. Can be 'DRIVE', 'BICYCLE', 'WALK', or 'TRANSIT'.
     """
-    trip_destination = None
-    starting_location = None
-    if tool_context:
-        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
-        itinerary = state.get("final_itinerary") or {}
-        if isinstance(itinerary, str):
-            try: itinerary = json.loads(itinerary)
-            except: itinerary = {}
-        trip_destination = itinerary.get("destination")
-        
-        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
-        if isinstance(profile, str):
-            try: profile = json.loads(profile)
-            except: profile = {}
-        starting_location = profile.get("preferences", {}).get("starting_location")
+    itinerary, profile = get_state_context(tool_context)
+    trip_destination = itinerary.get("destination")
+    starting_location = profile.get("preferences", {}).get("starting_location")
 
     if trip_destination:
-        def anchor_loc(loc: str) -> str:
-            if not any(c.isalpha() for c in str(loc)): return loc # Skip coordinates (e.g. "47.6,-122.3")
-            if trip_destination.lower() in str(loc).lower(): return loc # Skip already anchored strings
-            if starting_location and starting_location.split(',')[0].strip().lower() in str(loc).lower(): return loc # Skip the starting location
-            return f"{loc} in {trip_destination}"
-            
-        origin = anchor_loc(origin)
-        destination = anchor_loc(destination)
+        origin = anchor_location(origin, trip_destination, starting_location)
+        destination = anchor_location(destination, trip_destination, starting_location)
 
-    raw_result = await asyncio.to_thread(_fetch_route_sync, origin, destination, travel_mode)
+    cache_key = (origin, destination, travel_mode)
+    cached_result = _ROUTES_CACHE.get(cache_key)
+    
+    if cached_result is not None:
+        raw_result = cached_result
+    elif cache_key in _IN_FLIGHT_ROUTES:
+        logger.info(f"get_route_directions for '{origin}' to '{destination}' is already in progress. Waiting...")
+        try:
+            raw_result = await asyncio.wait_for(_IN_FLIGHT_ROUTES[cache_key], timeout=30.0)
+        except asyncio.TimeoutError:
+            return "Error computing route: Request timed out waiting for in-flight operation."
+        except Exception as e:
+            return f"Error computing route: {str(e)}"
+    else:
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+        _IN_FLIGHT_ROUTES[cache_key] = future
+        try:
+            raw_result = await asyncio.wait_for(
+                asyncio.to_thread(_fetch_route_sync, origin, destination, travel_mode),
+                timeout=30.0
+            )
+            _ROUTES_CACHE.set(cache_key, raw_result)
+            future.set_result(raw_result)
+        except asyncio.TimeoutError:
+            err = TimeoutError("Google Routes API request timed out.")
+            future.set_exception(err)
+            return f"Exception occurred while calling Routes API: {str(err)}"
+        except Exception as e:
+            future.set_exception(e)
+            return f"Exception occurred while calling Routes API: {str(e)}"
+        finally:
+            _IN_FLIGHT_ROUTES.pop(cache_key, None)
+            
     try:
         res_dict = json.loads(raw_result)
         if "polyline" in res_dict:

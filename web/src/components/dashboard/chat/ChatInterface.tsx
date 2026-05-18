@@ -40,6 +40,23 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
   const isProcessingRef = useRef(false);
   const isMessagesHoveredRef = useRef(false);
   const prevMessagesLengthRef = useRef(messages.length);
+  
+  const messageQueueRef = useRef<{
+    userMessage: string,
+    itineraryDelta?: any,
+    profileDelta?: any,
+    displayMessage?: string
+  }[]>([]);
+
+  const latestItineraryRef = useRef(itinerary);
+  useEffect(() => {
+    latestItineraryRef.current = itinerary;
+  }, [itinerary]);
+
+  const latestProfileRef = useRef(profile);
+  useEffect(() => {
+    latestProfileRef.current = profile;
+  }, [profile]);
 
   // Fetch history when session changes
   useEffect(() => {
@@ -127,8 +144,27 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isHovered]);
 
-  const sendMessage = useCallback(async (userMessage: string, overrideItinerary?: any, overrideProfile?: any, displayMessage?: string) => {
-    if (isProcessingRef.current) return;
+  const sendMessage = useCallback(async (
+    userMessage: string, 
+    overrideItinerary?: any, 
+    overrideProfile?: any, 
+    displayMessage?: string,
+    isFromQueue: boolean = false
+  ) => {
+    if (isProcessingRef.current && !isFromQueue) {
+      messageQueueRef.current.push({
+        userMessage,
+        itineraryDelta: overrideItinerary,
+        profileDelta: overrideProfile,
+        displayMessage
+      });
+      return;
+    }
+
+    // Merge the exact properties that changed over the very latest state
+    let finalItinerary = { ...(isFromQueue ? latestItineraryRef.current : itinerary), ...(overrideItinerary || {}) };
+    let finalProfile = { ...(isFromQueue ? latestProfileRef.current : profile), ...(overrideProfile || {}) };
+
     isProcessingRef.current = true;
     window.dispatchEvent(new CustomEvent('travel_aigent_generation_start'));
 
@@ -147,8 +183,8 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
           message: userMessage,
           session_id: sessionId,
           user_id: userId,
-          traveler_profile: overrideProfile || profile,
-          itinerary: overrideItinerary || itinerary,
+          traveler_profile: finalProfile,
+          itinerary: finalItinerary,
         }),
       });
 
@@ -213,6 +249,16 @@ export default function ChatInterface({ sessionId, userId, onMessageReceived }: 
       setIsLoading(false);
       isProcessingRef.current = false;
       window.dispatchEvent(new CustomEvent('travel_aigent_generation_end'));
+
+      // Process next in queue
+      if (messageQueueRef.current.length > 0) {
+        const nextMsg = messageQueueRef.current.shift();
+        if (nextMsg) {
+          setTimeout(() => {
+            sendMessage(nextMsg.userMessage, nextMsg.itineraryDelta, nextMsg.profileDelta, nextMsg.displayMessage, true);
+          }, 100);
+        }
+      }
     }
   }, [sessionId, userId, profile, itinerary, onMessageReceived]);
 

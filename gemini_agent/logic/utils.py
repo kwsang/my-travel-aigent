@@ -1,6 +1,9 @@
 from typing import Any
 import logging
 import asyncio
+import json
+import re
+import ast
 from bson import ObjectId
 from gemini_agent.clients import gmaps_client, places_client, destinations_collection
 
@@ -35,6 +38,82 @@ def calculate_travel_time(origin: Any, destination: Any) -> tuple[int, float, st
     except Exception as e:
         logger.error(f"Failed to calculate travel time from {origin} to {destination}: {e}")
     return 0, 0.0, "unknown"
+
+def _parse_json_or_literal(raw_str: str, default_val: Any) -> Any:
+    if not isinstance(raw_str, str):
+        return raw_str
+    s = raw_str.strip()
+    if not s:
+        return default_val
+        
+    # Clean up non-breaking spaces (LLM formatting hallucination)
+    s = s.replace('\xa0', ' ')
+
+    match = re.search(r'```(?:json)?\s*(.*?)\s*```', s, re.DOTALL | re.IGNORECASE)
+    if match:
+        s = match.group(1).strip()
+        
+    # Auto-fix truncated JSON arrays common in LLM outputs
+    if s.startswith('[') and not s.endswith(']'):
+        s += ']'
+    elif s.startswith('{') and not s.endswith('}'):
+        s += '}'
+
+    # 1. Try JSON parsing. Replace invalid single-quote escapes first.
+    try:
+        s_json = s.replace("\\'", "'")
+        return json.loads(s_json, strict=False)
+    except json.JSONDecodeError:
+        # 2. Fallback to Python literal evaluation
+        try:
+            s_py = re.sub(r'\btrue\b', 'True', s)
+            s_py = re.sub(r'\bfalse\b', 'False', s_py)
+            s_py = re.sub(r'\bnull\b', 'None', s_py)
+            return ast.literal_eval(s_py)
+        except Exception:
+            raise ValueError(f"Could not parse string as JSON or Python literal. String was: {s[:100]}...")
+
+def _extract_list_from_payload(payload: Any) -> list:
+    if isinstance(payload, str):
+        try: 
+            payload = _parse_json_or_literal(payload, [])
+        except Exception:
+            pass
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    elif isinstance(payload, dict):
+        for v in payload.values():
+            if isinstance(v, list):
+                return [item for item in v if isinstance(item, dict)]
+        return [payload]
+    return []
+
+def get_state_context(tool_context: Any) -> tuple[dict, dict]:
+    """Safely extracts the itinerary and profile dictionaries from the agent's tool context state."""
+    if not tool_context:
+        return {}, {}
+        
+    state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
+    
+    itinerary = state.get("final_itinerary") or {}
+    if isinstance(itinerary, str):
+        try: itinerary = json.loads(itinerary)
+        except Exception: itinerary = {}
+        
+    profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
+    if isinstance(profile, str):
+        try: profile = json.loads(profile)
+        except Exception: profile = {}
+        
+    return itinerary, profile
+
+def anchor_location(loc: str, destination: str, starting_location: str = None) -> str:
+    """Appends the destination to a location string for geographic anchoring, preventing LLM hallucinations."""
+    if not loc or not destination: return loc
+    if not any(c.isalpha() for c in str(loc)): return loc # Skip raw coordinates
+    if destination.lower() in str(loc).lower(): return loc # Skip already anchored strings
+    if starting_location and starting_location.split(',')[0].strip().lower() in str(loc).lower(): return loc # Skip the starting location
+    return f"{loc} in {destination}"
 
 def parse_price_level(pl) -> int:
     """Helper to safely convert Google Places price levels to an integer from 1 to 4."""

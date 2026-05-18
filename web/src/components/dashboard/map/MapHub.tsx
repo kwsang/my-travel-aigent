@@ -83,9 +83,13 @@ function MapInner() {
   const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   
   const showToast = React.useCallback((title: string, desc: string) => {
-    setActionToast({ title, desc });
+    setActionToast(null);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    toastTimeoutRef.current = setTimeout(() => setActionToast(null), 4000);
+    
+    setTimeout(() => {
+      setActionToast({ title, desc });
+      toastTimeoutRef.current = setTimeout(() => setActionToast(null), 4000);
+    }, 10);
   }, []);
 
   React.useEffect(() => {
@@ -441,6 +445,7 @@ function MapInner() {
       {!itinerary.destination && isLoaded && (
         <MapSearchBar
           type="regions"
+          instruction="1. Select a Destination"
           placeholder="Where do you want to go?"
           onPlaceSelected={(place) => handleSelectDestination(place.formatted_address || place.name)}
         />
@@ -450,6 +455,7 @@ function MapInner() {
       {!!itinerary.destination && !itinerary.lodging && isLoaded && (
         <MapSearchBar
           type="establishment"
+          instruction="2. Choose Your Lodging"
           placeholder="Search for a hotel or lodging..."
           onPlaceSelected={handleMapAddLodging}
         />
@@ -459,6 +465,7 @@ function MapInner() {
       {!!itinerary.destination && !!itinerary.lodging && isLoaded && (
         <MapSearchBar
           type="establishment"
+          instruction="3. Add Activities & Dining"
           placeholder="Search for an activity or dining venue..."
           onPlaceSelected={(place) => {
             setActiveSuggestion({
@@ -482,7 +489,9 @@ function MapInner() {
       {!isLoaded && <MapLoadingState />}
 
       {/* Subtle Action Toast */}
-      <MapActionToast actionToast={actionToast} />
+      <MapActionToast actionToast={actionToast || (!!itinerary.destination && !itinerary.lodging && (!destinationInfo?.suggested_lodging || destinationInfo.suggested_lodging.length === 0) 
+        ? { title: 'Agent is working...', desc: 'Finding lodging to suggest' } 
+        : null)} />
     </>
   );
 }

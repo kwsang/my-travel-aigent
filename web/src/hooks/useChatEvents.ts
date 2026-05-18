@@ -13,9 +13,8 @@ export function useChatEvents(
       const customEvent = e as CustomEvent<any>;
       const { item, originalDay, targetDay, updatedSegments } = customEvent.detail;
       
-      if (!isLoading && item) {
+      if (item) {
         const itemName = item.details?.name || item.segment || 'an event';
-        const updatedItinerary = { ...itinerary, events: updatedSegments };
         
         let actionText = `from Day ${originalDay} to Day ${targetDay}`;
         if (originalDay === targetDay) {
@@ -24,7 +23,7 @@ export function useChatEvents(
 
         sendMessage(
           `I manually dragged and dropped ${itemName} ${actionText}. Please review the updated timeline for any conflicts, adjust the schedule to fit, and verify the budget.`,
-          updatedItinerary,
+          { events: updatedSegments },
           undefined,
           `I moved ${itemName} ${actionText}.`
         );
@@ -41,17 +40,12 @@ export function useChatEvents(
       const customEvent = e as CustomEvent<string>;
       const destination = customEvent.detail;
       
-      if (destination && !isLoading) {
+      if (destination) {
         const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
-        const updatedItinerary = { 
-          ...itinerary, 
-          destination,
-          ...(isDefaultName ? { trip_name: `${destination} Trip` } : {})
-        };
 
         sendMessage(
           `I've selected ${destination} as my destination. Please communicate with the travel_pioneer to determine travel and lodging based on my traveler profile.`, 
-          updatedItinerary,
+          { destination, ...(isDefaultName ? { trip_name: `${destination} Trip` } : {}) },
           undefined,
           `I've selected ${destination}. Can you determine travel and lodging?`
         );
@@ -68,12 +62,8 @@ export function useChatEvents(
       const customEvent = e as CustomEvent<any>;
       const lodging = customEvent.detail;
       
-      if (lodging && !isLoading) {
+      if (lodging) {
         const isReplacement = !!itinerary.lodging;
-        const updatedItinerary = { 
-          ...itinerary, 
-          lodging
-        };
 
         const hiddenMessage = isReplacement 
           ? `I have changed my lodging to ${lodging.name}. Please communicate with the travel_pioneer to update any travel logistics and the activity_planner to rearrange my daily experiences based on this new location. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`
@@ -83,7 +73,7 @@ export function useChatEvents(
           ? `I've changed my lodging to ${lodging.name}. Can you update my trip?`
           : `I've selected ${lodging.name} as my lodging. Can you plan the rest of the trip?`;
 
-        sendMessage(hiddenMessage, updatedItinerary, undefined, displayMessage);
+        sendMessage(hiddenMessage, { lodging }, undefined, displayMessage);
       }
     };
 
@@ -97,10 +87,10 @@ export function useChatEvents(
       const customEvent = e as CustomEvent<any>;
       const { placeName, eventCategory } = customEvent.detail;
       
-      if (placeName && !isLoading) {
+      if (placeName) {
         sendMessage(
           `I found a great ${eventCategory} option on the map called "${placeName}". Please add it to my itinerary at the most appropriate time and day based on my schedule. You MUST also use the save_destination_activities tool to permanently save this venue to the destination's atlas so it is cached for the future.`, 
-          itinerary,
+          undefined,
           undefined,
           `Please add ${placeName} to my itinerary.`
         );
@@ -117,19 +107,15 @@ export function useChatEvents(
       const customEvent = e as CustomEvent<any>;
       const { updatedProfile, targetAgent, changeDesc } = customEvent.detail;
       
-      if (updatedProfile && targetAgent && !isLoading) {
+      if (updatedProfile && targetAgent) {
         if (profileUpdateTimerRef.current) {
           clearTimeout(profileUpdateTimerRef.current);
         }
         
         profileUpdateTimerRef.current = setTimeout(() => {
-          const updatedItinerary = {
-            ...itinerary,
-            budget: updatedProfile.budget || itinerary.budget
-          };
           sendMessage(
             `I've updated my ${changeDesc} in my traveler profile. Please communicate directly with the ${targetAgent} to review and adjust the itinerary if needed.`, 
-            updatedItinerary,
+            { budget: updatedProfile.budget || itinerary.budget },
             updatedProfile,
             `I've updated my ${changeDesc}. Please review the itinerary.`
           );

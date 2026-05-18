@@ -35,6 +35,7 @@ from gemini_agent.tools.tools import (
     search_local_events
 )
 from gemini_agent.tools.routes import get_route_directions
+from gemini_agent.logic.utils import get_state_context
 
 logger = logging.getLogger(__name__)
 
@@ -86,16 +87,7 @@ def create_travel_agent():
 
     # Helper to safely parse stringified JSON states for prompt injection
     def _get_safe_state(ctx: Context):
-        state = getattr(ctx, "state", None) or getattr(ctx.session, "state", None) or {}
-        itinerary = state.get("final_itinerary") or {}
-        if isinstance(itinerary, str):
-            try: itinerary = json.loads(itinerary)
-            except: itinerary = {}
-            
-        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
-        if isinstance(profile, str):
-            try: profile = json.loads(profile)
-            except: profile = {}
+        itinerary, profile = get_state_context(ctx)
             
         if isinstance(itinerary, dict) and "events" in itinerary:
             itinerary = copy.deepcopy(itinerary)
@@ -284,10 +276,15 @@ def create_travel_agent():
                 has_transport = any(e.get("segment") in ["TRANSPORT", "FLIGHT"] for e in events)
                 has_activities = any(e.get("segment") in ["EXPERIENCE", "DINING"] for e in events)
                 
+                target_duration = profile_data.get("preferences", {}).get("target_duration_days", 0)
+                max_day_planned = max([e.get("day", 0) for e in events if e.get("segment") in ["EXPERIENCE", "DINING"]], default=0)
+                
                 if has_lodging and has_transport and not has_activities:
                     handoff_context += f"{map_context} Initial lodging and transport are settled. You MUST invoke the 'call_activity_planner' tool to schedule daily experiences and dining."
                 elif itinerary_data.get("lodging") and not has_lodging:
                     handoff_context += f"{map_context} The user has selected their lodging, but lodging events have not been scheduled yet. You MUST invoke the 'call_travel_pioneer' tool to schedule lodging check-in/out and any missing transit."
+                elif has_activities and target_duration and max_day_planned < target_duration:
+                    handoff_context += f"{map_context} The itinerary is partially planned (activities scheduled up to Day {max_day_planned} of {target_duration}). You MUST invoke the 'call_activity_planner' tool to continue scheduling the remaining days."
                 else:
                     handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
             elif itinerary_data.get("lodging"):

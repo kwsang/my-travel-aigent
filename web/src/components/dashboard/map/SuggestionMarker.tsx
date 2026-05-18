@@ -34,9 +34,9 @@ export default function SuggestionMarker({ place, idx, type, onClick }: Suggesti
     shadowHoverClass = 'group-hover:shadow-violet-500/30';
   } else if (isDining) {
     Icon = Utensils;
-    bgClass = 'bg-amber-500';
-    borderHoverClass = 'group-hover:border-amber-300';
-    shadowHoverClass = 'group-hover:shadow-amber-500/30';
+    bgClass = 'bg-red-500';
+    borderHoverClass = 'group-hover:border-red-300';
+    shadowHoverClass = 'group-hover:shadow-red-500/30';
   }
 
   return (

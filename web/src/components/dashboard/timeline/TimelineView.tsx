@@ -154,13 +154,6 @@ export default function TimelineView() {
   const segmentsByDay = React.useMemo(() => {
     const grouped = new Map<number, { event: Event; absoluteIndex: number; time: number }[]>();
     segments.forEach((event, absoluteIndex) => {
-      // Hide transfer transports entirely, except for rentals and airport transfers
-      const isTransport = event.segment === 'TRANSPORT';
-      const isRental = event.details?.is_rental;
-      const isAirportTransfer = event.details?.name?.toLowerCase().includes('airport') || 
-                                event.details?.description?.toLowerCase().includes('airport');
-
-      if (isTransport && !isRental && !isAirportTransfer) return;
 
       if (!grouped.has(event.day)) grouped.set(event.day, []);
       const time = event.schedule?.local_start_time ? new Date(event.schedule.local_start_time).getTime() : 0;
@@ -177,6 +170,16 @@ export default function TimelineView() {
     days = Array.from({ length: maxDay }, (_, i) => i + 1);
   }
   const hasAnyCollapsed = expandedDays.size < days.length;
+
+  // Calculate the current progress of the agent
+  const maxDayPlanned = React.useMemo(() => {
+    const activityDays = segments
+      .filter(s => ['EXPERIENCE', 'DINING'].includes(s.segment))
+      .map(s => s.day);
+    return activityDays.length > 0 ? Math.max(...activityDays) : 0;
+  }, [segments]);
+
+  const planningProgress = targetDuration > 0 ? Math.max(5, Math.min(100, Math.round((maxDayPlanned / targetDuration) * 100))) : (isGenerating ? 100 : 0);
 
   if (segments.length === 0 && days.length === 0) {
     if (isGenerating) {
@@ -210,6 +213,27 @@ export default function TimelineView() {
       )}
       
       <TimelineHeader profile={profile} />
+
+      {/* Agent Planning Progress Bar */}
+      {isGenerating && (
+        <div className="flex flex-col gap-2 -mt-4 mb-2 animate-in fade-in slide-in-from-top-2 duration-500">
+          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-primary">
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Agent is planning...
+            </span>
+            {targetDuration > 0 && <span>{Math.min(maxDayPlanned, targetDuration)} / {targetDuration} Days</span>}
+          </div>
+          <div className="w-full bg-primary/10 rounded-full h-1.5 overflow-hidden">
+            <div 
+              className="h-full bg-primary transition-all duration-1000 ease-out rounded-full relative overflow-hidden"
+              style={{ width: `${targetDuration > 0 ? planningProgress : 100}%` }}
+            >
+              <div className="absolute inset-0 bg-white/20 w-full animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global Validation Errors / Budget Warnings Banner */}
       <TimelineGlobalErrors errors={globalErrors} />

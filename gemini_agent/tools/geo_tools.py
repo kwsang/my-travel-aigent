@@ -5,6 +5,7 @@ from typing import Optional
 from gemini_agent.clients import places_client, gmaps_client
 from gemini_agent.logic.cache import LRUTTLCache
 from google.adk.agents.invocation_context import InvocationContext
+from gemini_agent.logic.utils import get_state_context, anchor_location
 
 logger = logging.getLogger(__name__)
 
@@ -13,35 +14,20 @@ _MATRIX_CACHE = LRUTTLCache()
 _PLACES_CACHE = LRUTTLCache()
 _GEOCODE_CACHE = LRUTTLCache()
 
+_IN_FLIGHT_PLACES = {}
+_IN_FLIGHT_MATRIX = {}
+
 async def google_maps_matrix(origins: list[str], destinations: list[str], tool_context: InvocationContext) -> str:
     """
     Calculates real-time driving time and distance between locations.
     """
-    destination = None
-    starting_location = None
-    if tool_context:
-        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
-        itinerary = state.get("final_itinerary") or {}
-        if isinstance(itinerary, str):
-            try: itinerary = json.loads(itinerary)
-            except: itinerary = {}
-        destination = itinerary.get("destination")
-        
-        profile = state.get("traveler_profile") or state.get("user_profile_data") or {}
-        if isinstance(profile, str):
-            try: profile = json.loads(profile)
-            except: profile = {}
-        starting_location = profile.get("preferences", {}).get("starting_location")
+    itinerary, profile = get_state_context(tool_context)
+    destination = itinerary.get("destination")
+    starting_location = profile.get("preferences", {}).get("starting_location")
 
     if destination:
-        def anchor_loc(loc: str) -> str:
-            if not any(c.isalpha() for c in str(loc)): return loc # Skip coordinates (e.g. "47.6,-122.3")
-            if destination.lower() in str(loc).lower(): return loc # Skip already anchored strings
-            if starting_location and starting_location.split(',')[0].strip().lower() in str(loc).lower(): return loc # Skip the starting location
-            return f"{loc} in {destination}"
-            
-        origins = [anchor_loc(o) for o in origins]
-        destinations = [anchor_loc(d) for d in destinations]
+        origins = [anchor_location(o, destination, starting_location) for o in origins]
+        destinations = [anchor_location(d, destination, starting_location) for d in destinations]
 
     logger.info(f"Tool invoked: google_maps_matrix with origins {origins} and destinations {destinations}")
     
@@ -51,22 +37,48 @@ async def google_maps_matrix(origins: list[str], destinations: list[str], tool_c
     if cached_result is not None:
         return cached_result
         
+    if cache_key in _IN_FLIGHT_MATRIX:
+        logger.info(f"google_maps_matrix for {origins} to {destinations} is already in progress. Waiting...")
+        try:
+            return await asyncio.wait_for(_IN_FLIGHT_MATRIX[cache_key], timeout=30.0)
+        except asyncio.TimeoutError:
+            return "Error calculating distance matrix: Request timed out waiting for in-flight operation."
+        except Exception as e:
+            return f"Error calculating distance matrix: {str(e)}"
+
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    _IN_FLIGHT_MATRIX[cache_key] = future
+
     try:
         if gmaps_client is None:
-            return "Error: Google Maps service is currently unavailable."
+            err_msg = "Error: Google Maps service is currently unavailable."
+            future.set_result(err_msg)
+            return err_msg
             
-        matrix = await asyncio.to_thread(
-            gmaps_client.distance_matrix,
-            origins=origins,
-            destinations=destinations,
-            mode="driving",
-            departure_time="now"
+        matrix = await asyncio.wait_for(
+            asyncio.to_thread(
+                gmaps_client.distance_matrix,
+                origins=origins,
+                destinations=destinations,
+                mode="driving",
+                departure_time="now"
+            ),
+            timeout=30.0
         )
         result = json.dumps(matrix)
         _MATRIX_CACHE.set(cache_key, result)
+        future.set_result(result)
         return result
+    except asyncio.TimeoutError:
+        err = TimeoutError("Google Maps Matrix API request timed out.")
+        future.set_exception(err)
+        return f"Error calculating distance matrix: {str(err)}"
     except Exception as e:
+        future.set_exception(e)
         return f"Error calculating distance matrix: {str(e)}"
+    finally:
+        _IN_FLIGHT_MATRIX.pop(cache_key, None)
 
 async def search_places(
     query: str,
@@ -79,23 +91,33 @@ async def search_places(
     Searches for venues, restaurants, or activities using the Google Places API.
     Dynamically enriches the query with user interests to improve semantic relevance.
     """
-    destination = None
-    if tool_context:
-        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
-        itinerary = state.get("final_itinerary") or {}
-        if isinstance(itinerary, str):
-            try: itinerary = json.loads(itinerary)
-            except: itinerary = {}
-        destination = itinerary.get("destination")
+    itinerary, profile = get_state_context(tool_context)
+    destination = itinerary.get("destination")
+    starting_location = profile.get("preferences", {}).get("starting_location")
 
     cache_key = (query, location_type, location_bias, destination, tuple(interests) if interests else None)
     cached_result = _PLACES_CACHE.get(cache_key)
     if cached_result is not None:
         return cached_result
 
+    if cache_key in _IN_FLIGHT_PLACES:
+        logger.info(f"search_places for '{query}' is already in progress. Waiting to prevent duplicates...")
+        try:
+            return await asyncio.wait_for(_IN_FLIGHT_PLACES[cache_key], timeout=30.0)
+        except asyncio.TimeoutError:
+            return "Error searching Google Places: Request timed out waiting for in-flight operation."
+        except Exception as e:
+            return f"Error searching Google Places: {str(e)}"
+
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    _IN_FLIGHT_PLACES[cache_key] = future
+
     try:
         if places_client is None:
-            return "Error: Google Places service is currently unavailable."
+            err_msg = "Error: Google Places service is currently unavailable."
+            future.set_result(err_msg)
+            return err_msg
             
         enhanced_query = query
         if interests:
@@ -106,7 +128,14 @@ async def search_places(
         location_bias_dict = None
 
         if active_location:
-            enhanced_query += f" in {active_location}"
+            is_starting_loc = starting_location and starting_location.split(',')[0].strip().lower() in query.lower()
+            is_dest_loc = active_location.split(',')[0].strip().lower() in query.lower()
+            
+            if not is_starting_loc and not is_dest_loc:
+                enhanced_query += f" in {active_location}"
+            elif is_starting_loc:
+                # Point the spatial bias to the starting location instead of the destination
+                active_location = starting_location
             
             # Geocode the location to get coordinates for a 50km bias circle
             cached_geo = _GEOCODE_CACHE.get(active_location)
@@ -141,10 +170,13 @@ async def search_places(
         if location_type: request["included_type"] = location_type
         if location_bias_dict: request["location_bias"] = location_bias_dict
         
-        response = await asyncio.to_thread(
-            places_client.search_text,
-            request=request, 
-            metadata=[("x-goog-fieldmask", mask)]
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                places_client.search_text,
+                request=request, 
+                metadata=[("x-goog-fieldmask", mask)]
+            ),
+            timeout=30.0
         )
         
         venues = []
@@ -176,24 +208,26 @@ async def search_places(
 
         result_json = json.dumps(venues, default=str)
         _PLACES_CACHE.set(cache_key, result_json)
+        future.set_result(result_json)
         return result_json
+    except asyncio.TimeoutError:
+        err = TimeoutError("Google Places API request timed out.")
+        future.set_exception(err)
+        return f"Error searching Google Places: {str(err)}"
     except Exception as e:
+        future.set_exception(e)
         return f"Error searching Google Places: {str(e)}"
+    finally:
+        _IN_FLIGHT_PLACES.pop(cache_key, None)
 
 async def search_local_events(location: str, tool_context: InvocationContext, query: str = "festivals and events") -> str:
     """
     Searches for current local events, festivals, and happenings in a specific city.
     Useful for providing real-time value and engagement during the user intake process.
     """
-    destination = None
-    if tool_context:
-        state = getattr(tool_context, "state", None) or getattr(tool_context.session, "state", None) or {}
-        itinerary = state.get("final_itinerary") or {}
-        if isinstance(itinerary, str):
-            try: itinerary = json.loads(itinerary)
-            except: itinerary = {}
-        destination = itinerary.get("destination")
-
+    itinerary, _ = get_state_context(tool_context)
+    destination = itinerary.get("destination")
+    
     active_location = destination or location
 
     logger.info(f"Tool invoked: search_local_events in '{active_location}' with query '{query}'")
