@@ -66,7 +66,7 @@ export default function MapMarkers({
         <AdvancedMarker
           position={{ lat: destinationInfo.location.coordinates[1], lng: destinationInfo.location.coordinates[0] }}
           title={itinerary.destination}
-          zIndex={0}
+          zIndex={-1}
         >
           <div className="flex flex-col items-center group transition-transform hover:scale-110 animate-in fade-in zoom-in duration-500 cursor-default">
             <div className="bg-primary/90 border-2 border-white/20 shadow-xl rounded-full w-12 h-12 flex items-center justify-center text-2xl mb-1 transition-colors">

@@ -2,9 +2,10 @@ import React from 'react';
 import { AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Bed, Utensils, Sparkles, Star } from 'lucide-react';
 import { useMapContext } from './MapContext';
+import { SuggestionPlace } from '@/types';
 
 interface SuggestionMarkerProps {
-  place: any;
+  place: SuggestionPlace;
   idx: number;
   type: 'lodging' | 'activity';
   onClick: () => void;

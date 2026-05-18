@@ -41,9 +41,10 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
       const parsed = parseProfileData(initialData);
       // Ensure newly added fields aren't stripped by older parseProfileData utility
       parsed.preferences.start_date = initialData.preferences?.start_date || getTodayString();
-      parsed.preferences.end_date = initialData.preferences?.end_date;
-      parsed.preferences.target_duration_days = initialData.preferences?.target_duration_days;
-      parsed.preferences.starting_location = initialData.preferences?.starting_location;
+      parsed.preferences.end_date = initialData.preferences?.end_date ?? undefined;
+      parsed.preferences.target_duration_days = initialData.preferences?.target_duration_days ?? undefined;
+      parsed.preferences.starting_location = initialData.preferences?.starting_location ?? undefined;
+      parsed.preferences.activity_density = initialData.preferences?.activity_density ?? 'medium';
       
       setFormData(parsed);
       setStartDate(initialData.preferences?.start_date || getTodayString());
@@ -454,7 +455,7 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mt-2">
+      <div className="grid grid-cols-3 gap-4 mt-2">
         <ThemedSelect
           label="Buffer"
           icon={Shield}
@@ -463,11 +464,22 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
           options={PROFILE_OPTIONS.RISK_TOLERANCES}
         />
         <ThemedSelect
-        label="Sleep Type"
+          label="Sleep Type"
           icon={SunMoon}
           value={formData.preferences.circadian_preference}
           onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, circadian_preference: val as 'early_bird' | 'night_owl'}})}
           options={PROFILE_OPTIONS.CIRCADIAN_PREFERENCES}
+        />
+        <ThemedSelect
+          label="Pacing"
+          icon={Zap}
+          value={formData.preferences.activity_density}
+          onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, activity_density: val as 'low' | 'medium' | 'high'}})}
+          options={[
+            { value: 'low', label: 'Relaxed' },
+            { value: 'medium', label: 'Balanced' },
+            { value: 'high', label: 'Packed' }
+          ]}
         />
       </div>
 

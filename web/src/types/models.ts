@@ -1,95 +1,58 @@
-export interface Price {
-  amount: number;
-  currency: string;
-  is_estimated: boolean;
-}
+import type { components } from './generated-api';
 
-export interface Schedule {
-  local_start_time: string;
-  local_end_time?: string;
-  start_time_utc?: string;
-  end_time_utc?: string;
-  timezone: string;
-  estimated_traffic_minutes?: number;
-  applied_buffer_minutes?: number;
-}
+export type Price = components['schemas']['Price'];
+export type Schedule = components['schemas']['Schedule'];
+export type GeoCoordinates = components['schemas']['GeoCoordinates'];
+export type EventDetails = components['schemas']['EventDetails'] & { photo_url?: string; google_maps_uri?: string; notes?: string; };
+export type Budget = components['schemas']['TripBudget'];
+export type TravelerProfile = components['schemas']['TravelerProfile'];
 
-export interface GeoCoordinates {
-  latitude: number;
-  longitude: number;
-}
-
-export interface EventDetails {
+export interface Destination {
   name: string;
-  description?: string;
-  notes?: string;
-  image_url?: string;
-  category?: string;
-  city?: string;
-  travel_zone?: string;
+  state?: string | null;
+  country: string;
+  description: string;
+  location: { type: 'Point'; coordinates: number[] };
+  vibe_tags: string[];
+  price_rating?: number | null;
+  suggested_lodging?: any[];
+  suggested_activities?: any[];
+}
+
+export type Event = components['schemas']['Event'] & { image_url?: string; google_maps_uri?: string; };
+export type Itinerary = components['schemas']['Itinerary'] & { _id?: string; };
+
+export type SegmentType = components['schemas']['Event']['segment'];
+
+export type PriceLevel = 
+  | 'PRICE_LEVEL_UNSPECIFIED'
+  | 'PRICE_LEVEL_FREE'
+  | 'PRICE_LEVEL_INEXPENSIVE'
+  | 'PRICE_LEVEL_MODERATE'
+  | 'PRICE_LEVEL_EXPENSIVE'
+  | 'PRICE_LEVEL_VERY_EXPENSIVE'
+  | 0 | 1 | 2 | 3 | 4;
+
+export interface SuggestionPlace {
+  name?: string;
+  displayName?: { text: string };
+  location?: any;
   geo?: GeoCoordinates;
-  price?: Price;
+  details?: Partial<EventDetails> & { types?: string[]; priceLevel?: PriceLevel };
+  price?: any;
+  priceLevel?: PriceLevel;
+  price_level?: PriceLevel;
+  price_tier?: PriceLevel;
   rating?: number;
+  userRatingCount?: number;
   user_rating_count?: number;
-  is_rental: boolean;
-  vehicle_count: number;
-  polyline?: string;
-}
-
-export type SegmentType =
-  | "TRANSPORT"
-  | "DINING"
-  | "EXPERIENCE"
-  | "LODGING"
-  | "LOGISTICS"
-  | "FLIGHT";
-
-export interface Event {
-  day: number;
-  segment: SegmentType;
-  schedule: Schedule;
-  geo?: GeoCoordinates;
-  details: EventDetails;
-}
-
-export interface Budget {
-  total_limit: number;
-  currency: string;
-}
-
-export interface Itinerary {
-  _id?: string;
-  user_id: string;
-  session_id: string;
-  trip_name: string;
-  duration_days: number;
-  party_size_total: number;
-  events: Event[];
-  budget?: Budget;
-  status?: 'draft' | 'final';
-  destination?: string; // Add this line!
-  lodging?: any;
-  updated_at: string;
-  is_conflict: boolean;
-  validation_errors: string[];
-  traveler_profile?: TravelerProfile;
-}
-
-export interface TravelerProfile {
-  party_size: number;
-  budget?: Budget;
-  preferences: {
-    risk_tolerance: 'relaxed' | 'strict';
-    circadian_preference: 'early_bird' | 'night_owl';
-    group_planning_per_person?: boolean;
-    starting_location?: string;
-    transport_preference?: 'public' | 'rideshare' | 'rental';
-    personal_transport_available?: boolean;
-    start_date?: string;
-    end_date?: string;
-    target_duration_days?: number;
-  };
-  room_sharing?: boolean;
-  people_per_room?: number;
-  interests?: string[];
+  user_ratings_total?: number;
+  image_url?: string;
+  photo_url?: string;
+  photoUri?: string;
+  photos?: Array<{ photoUri?: string; name?: string }>;
+  google_maps_uri?: string;
+  types?: string[];
+  _suggestionType?: 'destination' | 'lodging' | 'activity';
+  [key: string]: any;
 }

@@ -1,5 +1,7 @@
 # End-to-End Test Case: Destination Selection Data Flow
 
+**Status: RESOLVED**
+
 This document traces the data flow across the My-Travel-Aigent stack when a user selects a destination. It specifically maps the sequence of events to debug the "Infinite Loading / Duplicate Destination" bug, reflecting actual application logs.
 
 ## The Scenario
@@ -62,8 +64,8 @@ With two identical documents in the database:
 
 ---
 
-## The Fix
-To fix this permanently, we must relax the regex query so it reliably finds newly inserted documents, and rely on MongoDB to enforce uniqueness.
+## The Fix (Implemented)
+To fix this permanently, we relaxed the regex query so it reliably finds newly inserted documents, and relied on MongoDB to enforce uniqueness.
 
-1. **Relax `_build_destination_query`:** Modify `discovery.py` to match strictly on the primary city name rather than fragile state abbreviations.
-2. **Database Constraint:** Add a **Unique Compound Index** to the MongoDB `destinations` collection on `{"name": 1, "state": 1, "country": 1}`. This guarantees that even if a multi-worker cache stampede occurs, MongoDB will block the duplicate insertion.
+- [x] **Relax `_build_destination_query`:** Modified `discovery.py` to match strictly on the primary city name rather than fragile state abbreviations.
+- [x] **Database Constraint:** Added a **Unique Compound Index** to the MongoDB `destinations` collection on `{"name": 1, "state": 1, "country": 1}`. This guarantees that even if a multi-worker cache stampede occurs, MongoDB will block the duplicate insertion.

@@ -3,7 +3,7 @@
 This test suite is designed to verify that the Gemini reasoning engine correctly applies the rules defined in `DATA_MODEL.md` and `SYSTEM_PROMPT.md`.
 
 ## Calculation Reference
-- **Base Buffer ($B_{base}$):** `(Traffic * M) + 10 minutes` (where $M=1.2$ or $1.5$ for peak).
+- **Base Buffer ($B_{base}$):** `(Estimated Transit * M) + 10 minutes` (where $M=1.2$ or $1.5$ for peak).
 - **Strict Buffer:** `max($B_{base}$, 20 mins)`.
 - **Relaxed Buffer:** `max($B_{base}$ + 15 mins, 40 mins)`.
 
@@ -12,7 +12,7 @@ This test suite is designed to verify that the Gemini reasoning engine correctly
 ## Scenario 1: The Short Hop (Non-Peak)
 **Input:** 
 - **Commute:** Hotel to nearby restaurant.
-- **Traffic Estimate:** 5 minutes.
+- **Transit Estimate:** 5 minutes.
 - **Local Time:** 12:00 PM.
 
 | User Profile | Expected Reasoning | Expected Buffer |
@@ -25,7 +25,7 @@ This test suite is designed to verify that the Gemini reasoning engine correctly
 ## Scenario 2: Standard City Commute (Non-Peak)
 **Input:** 
 - **Commute:** Restaurant to Museum.
-- **Traffic Estimate:** 25 minutes.
+- **Transit Estimate:** 25 minutes.
 - **Local Time:** 2:30 PM.
 
 | User Profile | Expected Reasoning | Expected Buffer |
@@ -38,7 +38,7 @@ This test suite is designed to verify that the Gemini reasoning engine correctly
 ## Scenario 3: Rush Hour Risk
 **Input:** 
 - **Commute:** Experience to Dinner.
-- **Traffic Estimate:** 20 minutes.
+- **Transit Estimate:** 20 minutes.
 - **Local Time:** 5:30 PM (Peak Window).
 
 | User Profile | Expected Reasoning | Expected Buffer |
@@ -51,7 +51,7 @@ This test suite is designed to verify that the Gemini reasoning engine correctly
 ## Scenario 4: Long Distance Transition
 **Input:** 
 - **Commute:** Hotel to Airport.
-- **Traffic Estimate:** 50 minutes.
+- **Transit Estimate:** 50 minutes.
 - **Local Time:** 10:00 AM.
 
 | User Profile | Expected Reasoning | Expected Buffer |

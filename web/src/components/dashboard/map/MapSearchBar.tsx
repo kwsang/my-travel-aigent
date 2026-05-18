@@ -1,14 +1,14 @@
 import React from 'react';
 import { useApiIsLoaded } from '@vis.gl/react-google-maps';
+import { SuggestionPlace } from '@/types';
 
 interface MapSearchBarProps {
-  type: 'regions' | 'establishment';
   placeholder: string;
   instruction?: string;
-  onPlaceSelected: (place: any) => void;
+  onPlaceSelected: (place: SuggestionPlace) => void;
 }
 
-export default function MapSearchBar({ type, placeholder, instruction, onPlaceSelected }: MapSearchBarProps) {
+export default function MapSearchBar({ placeholder, instruction, onPlaceSelected }: MapSearchBarProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const isLoaded = useApiIsLoaded();
 
@@ -55,7 +55,7 @@ export default function MapSearchBar({ type, placeholder, instruction, onPlaceSe
     return () => {
       autocomplete.removeEventListener('gmp-placeselect', listener);
     };
-  }, [isLoaded, type, placeholder, onPlaceSelected]);
+  }, [isLoaded, placeholder, onPlaceSelected]);
 
   return (
     <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 flex flex-col items-center gap-2 pointer-events-auto animate-in fade-in slide-in-from-top-4">

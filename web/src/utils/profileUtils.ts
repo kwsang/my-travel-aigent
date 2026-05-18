@@ -9,9 +9,14 @@ export const parseProfileData = (data?: TravelerProfile): ProfileFormData => ({
   preferences: {
     risk_tolerance: data?.preferences?.risk_tolerance || 'relaxed',
     circadian_preference: data?.preferences?.circadian_preference || 'night_owl',
+    activity_density: data?.preferences?.activity_density || 'medium',
     group_planning_per_person: data?.preferences?.group_planning_per_person || false,
     transport_preference: data?.preferences?.transport_preference || 'rental',
-    personal_transport_available: data?.preferences?.personal_transport_available || false
+    personal_transport_available: data?.preferences?.personal_transport_available || false,
+    starting_location: data?.preferences?.starting_location ?? undefined,
+    start_date: data?.preferences?.start_date ?? undefined,
+    end_date: data?.preferences?.end_date ?? undefined,
+    target_duration_days: data?.preferences?.target_duration_days ?? undefined
   },
   interests: data?.interests || []
 });

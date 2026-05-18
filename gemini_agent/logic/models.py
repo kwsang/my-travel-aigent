@@ -35,13 +35,13 @@ class Schedule(BaseModel):
     start_time_utc: Optional[str] = Field(None, description="UTC normalized start time.")
     end_time_utc: Optional[str] = Field(None, description="UTC normalized end time.")
     timezone: str = Field(default="America/New_York", description="IANA Timezone ID (e.g., 'America/Los_Angeles'). You MUST explicitly provide the correct timezone.")
-    estimated_traffic_minutes: Optional[int] = Field(None, description="Raw traffic data from Maps API.")
     applied_buffer_minutes: Optional[int] = Field(None, description="Buffer calculated by validation logic.")
 
 class EventDetails(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
     name: str = Field(..., description="Display name of the venue or activity.")
     description: Optional[str] = Field(None, description="Description of the venue or event.")
+    notes: Optional[str] = Field(None, description="Additional notes or context for the event.")
     image_url: Optional[str] = Field(None, description="Image URL for the venue.")
     category: Optional[str] = Field(None, description="Broad category (e.g., Museum, Fine Dining).")
     city: Optional[str] = Field(None, description="Primary city.")
@@ -52,8 +52,6 @@ class EventDetails(BaseModel):
     user_rating_count: Optional[int] = Field(None, description="Number of user reviews.")
     is_rental: bool = Field(default=False, description="True if this is a rental car segment.")
     vehicle_count: int = Field(default=1, description="Number of vehicles for large groups.")
-    travel_mode: Optional[str] = Field(None, description="Mode of transit (e.g. DRIVE, WALK, BICYCLE, TRANSIT).")
-    polyline: Optional[str] = Field(None, description="Encoded polyline string from the routes API for transit segments.")
 
 class UserProfilePreferences(BaseModel):
     risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')
@@ -247,8 +245,8 @@ class ValidationResponse(BaseModel):
 class ChatResponse(BaseModel):
     response: str = Field(..., description="The agent's text response.")
     is_conflict: bool = Field(default=False, description="True if the current itinerary has validation errors.")
-    itinerary: Optional[Dict[str, Any]] = Field(None, description="The latest itinerary state from the agent.")
-    traveler_profile: Optional[Dict[str, Any]] = Field(None, description="The latest traveler profile state from the agent.")
+    itinerary: Optional[Itinerary] = Field(None, description="The latest itinerary state from the agent.")
+    traveler_profile: Optional[TravelerProfile] = Field(None, description="The latest traveler profile state from the agent.")
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="The user's chat input.")

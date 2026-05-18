@@ -31,10 +31,8 @@ from gemini_agent.tools.tools import (
     clone_itinerary,
     save_itinerary,
     finalize_itinerary,
-    google_maps_matrix,
     search_local_events
 )
-from gemini_agent.tools.routes import get_route_directions
 from gemini_agent.logic.utils import get_state_context
 
 logger = logging.getLogger(__name__)
@@ -64,8 +62,6 @@ def create_travel_agent():
     # Local Python-based versions of the MCP/API tools to avoid Protocol errors
     get_profile_tool = FunctionTool(func=query_user_profile)
     persist_tool = FunctionTool(func=save_itinerary)
-    traffic_tool = FunctionTool(func=google_maps_matrix)
-    route_directions_tool = FunctionTool(func=get_route_directions)
 
     # 3. Load Instruction Prompts
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
@@ -88,12 +84,6 @@ def create_travel_agent():
     # Helper to safely parse stringified JSON states for prompt injection
     def _get_safe_state(ctx: Context):
         itinerary, profile = get_state_context(ctx)
-            
-        if isinstance(itinerary, dict) and "events" in itinerary:
-            itinerary = copy.deepcopy(itinerary)
-            for event in itinerary.get("events", []):
-                if "details" in event:
-                    event["details"].pop("polyline", None)
             
         return profile, itinerary
 
@@ -201,7 +191,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=get_pioneer_instructions,
-        tools=[search_tool, discovery_tool, get_cached_acc_tool, save_dest_acc_tool, places_search_tool, traffic_tool, route_directions_tool, persist_tool],
+        tools=[search_tool, discovery_tool, get_cached_acc_tool, save_dest_acc_tool, places_search_tool, persist_tool],
         description="Specializes in geographic anchoring, transportation, and finding the perfect destination and lodging."
     )
 
@@ -210,7 +200,7 @@ def create_travel_agent():
         model="gemini-2.5-flash",
         static_instruction=system_instructions,
         instruction=get_activity_planner_instructions,
-        tools=[places_search_tool, events_tool, get_cached_act_tool, save_dest_act_tool, traffic_tool, route_directions_tool, persist_tool],
+        tools=[places_search_tool, events_tool, get_cached_act_tool, save_dest_act_tool, persist_tool],
         description="Fills the itinerary with incredible EXPERIENCE and DINING segments that match the user's interests, vibe, and circadian rhythm."
     )
 

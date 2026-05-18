@@ -3,15 +3,13 @@
 import React from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
 import { APIProvider, Map, useMap, useApiIsLoaded } from '@vis.gl/react-google-maps';
-import RoutePolyline from './RoutePolyline';
 import { marineSunsetMapStyle } from '@/config/mapStyles';
-import { Event } from '@/types';
+import { SuggestionPlace, Event, Destination } from '@/types';
 import { API_CONFIG } from '@/config/constants';
 import MapOverlay from './MapOverlay';
 import SegmentInfoWindow from './SegmentInfoWindow';
 import SuggestionInfoWindow from './SuggestionInfoWindow';
 import MapSearchBar from './MapSearchBar';
-import { useRouteEdges } from '@/hooks/useRouteEdges';
 import { useMapBounds } from '@/hooks/useMapBounds';
 import { useMapClick } from '@/hooks/useMapClick';
 import MapMarkers from './MapMarkers';
@@ -66,7 +64,7 @@ function MapInner() {
 
   const [popularDestinations, setPopularDestinations] = React.useState<{name: string; lat: number; lng: number; emoji: string}[]>([]);
 
-  const [destinationInfo, setDestinationInfo] = React.useState<any>(null);
+  const [destinationInfo, setDestinationInfo] = React.useState<Destination | null>(null);
 
   const [hoveredPopularIndex, setHoveredPopularIndex] = React.useState<number | null>(null);
   const hoveredPopularIndexRef = React.useRef<number | null>(null);
@@ -106,7 +104,7 @@ function MapInner() {
     return () => { if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current); };
   }, []);
 
-  const [activeSuggestion, setActiveSuggestion] = React.useState<any>(null);
+  const [activeSuggestion, setActiveSuggestion] = React.useState<SuggestionPlace | null>(null);
 
   React.useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -176,7 +174,7 @@ function MapInner() {
     window.dispatchEvent(new CustomEvent('travel_aigent_set_destination', { detail: destName }));
   }, [sessionId, userId, setItinerary, showToast]);
 
-  const handleSelectLodging = React.useCallback(async (placeData: any) => {
+  const handleSelectLodging = React.useCallback(async (placeData: SuggestionPlace) => {
     const currentItinerary = currentItineraryRef.current;
     const isReplacement = !!currentItinerary.lodging;
     const newItinerary = { ...currentItinerary, lodging: placeData };
@@ -207,16 +205,16 @@ function MapInner() {
     window.dispatchEvent(new CustomEvent('travel_aigent_add_activity', { detail: { placeName, eventCategory } }));
   }, [showToast]);
 
-  const handleMapAddLodging = React.useCallback((place: any) => {
+  const handleMapAddLodging = React.useCallback((place: SuggestionPlace) => {
     handleSelectLodging({
       name: place.details?.name || place.displayName?.text || place.name || 'Selected Lodging',
-      description: place.details?.description || place.formattedAddress || place.formatted_address,
-      geo: place.geo || place.details?.geo || (place.geometry?.location ? { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() } : place.location),
-      rating: place.details?.rating || place.rating,
-      user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count || place.user_ratings_total,
-      priceLevel: place.priceLevel || place.details?.priceLevel || place.price_level,
+      description: place.details?.description || place.formattedAddress || place.formatted_address || undefined,
+      geo: place.geo || place.details?.geo || (place.geometry?.location ? { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() } : place.location) || undefined,
+      rating: place.details?.rating || place.rating || undefined,
+      user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count || place.user_ratings_total || undefined,
+      priceLevel: place.priceLevel || place.details?.priceLevel || place.price_level || undefined,
       types: place.types || place.details?.types || [],
-      google_maps_uri: place.google_maps_uri || place.details?.google_maps_uri
+      google_maps_uri: place.google_maps_uri || place.details?.google_maps_uri || undefined
     });
   }, [handleSelectLodging]);
 
@@ -233,7 +231,7 @@ function MapInner() {
   }, [segments.length, itinerary.destination, fetchPopular]);
 
   // Extract starting location from profile preferences (populated by the Concierge agent)
-  const startingLocation = profile?.preferences?.starting_location;
+  const startingLocation = profile?.preferences?.starting_location || undefined;
 
   // Extract destination from the events (prioritizing non-transit segments to avoid origin airports)
   const nonTransitSegments = segments.filter((s: Event) => !['FLIGHT', 'TRANSPORT'].includes(s.segment));
@@ -263,35 +261,15 @@ function MapInner() {
     });
   }, [isLoaded, startingLocation]);
 
-  // Enhance segments with synthetic flight polylines if missing
-  const enhancedSegments = React.useMemo(() => {
-    if (!isLoaded || !(window as any).google?.maps?.geometry?.encoding) return segments;
-
-    return segments.map((s: Event) => {
-      const details = s.details as any;
-      if (s.segment === 'FLIGHT' && !details?.polyline && details?.origin_geo?.coordinates && details?.destination_geo?.coordinates) {
-        try {
-          const path = [
-            { lat: details.origin_geo.coordinates[1], lng: details.origin_geo.coordinates[0] },
-            { lat: details.destination_geo.coordinates[1], lng: details.destination_geo.coordinates[0] }
-          ];
-          return { ...s, details: { ...details, polyline: (window as any).google.maps.geometry.encoding.encodePath(path) } };
-        } catch (e) {
-          // Ignore encoding errors
-        }
-      }
-      return s;
-    });
-  }, [segments, isLoaded]);
-
   // Memoize the map center so it doesn't cause the map to re-pan on every context render
   const mapCenter = React.useMemo(() => {
     const defaultCenter = { lat: 39.8283, lng: -98.5795 }; // Center on continental US
-    const centerSegment = enhancedSegments.find((s: Event) => {
+    const centerSegment = segments.find((s: Event) => {
       if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(s.segment)) return false;
       return s.geo || s.details?.geo;
     });
-    const geo = centerSegment?.geo || centerSegment?.details?.geo || itinerary.lodging?.geo || itinerary.lodging?.details?.geo || itinerary.lodging?.location;
+    const lodgingPlace = itinerary.lodging as SuggestionPlace | undefined;
+    const geo = centerSegment?.geo || centerSegment?.details?.geo || lodgingPlace?.geo || lodgingPlace?.details?.geo || lodgingPlace?.location;
     if (geo) {
       return { lat: geo.latitude, lng: geo.longitude };
     }
@@ -321,7 +299,7 @@ function MapInner() {
       return { lat: dest.lat, lng: dest.lng };
     }
     return defaultCenter;
-  }, [enhancedSegments, itinerary.destination, itinerary.lodging, popularDestinations, destinationInfo?.suggested_lodging, destinationInfo?.suggested_activities]);
+  }, [segments, itinerary.destination, itinerary.lodging, popularDestinations, destinationInfo?.suggested_lodging, destinationInfo?.suggested_activities]);
 
   // Create a stable signature of all geographic points to display on the map.
   // This prevents the map from re-fitting its bounds unless the actual coordinates of markers change.
@@ -336,13 +314,9 @@ function MapInner() {
     const coords: (string | null)[] = [];
 
     // Add coordinates from all potential marker sources
-    enhancedSegments.forEach(s => {
+    segments.forEach(s => {
       if (!itinerary.lodging && ['DINING', 'EXPERIENCE'].includes(s.segment)) return;
       coords.push(getCoords(s));
-      const details = s.details as typeof s.details & { polyline?: string };
-      if ((s.segment === 'FLIGHT' || s.segment === 'TRANSPORT') && details?.polyline) {
-        coords.push(details.polyline);
-      }
     });
     if (itinerary.lodging) {
       coords.push(getCoords(itinerary.lodging));
@@ -364,10 +338,7 @@ function MapInner() {
 
     // Sort to ensure order doesn't matter, then stringify for a stable dependency.
     return JSON.stringify(coords.filter(Boolean).sort());
-  }, [enhancedSegments, itinerary.lodging, destinationInfo, startGeo]);
-
-  // Custom hook to generate individual edges for the polyline
-  const routeEdges = useRouteEdges(enhancedSegments, activeSegmentIndex, startGeo, itinerary, destinationInfo);
+  }, [segments, itinerary.lodging, destinationInfo, startGeo]);
 
   // Automatically fit bounds or pan to active segment
   useMapBounds(
@@ -375,7 +346,7 @@ function MapInner() {
     isLoaded,
     activeSegmentIndex,
     geoSignature,
-    enhancedSegments,
+    segments,
     itinerary,
     destinationInfo,
     popularDestinations,
@@ -387,7 +358,7 @@ function MapInner() {
     currentItineraryRef,
     showToast,
     setActiveSuggestion,
-    setActiveSegmentIndex as any
+    setActiveSegmentIndex
   );
 
   const mapContextValue = React.useMemo(() => ({
@@ -423,20 +394,11 @@ function MapInner() {
               setHoveredPopularIndex={setHoveredPopularIndex}
             />
 
-            {/* Polyline Routes */}
-            {routeEdges.map((edge, index) => (
-              <RoutePolyline
-                key={`route-edge-${index}`}
-                path={edge.path}
-                options={edge.options}
-              />
-            ))}
-
             {/* Active Segment Info Window */}
             {activeSegmentIndex !== null && segments[activeSegmentIndex] && (
               <SegmentInfoWindow 
                 segment={segments[activeSegmentIndex]} 
-                onClose={() => setActiveSegmentIndex(null as any)}
+                onClose={() => setActiveSegmentIndex(null)}
               />
             )}
 
@@ -466,7 +428,6 @@ function MapInner() {
       {/* Search Bar for selecting a destination */}
       {!itinerary.destination && isLoaded && (
         <MapSearchBar
-          type="regions"
           instruction="1. Select a Destination"
           placeholder="Where do you want to go?"
           onPlaceSelected={(place) => handleSelectDestination(place.formatted_address || place.name)}
@@ -476,7 +437,6 @@ function MapInner() {
       {/* Search Bar for selecting a lodging */}
       {!!itinerary.destination && !itinerary.lodging && isLoaded && (
         <MapSearchBar
-          type="establishment"
           instruction="2. Choose Your Lodging"
           placeholder="Search for a hotel or lodging..."
           onPlaceSelected={handleMapAddLodging}
@@ -486,7 +446,6 @@ function MapInner() {
       {/* Search Bar for adding an activity */}
       {!!itinerary.destination && !!itinerary.lodging && isLoaded && (
         <MapSearchBar
-          type="establishment"
           instruction="3. Add Activities & Dining"
           placeholder="Search for an activity or dining venue..."
           onPlaceSelected={(place) => {
@@ -494,16 +453,16 @@ function MapInner() {
               _suggestionType: 'activity',
               details: {
                 name: place.details?.name || place.displayName?.text || place.name || 'Selected Venue',
-                description: place.details?.description || place.formattedAddress || place.formatted_address,
-                geo: place.geo || place.details?.geo || (place.geometry?.location ? { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() } : place.location),
-                rating: place.details?.rating || place.rating,
-                user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count || place.user_ratings_total,
+                description: place.details?.description || place.formattedAddress || place.formatted_address || undefined,
+                geo: place.geo || place.details?.geo || (place.geometry?.location ? { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() } : place.location) || undefined,
+                rating: place.details?.rating || place.rating || undefined,
+                user_rating_count: place.details?.user_rating_count || place.userRatingCount || place.user_rating_count || place.user_ratings_total || undefined,
               },
-              priceLevel: place.priceLevel || place.details?.priceLevel || place.price_level,
+              priceLevel: place.priceLevel || place.details?.priceLevel || place.price_level || undefined,
               types: place.types || place.details?.types || [],
-              google_maps_uri: place.google_maps_uri || place.details?.google_maps_uri
+              google_maps_uri: place.google_maps_uri || place.details?.google_maps_uri || undefined
             });
-            setActiveSegmentIndex(null as any);
+            setActiveSegmentIndex(null);
           }}
         />
       )}

@@ -58,7 +58,7 @@ export default function TimelineItem({
   };
 
   let effectiveSegment = event.segment as string;
-  if (effectiveSegment.includes('DINING') || (effectiveSegment === 'EXPERIENCE' && event.details?.category && ['lunch', 'dinner', 'breakfast', 'brunch', 'dining', 'food', 'meal', 'restaurant', 'cafe'].some(c => event.details!.category!.toLowerCase().includes(c)))) {
+  if (effectiveSegment.includes('DINING') || (effectiveSegment === 'EXPERIENCE' && event.details?.category && ['lunch', 'dinner', 'breakfast', 'brunch', 'dining', 'food', 'meal', 'restaurant', 'cafe'].some(c => (event.details!.category as string).toLowerCase().includes(c)))) {
     effectiveSegment = 'DINING';
   } else if (effectiveSegment.includes('EXPERIENCE')) {
     effectiveSegment = 'EXPERIENCE';
@@ -68,6 +68,15 @@ export default function TimelineItem({
     if (!event.details?.name || !itineraryData.itinerary.validation_errors) return false;
     return itineraryData.itinerary.validation_errors.some(err => err.includes(`'${event.details?.name}'`));
   }, [event.details?.name, itineraryData.itinerary.validation_errors]);
+
+  // Strongly type variables to prevent `unknown` type errors during React rendering
+  const placeName = (event.details?.name || (effectiveSegment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')) as string;
+  const description = event.details?.description as string | undefined;
+  const notes = event.details?.notes as string | undefined;
+  const city = event.details?.city as string | undefined;
+  const category = event.details?.category as string | undefined;
+  const rating = event.details?.rating as number | undefined;
+  const ratingCount = event.details?.user_rating_count as number | undefined;
 
   const isDraggable = effectiveSegment !== 'TRANSPORT' && effectiveSegment !== 'FLIGHT';
 
@@ -132,19 +141,19 @@ export default function TimelineItem({
           >
             {React.createElement(SegmentIcons[effectiveSegment as SegmentType] || DefaultIcon, { className: 'w-3 h-3' })}
             {effectiveSegment.replace('_', ' ')}
-            {event.details?.category && event.details.category.toLowerCase() !== effectiveSegment.toLowerCase() && (
+            {category && category.toLowerCase() !== effectiveSegment.toLowerCase() && (
               <span className="capitalize normal-case tracking-normal opacity-90 ml-0.5">
-                ({event.details.category})
+                ({category})
               </span>
             )}
           </span>
             <div className="flex items-center gap-2 mt-0.5">
-              {event.details?.rating && (
+              {rating && (
                 <div className="flex items-center gap-1 text-[10px] font-bold bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded border border-amber-500/20 shadow-sm shrink-0">
                   <Star size={10} className="fill-amber-500" />
-                  <span>{event.details.rating}</span>
-                  {event.details.user_rating_count && (
-                    <span className="opacity-70 font-medium">({event.details.user_rating_count})</span>
+                  <span>{rating}</span>
+                  {ratingCount && (
+                    <span className="opacity-70 font-medium">({ratingCount})</span>
                   )}
                 </div>
               )}
@@ -153,14 +162,14 @@ export default function TimelineItem({
                   {flightDetails.from} <Plane size={14} className="text-muted-foreground" /> {flightDetails.to}
                 </h4>
               ) : (
-            <h4 className={`font-semibold text-foreground leading-tight ${effectiveSegment === 'LOGISTICS' ? 'text-sm' : ''}`}>{event.details?.name || (effectiveSegment === 'FLIGHT' ? 'Flight' : 'Unnamed Event')}</h4>
+            <h4 className={`font-semibold text-foreground leading-tight ${effectiveSegment === 'LOGISTICS' ? 'text-sm' : ''}`}>{placeName}</h4>
               )}
             </div>
             {effectiveSegment === 'FLIGHT' && flightDetails?.airline ? (
               <p className="text-sm font-medium text-sky-500/80">{flightDetails.airline}</p>
             ) : (
               <p className={`${effectiveSegment === 'LOGISTICS' ? 'text-xs' : 'text-sm'} text-muted-foreground line-clamp-2`}>
-                {event.details?.description || event.details?.notes || (event.details?.city ? `Located in ${event.details.city}` : '')}
+                {description || notes || (city ? `Located in ${city}` : '')}
               </p>
             )}
           </div>
@@ -240,9 +249,9 @@ export default function TimelineItem({
                 )}
               </p>
             )}
-            {(effectiveSegment === 'LODGING' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && event.details?.city && (
+            {(effectiveSegment === 'LODGING' || effectiveSegment === 'EXPERIENCE' || effectiveSegment === 'DINING') && city && (
               <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60 mt-1">
-                {event.details.city.split(',').slice(0, 2).join(',').trim()}
+                {city.split(',').slice(0, 2).join(',').trim()}
               </p>
             )}
         </div>

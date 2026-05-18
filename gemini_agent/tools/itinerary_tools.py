@@ -58,7 +58,6 @@ async def save_itinerary(
         elif isinstance(lodging, dict):
             parsed_lodging = lodging
 
-        route_cache = tool_context.state.get("_route_cache", {})
         venue_cache = tool_context.state.get("_venue_cache", {})
         
         if parsed_lodging:
@@ -91,18 +90,6 @@ async def save_itinerary(
                 for k, v in cached_venue.items():
                     if k not in details:
                         details[k] = v
-            
-            if "polyline" in details and isinstance(details["polyline"], str):
-                token = details["polyline"]
-                if token.startswith("route_") and token in route_cache:
-                    details["polyline"] = route_cache[token]
-                    
-            if "polyline" not in details or not details["polyline"]:
-                for old_ev in existing_events:
-                    old_details = old_ev.get("details", {})
-                    if old_details.get("name") == details.get("name") and "polyline" in old_details:
-                        details["polyline"] = old_details["polyline"]
-                        break
 
         # Deep equality check to prevent redundant saves from the LLM
         has_changes = False
@@ -177,12 +164,6 @@ async def get_itinerary(tool_context: InvocationContext, trip_name: Optional[str
             if trip_name:
                 msg += f" with name '{trip_name}'"
             return msg + "."
-
-        # Strip massive polyline strings to save tokens and prevent agent context overflow
-        for res in results:
-            for event in res.get("events", []):
-                if isinstance(event, dict) and "details" in event and isinstance(event["details"], dict):
-                    event["details"].pop("polyline", None)
 
         return json.dumps(results, default=str)
     except Exception as e:
@@ -296,12 +277,6 @@ async def list_trip_versions(source_trip_name: str, tool_context: InvocationCont
         results = await db["itineraries"].find(query).to_list(length=None)
         if not results:
             return f"No draft versions found cloned from '{source_trip_name}' for user '{user_id}'."
-
-        # Strip massive polyline strings to save tokens and prevent agent context overflow
-        for res in results:
-            for event in res.get("events", []):
-                if isinstance(event, dict) and "details" in event and isinstance(event["details"], dict):
-                    event["details"].pop("polyline", None)
 
         return json.dumps(results, default=str)
     except Exception as e:

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node .next/standalone/server.js",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate-types": "npx openapi-typescript http://localhost:8000/openapi.json -o src/types/generated-api.ts"
   },
   "dependencies": {
     "@googlemaps/react-wrapper": "^1.1.42",
@@ -35,6 +36,7 @@
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.4.5"

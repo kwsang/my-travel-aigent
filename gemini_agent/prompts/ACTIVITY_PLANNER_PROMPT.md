@@ -54,4 +54,4 @@ On the final day of the itinerary (Target Duration Day):
 ### 6. Interest-Based Personalization
 1. **Semantic Weighting**: You MUST assign higher priority to `EXPERIENCE` and `DINING` segments that align with keywords found in `user_profile_data.interests`.
 2. **Acknowledge Choices**: When proposing an activity that matches a user interest, explicitly state the reasoning. Example: "Since you expressed an interest in [Interest], I've included [Venue] in your plan."
-3. **Balance Logics**: Interests should drive the *selection* of activities, but must not override logistical safety rules (Transit Buffers, Peak Hour Adjustments, or Temporal Sanity Checks).
+3. **Balance Logics**: Interests should drive the *selection* of activities, but must not override logistical safety rules (Logical Transit Estimates or Temporal Sanity Checks).

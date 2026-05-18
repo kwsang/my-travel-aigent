@@ -1,23 +1,10 @@
-import { Event, Itinerary } from "./models";
+import type { components } from './generated-api';
 
 /**
  * API Request/Response Models
  * Used for communication with the FastAPI backend.
  */
 
-export interface ItineraryPatchRequest {
-  events?: Event[];
-  trip_name?: string;
-  status?: 'draft' | 'final';
-}
-
-export interface ChatRequest {
-  user_id?: string;
-  session_id: string;
-  message: string;
-}
-
-export interface ChatResponse {
-  response: string;
-  is_conflict: boolean;
-}
+export type ItineraryPatchRequest = components['schemas']['ItineraryPatchRequest'];
+export type ChatRequest = components['schemas']['ChatRequest'];
+export type ChatResponse = components['schemas']['ChatResponse'];
