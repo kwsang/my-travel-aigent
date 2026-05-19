@@ -8,6 +8,7 @@ import ast
 from typing import Optional, Any
 from google.adk.agents.invocation_context import InvocationContext
 from gemini_agent.logic.utils import _parse_json_or_literal, _extract_list_from_payload, get_state_context
+from api.utils import safe_parse_json
 
 logger = logging.getLogger(__name__)
 
@@ -183,16 +184,7 @@ async def _discover_new_destination_impl(vibe_or_city: str) -> str:
                 contents=vibe_prompt
             )
             
-            # Clean potential markdown wrapping
-            raw_text = vibe_response.text.strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:]
-            elif raw_text.startswith("```"):
-                raw_text = raw_text[3:]
-            if raw_text.endswith("```"):
-                raw_text = raw_text[:-3]
-                
-            parsed_resp = json.loads(raw_text.strip())
+            parsed_resp = safe_parse_json(vibe_response.text, default={})
             description = parsed_resp.get("description", base_description)
             
             raw_tags = parsed_resp.get("tags", [])

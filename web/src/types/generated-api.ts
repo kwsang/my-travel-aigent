@@ -493,6 +493,13 @@ export interface components {
             people_per_room?: number | null;
             /** Interests */
             interests?: string[] | null;
+            /**
+             * Starting Location
+             * @description Catch-all for UI sending location at the root level
+             */
+            starting_location?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** Schedule */
         Schedule: {
@@ -621,6 +628,8 @@ export interface components {
              * @description Target trip duration
              */
             target_duration_days?: number | null;
+        } & {
+            [key: string]: unknown;
         };
         /** ValidationError */
         ValidationError: {

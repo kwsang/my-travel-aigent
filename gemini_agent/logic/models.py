@@ -54,6 +54,7 @@ class EventDetails(BaseModel):
     vehicle_count: int = Field(default=1, description="Number of vehicles for large groups.")
 
 class UserProfilePreferences(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
     risk_tolerance: Literal['relaxed', 'strict'] = Field(default='relaxed')
     circadian_preference: Literal['early_bird', 'night_owl'] = Field(default='night_owl')
     activity_density: Literal['low', 'medium', 'high'] = Field(default='medium')
@@ -86,12 +87,14 @@ class TravelerProfile(BaseModel):
         return v
 
 class ProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
     party_size: Optional[int] = None
     budget: Optional[TripBudget] = None
     preferences: Optional[UserProfilePreferences] = None
     room_sharing: Optional[bool] = None
     people_per_room: Optional[int] = None
     interests: Optional[List[str]] = None
+    starting_location: Optional[str] = Field(default=None, description="Catch-all for UI sending location at the root level")
 
 class Event(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")

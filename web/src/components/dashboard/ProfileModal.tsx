@@ -43,7 +43,6 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
       parsed.preferences.start_date = initialData.preferences?.start_date || getTodayString();
       parsed.preferences.end_date = initialData.preferences?.end_date ?? undefined;
       parsed.preferences.target_duration_days = initialData.preferences?.target_duration_days ?? undefined;
-      parsed.preferences.starting_location = initialData.preferences?.starting_location ?? undefined;
       parsed.preferences.activity_density = initialData.preferences?.activity_density ?? 'medium';
       
       setFormData(parsed);

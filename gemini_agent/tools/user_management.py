@@ -3,6 +3,7 @@ import logging
 from typing import Any
 from gemini_agent.clients import destinations_collection
 from gemini_agent.logic.models import TravelerProfile
+from gemini_agent.logic.utils import get_state_context
 from google.adk.agents.invocation_context import InvocationContext
 
 logger = logging.getLogger(__name__)
@@ -10,9 +11,9 @@ logger = logging.getLogger(__name__)
 async def record_user_profile(
     party_size: int,
     budget_limit: float,
-    starting_location: str,
     target_duration_days: int,
     tool_context: InvocationContext,
+    starting_location: str = None,
     start_date: str = None,
     end_date: str = None,
     budget_currency: str = "USD",
@@ -39,12 +40,16 @@ async def record_user_profile(
         else:
             transport_preference = "rental"
 
+    # Merge with existing profile to prevent agent from wiping out fields it didn't update
+    _, existing_profile = get_state_context(tool_context)
+    existing_prefs = existing_profile.get("preferences", {})
+
     profile_dict = {
         "party_size": party_size,
         "budget": {"total_limit": budget_limit, "currency": budget_currency},
         "room_sharing": room_sharing,
         "people_per_room": people_per_room,
-        "interests": interests or [],
+        "interests": interests if interests else existing_profile.get("interests", []),
         "preferences": {
             "risk_tolerance": risk_tolerance,
             "circadian_preference": circadian_preference,
@@ -52,9 +57,9 @@ async def record_user_profile(
             "group_planning_per_person": group_planning_per_person,
             "transport_preference": transport_preference,
             "personal_transport_available": personal_transport_available,
-            "starting_location": starting_location,
-            "start_date": start_date,
-            "end_date": end_date,
+            "starting_location": starting_location if starting_location else existing_prefs.get("starting_location"),
+            "start_date": start_date if start_date else existing_prefs.get("start_date"),
+            "end_date": end_date if end_date else existing_prefs.get("end_date"),
             "target_duration_days": target_duration_days
         }
     }

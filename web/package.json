@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "node .next/standalone/server.js",
     "lint": "next lint",
-    "generate-types": "npx openapi-typescript http://localhost:8000/openapi.json -o src/types/generated-api.ts"
+    "generate-types": "npx openapi-typescript http://localhost:8000/openapi.json -o src/types/generated-api.ts",
+    "test": "jest"
   },
   "dependencies": {
     "@googlemaps/react-wrapper": "^1.1.42",
@@ -32,10 +33,15 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@tailwindcss/typography": "^0.5.19",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/google.maps": "^3.64.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^4.0.0",

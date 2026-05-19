@@ -10,6 +10,7 @@ from gemini_agent.logic.validate_buffers import (
     validate_itinerary_structure, 
     validate_itinerary_budget
 )
+from api.utils import flatten_for_mongo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/itinerary", tags=["itinerary"])
@@ -127,87 +128,91 @@ async def update_itinerary(
     logger.info(f"PATCH Itinerary Request: session={session_id}, user={identity}")
     try:
         itinerary_doc = await db.itineraries.find_one({"session_id": session_id, "user_id": identity})
-        
-        # If the doc doesn't exist (e.g., renaming a brand new trip), create a skeleton
-        if not itinerary_doc:
-            logger.debug(f"Itinerary {session_id} not found in DB. Initializing skeleton for update.")
-            itinerary_doc = {
-                "session_id": session_id,
-                "user_id": identity,
-                "events": [],
-                "trip_name": "New Trip",
-                "destination": None,
-                "lodging": None,
-                "duration_days": 0,
-                "party_size_total": 1,
-                "status": "draft",
-            }
-
-        traveler_profile = None
-        if updates.traveler_profile:
-            traveler_profile = updates.traveler_profile.model_dump(exclude_unset=True)
-        if not traveler_profile:
-            traveler_profile = itinerary_doc.get("traveler_profile") or await db.user_profiles.find_one({"user_id": identity})
-
-        profile_for_val = traveler_profile or {
-            "preferences": {}, 
-            "party_size": 1, 
-            "room_sharing": False, 
-            "people_per_room": 2
-        }
-
-        # Extract updates from the request body
         update_data = updates.model_dump(exclude_unset=True)
-        update_time = datetime.now(timezone.utc)
-        update_data["updated_at"] = update_time
-        logger.debug(f"Updates to apply: {list(update_data.keys())}")
+        logger.info(f"Itinerary patch payload for {session_id}: {update_data}")
 
-        # Prepare the full itinerary object for validation
-        itinerary = {**itinerary_doc, **update_data}
+        if itinerary_doc:
+            merged_data = {**itinerary_doc, **update_data}
+            
+            # Deep merge traveler_profile to prevent dropping nested fields
+            if "traveler_profile" in update_data and isinstance(update_data["traveler_profile"], dict):
+                existing_profile = itinerary_doc.get("traveler_profile") or {}
+                merged_profile = {**existing_profile, **update_data["traveler_profile"]}
+                
+                if "preferences" in update_data["traveler_profile"] and isinstance(update_data["traveler_profile"]["preferences"], dict):
+                    existing_prefs = existing_profile.get("preferences") or {}
+                    merged_prefs = {**existing_prefs, **update_data["traveler_profile"]["preferences"]}
+                    
+                    # Prevent starting_location from being explicitly set to None if we already have one
+                    if update_data["traveler_profile"]["preferences"].get("starting_location") is None and existing_prefs.get("starting_location") is not None:
+                        merged_prefs["starting_location"] = existing_prefs["starting_location"]
+                        
+                    merged_profile["preferences"] = merged_prefs
+                    
+                if "budget" in update_data["traveler_profile"] and isinstance(update_data["traveler_profile"]["budget"], dict):
+                    existing_budget = existing_profile.get("budget") or {}
+                    merged_profile["budget"] = {**existing_budget, **update_data["traveler_profile"]["budget"]}
+                    
+                merged_data["traveler_profile"] = merged_profile
+
+            # Deep merge top-level budget
+            if "budget" in update_data and isinstance(update_data["budget"], dict):
+                existing_budget = itinerary_doc.get("budget") or {}
+                merged_data["budget"] = {**existing_budget, **update_data["budget"]}
+
+            itinerary_model = Itinerary.model_validate(merged_data)
+        else:
+            # If no doc exists, create a new one from the patch.
+            # We need to provide defaults for required fields not in ItineraryPatchRequest
+            base_skeleton = {
+                "session_id": session_id, "user_id": identity, "events": [],
+                "trip_name": "New Trip", "duration_days": 0, "party_size_total": 1
+            }
+            merged_data = {**base_skeleton, **update_data}
+            itinerary_model = Itinerary.model_validate(merged_data)
+
+        # Now that we have a fully merged model, perform validation
+        itinerary = itinerary_model.model_dump()
+        profile_for_val = itinerary.get("traveler_profile")
+        if not profile_for_val:
+             profile_for_val = await db.user_profiles.find_one({"user_id": identity}) or {}
 
         # Rely on Pydantic to provide default risk and vibe preferences automatically
         profile_model = TravelerProfile.model_validate(profile_for_val)
         risk = profile_model.preferences.risk_tolerance
         vibe = profile_model.preferences.circadian_preference
-
+        
         all_errors = []
         is_conflict = False
-
         if itinerary.get("events"):
-            logger.info(f"Running structural validation for {session_id} (Risk: {risk})")
             struct_errors = validate_itinerary_structure(itinerary, risk, vibe, profile_for_val)
             _, budget_errors = validate_itinerary_budget(itinerary, profile_for_val)
-
             all_errors = struct_errors + budget_errors
             is_conflict = len(all_errors) > 0
-            logger.debug(f"Validation complete. Conflicts: {is_conflict}, Errors: {len(all_errors)}")
+        
+        # Update the model with validation results before saving
+        itinerary_model.is_conflict = is_conflict
+        itinerary_model.validation_errors = all_errors
+        itinerary_model.updated_at = datetime.now(timezone.utc).isoformat()
+
+        # Save the complete, validated model to the database
+        final_update_data = itinerary_model.model_dump(exclude={"_id"}, by_alias=True)
 
         await db.itineraries.update_one(
             {"session_id": session_id, "user_id": identity},
-            {"$set": {**update_data, "session_id": session_id, "user_id": identity}},
+            {"$set": final_update_data},
             upsert=True
         )
 
-        # Sanitize User Profile for JSON serialization
-        if traveler_profile and "_id" in traveler_profile:
-            traveler_profile["_id"] = str(traveler_profile["_id"])
-
-        itinerary_doc.update(update_data)
-
-        # Explicit assignment to ensure these fields exist and are valid for Itinerary
-        itinerary_doc["duration_days"] = itinerary_doc.get("duration_days") or 0
-        itinerary_doc["party_size_total"] = itinerary_doc.get("party_size_total") or profile_for_val.get("party_size", 1)
-        itinerary_doc["destination"] = itinerary_doc.get("destination")
-        itinerary_doc["lodging"] = itinerary_doc.get("lodging")
-        itinerary_doc["status"] = itinerary_doc.get("status", "draft")
-        itinerary_doc["is_conflict"] = bool(is_conflict)
-        itinerary_doc["validation_errors"] = all_errors or []
-        itinerary_doc["updated_at"] = update_time
-        itinerary_doc["traveler_profile"] = traveler_profile
-        itinerary_doc.pop("user_profile_data", None)
-        itinerary_doc["_id"] = str(itinerary_doc.get("_id", "new"))
-
-        return itinerary_doc
+        # Prepare and return the final state as the response
+        response_doc = itinerary_model.model_dump(by_alias=True)
+        if itinerary_doc and "_id" in itinerary_doc:
+            response_doc["_id"] = str(itinerary_doc["_id"])
+        else:
+            new_doc = await db.itineraries.find_one({"session_id": session_id, "user_id": identity}, {"_id": 1})
+            response_doc["_id"] = str(new_doc["_id"]) if new_doc else "new"
+        
+        return response_doc
 
     except HTTPException:
         raise

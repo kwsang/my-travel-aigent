@@ -25,6 +25,10 @@ import { UserCircle, Loader2, Check } from 'lucide-react';
 import DeleteTripModal from '@/components/dashboard/DeleteTripModal';
 import RenameAlertModal from '@/components/dashboard/RenameAlertModal';
 
+import { APIProvider } from '@vis.gl/react-google-maps';
+
+const MAPS_LIBRARIES: ("marker" | "places" | "geometry")[] = ["marker", "places", "geometry"];
+
 /**
  * The Visual Planning Dashboard
  * Entry point for ad-hoc travel planning with a fresh session.
@@ -110,12 +114,14 @@ export default function DashboardPage() {
     setEditedName(itinerary.trip_name || 'New Trip');
   }, [itinerary.trip_name]);
 
+  const activeProfile = itinerary.traveler_profile || profile;
+
   // Automatically switch to per-person view if the profile is set to it
   useEffect(() => {
-    if (profile?.preferences?.group_planning_per_person) {
+    if (activeProfile?.preferences?.group_planning_per_person) {
       setViewMode('per_person');
     }
-  }, [profile, setViewMode]);
+  }, [activeProfile, setViewMode]);
 
   // Reset map highlights when changing trips
   useEffect(() => {
@@ -270,7 +276,7 @@ export default function DashboardPage() {
   // Memoize the context value to prevent unnecessary re-renders of all consumer components
   const contextValue = useMemo(() => ({
     itinerary,
-    profile,
+    profile: activeProfile,
     setItinerary,
     setProfile,
     viewMode,
@@ -285,10 +291,13 @@ export default function DashboardPage() {
     setHoveredSegmentIndex,
     expandedDays,
     setExpandedDays
-  }), [itinerary, profile, setItinerary, setProfile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex, hoveredSegmentIndex, expandedDays]);
+  }), [itinerary, activeProfile, setItinerary, setProfile, viewMode, setViewMode, refreshDashboard, currentSessionId, visitorId, isLoading, activeSegmentIndex, hoveredSegmentIndex, expandedDays]);
+
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
 
   return (
     <ItineraryContext.Provider value={contextValue}>
+      <APIProvider apiKey={apiKey} libraries={MAPS_LIBRARIES as any}>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <Navbar 
         centerContent={navbarCenter}
@@ -352,7 +361,7 @@ export default function DashboardPage() {
         <ProfileModal 
           sessionId={currentSessionId}
           userId={visitorId}
-          initialData={profile || undefined}
+          initialData={activeProfile || undefined}
           onClose={() => setShowProfileModal(false)}
           onSave={async (newProfile) => {
             setProfile(newProfile);
@@ -365,11 +374,16 @@ export default function DashboardPage() {
             // Blocking save to ensure DB has the latest profile and budget before any chat interactions
             if (currentSessionId && visitorId) {
               try {
-                await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`, {
+                const response = await fetch(`${API_CONFIG.BASE_URL}/itinerary/${currentSessionId}?user_id=${visitorId}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ ...newItin, traveler_profile: newProfile }),
                 });
+                
+                if (response.ok) {
+                  const validatedItinerary = await response.json();
+                  setItinerary(validatedItinerary);
+                }
               } catch (e) {
                 console.error("Failed to instantly save profile", e);
               }
@@ -406,6 +420,7 @@ export default function DashboardPage() {
         />
       )}
     </div>
+      </APIProvider>
     </ItineraryContext.Provider>
   );
 }

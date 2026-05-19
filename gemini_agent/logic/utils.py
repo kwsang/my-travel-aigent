@@ -83,7 +83,7 @@ def _extract_list_from_payload(payload: Any) -> list:
         return [item for item in payload if isinstance(item, dict)]
     elif isinstance(payload, dict):
         for v in payload.values():
-            if isinstance(v, list):
+            if isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
                 return [item for item in v if isinstance(item, dict)]
         return [payload]
     return []

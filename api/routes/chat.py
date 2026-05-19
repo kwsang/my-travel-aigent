@@ -12,6 +12,7 @@ from gemini_agent.logic.validate_buffers import (
     validate_itinerary_structure, 
     validate_itinerary_budget
 )
+from api.utils import safe_parse_json
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -30,6 +31,7 @@ async def chat(
     """
     user_id = auth_user_id or request.user_id or request.session_id
     logger.info(f"User: {user_id} | Session: {request.session_id} | Message: {request.message}")
+    logger.info(f"Chat request payload for {request.session_id}: {request.model_dump(exclude_unset=True)}")
 
     # LOGGING: Verify incoming state
     logger.info(f"[CHAT STATE VERIFICATION] Incoming Destination: {request.itinerary.get('destination') if request.itinerary else 'None'}")
@@ -38,6 +40,15 @@ async def chat(
         # Fetch latest materialized DB state to prevent stale React closures from wiping data
         latest_itin = await db.itineraries.find_one({"session_id": request.session_id, "user_id": user_id}) or {}
         
+        # The UI profile state may be stale if a modal was just saved. Trust the DB as the source of truth.
+        db_profile = latest_itin.get("traveler_profile")
+        if not db_profile:
+            db_profile = await db.user_profiles.find_one({"user_id": user_id})
+            if db_profile:
+                db_profile.pop("_id", None)
+        
+        active_profile = db_profile or request.traveler_profile
+
         if request.itinerary is not None:
             if not request.itinerary.get("destination") and latest_itin.get("destination"):
                 request.itinerary["destination"] = latest_itin["destination"]
@@ -56,13 +67,17 @@ async def chat(
                 
             update_state = {}
                 
-            if request.traveler_profile is not None:
-                session.state["traveler_profile"] = request.traveler_profile
-                update_state["data.state.traveler_profile"] = request.traveler_profile
-                prefs = request.traveler_profile.get("preferences") or {}
-                logger.info(f"Injected Profile Constraints - Start: {prefs.get('start_date')}, End: {prefs.get('end_date')}, Days: {prefs.get('target_duration_days')}")
+            if active_profile is not None:
+                session.state["traveler_profile"] = active_profile
+                update_state["data.state.traveler_profile"] = active_profile
+                prefs = active_profile.get("preferences") or {}
+                logger.info(f"Injected Profile Constraints - Start: {prefs.get('start_date')}, End: {prefs.get('end_date')}, Days: {prefs.get('target_duration_days')}, Location: {prefs.get('starting_location')}")
 
             if request.itinerary is not None:
+                # To prevent overwriting the DB's true traveler_profile with a stale request.itinerary profile
+                if active_profile:
+                    request.itinerary["traveler_profile"] = active_profile
+                    
                 session.state["final_itinerary"] = request.itinerary
                 update_state["data.state.final_itinerary"] = request.itinerary
                 
@@ -79,17 +94,18 @@ async def chat(
                 
             # Mutating `session.state` updates the in-memory reference used by the Runner.
             # We also persist it directly to MongoDB to ensure it isn't lost if the server restarts.
-            await session_db.sessions.update_one(
-                {"session_id": request.session_id, "user_id": user_id, "app_name": "my_travel_aigent"},
-                {
-                    "$set": {
-                        **update_state,
-                        "updated_at": datetime.now(timezone.utc)
+            if update_state:
+                await session_db.sessions.update_one(
+                    {"session_id": request.session_id, "user_id": user_id, "app_name": "my_travel_aigent"},
+                    {
+                        "$set": {
+                            **update_state,
+                            "updated_at": datetime.now(timezone.utc)
+                        },
+                        "$setOnInsert": {"data.events": []}
                     },
-                    "$setOnInsert": {"data.events": []}
-                },
-                upsert=True
-            )
+                    upsert=True
+                )
 
         agent_error = None
         try:
@@ -149,23 +165,14 @@ async def chat(
         if session:
             state = getattr(session, "state", None) or {}
             
-            itinerary = state.get("final_itinerary")
-            if isinstance(itinerary, str):
-                try: itinerary = json.loads(itinerary)
-                except: pass
-                
+            itinerary = safe_parse_json(state.get("final_itinerary"))
             if not itinerary:
                 itinerary_doc = await db.itineraries.find_one({"session_id": request.session_id, "user_id": user_id})
                 if itinerary_doc:
                     itinerary_doc.pop("_id", None)
                     itinerary = itinerary_doc
 
-            user_profile = state.get("traveler_profile") or state.get("user_profile_data")
-            
-            # Defensive string parsing
-            if isinstance(user_profile, str):
-                try: user_profile = json.loads(user_profile)
-                except: pass
+            user_profile = safe_parse_json(state.get("traveler_profile") or state.get("user_profile_data"))
                 
             # Sync the extracted state to the materialized collections
             # This ensures the visual dashboard can find the latest plans
@@ -210,10 +217,7 @@ async def chat(
             itinerary["validation_errors"] = []
             
             if isinstance(user_profile, dict) and itinerary.get("events"):
-                prefs = user_profile.get("preferences") or {}
-                if isinstance(prefs, str):
-                    try: prefs = json.loads(prefs)
-                    except: prefs = {}
+                prefs = safe_parse_json(user_profile.get("preferences"), default={})
 
                 risk = prefs.get("risk_tolerance", "relaxed")
                 vibe = prefs.get("circadian_preference", "night_owl")

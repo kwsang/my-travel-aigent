@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useItineraryData } from '@/context/ItineraryContext';
-import { APIProvider, Map, useMap, useApiIsLoaded } from '@vis.gl/react-google-maps';
+import { Map, useMap, useApiIsLoaded } from '@vis.gl/react-google-maps';
 import { marineSunsetMapStyle } from '@/config/mapStyles';
 import { SuggestionPlace, Event, Destination } from '@/types';
 import { API_CONFIG } from '@/config/constants';
@@ -18,9 +18,6 @@ import MapLoadingState from './MapLoadingState';
 import MapActionToast from './MapActionToast';
 import { MapProvider } from './MapContext';
 
-// Extracted outside the component to prevent infinite re-renders in useJsApiLoader
-const MAPS_LIBRARIES: ("marker" | "places" | "geometry")[] = ["marker", "places", "geometry"];
-
 /**
  * MapHub Component
  * Visualizes itinerary segments on a geographic workspace.
@@ -34,10 +31,7 @@ export default function MapHub() {
 
   return (
     <div className="relative h-full w-full bg-background overflow-hidden">
-      {/* Using `any` cast on libraries as @vis.gl types can sometimes conflict with native arrays */}
-      <APIProvider apiKey={apiKey} libraries={MAPS_LIBRARIES as any}>
-        <MapInner />
-      </APIProvider>
+      <MapInner />
     </div>
   );
 }

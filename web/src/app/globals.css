@@ -166,37 +166,40 @@ gmp-place-autocomplete {
   --pac-font-family: var(--font-sans); 
   
   /* Match Tailwind's dark oceanic theme */
-  --pac-color-background: var(--background);
+  --pac-color-background: var(--card);
   --pac-color-text: var(--foreground);
   --pac-color-text-secondary: var(--muted-foreground);
-  --pac-color-border: var(--border);
+  --pac-color-border: rgba(255, 255, 255, 0.1);
+  --pac-color-hover: rgba(255, 255, 255, 0.05);
   
   /* Match primary color */
   --pac-color-primary: var(--primary); 
   --pac-color-icon: var(--muted-foreground);
   
-  --pac-border-radius: var(--radius-md); 
-  --pac-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  --pac-border-radius: 0.75rem; 
+  --pac-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
 }
 
 /* Target the input element inside the Web Component */
 gmp-place-autocomplete::part(input) {
-  padding-top: 0.5rem;    
-  padding-bottom: 0.5rem;
-  padding-left: 0.75rem;  
-  padding-right: 0.75rem;
-  font-size: 0.875rem;    
-  line-height: 1.25rem;
-  background-color: var(--background);
+  width: 100%;
+  padding-top: 0.75rem;    
+  padding-bottom: 0.75rem;
+  padding-left: 1rem;  
+  padding-right: 1rem;
+  font-size: 1rem;    
+  line-height: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.05);
   color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  box-sizing: border-box;
+  transition: all 0.2s;
 }
 
 /* Replicate Tailwind's standard focus ring */
 gmp-place-autocomplete::part(input):focus {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-  border-color: var(--ring); 
-  box-shadow: 0 0 0 1px var(--ring); 
+  outline: none;
+  border-color: transparent; 
+  box-shadow: 0 0 0 2px rgba(23, 137, 252, 0.5); /* matches focus:ring-primary/50 */
 }
