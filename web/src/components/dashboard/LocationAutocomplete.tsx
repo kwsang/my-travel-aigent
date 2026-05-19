@@ -16,7 +16,8 @@ export default function LocationAutocomplete({
   placeholder = "e.g. New York, USA", 
   className = ""
 }: LocationAutocompleteProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<any>(null);
   const onChangeRef = useRef(onChange);
   const isLoaded = useApiIsLoaded();
 
@@ -25,60 +26,39 @@ export default function LocationAutocomplete({
   }, [onChange]);
 
   useEffect(() => {
-    if (!isLoaded || !containerRef.current) return;
+    if (!isLoaded || !inputRef.current) return;
 
-        containerRef.current.innerHTML = '';
-        const autocomplete = new (window as any).google.maps.places.PlaceAutocompleteElement();
+    // Initialize Classic Google Maps Autocomplete on our native React input
+    autocompleteRef.current = new (window as any).google.maps.places.Autocomplete(inputRef.current, {
+      fields: ['formatted_address', 'name'],
+    });
 
-        const inputElement = document.createElement('input');
-        inputElement.type = 'text';
-        inputElement.placeholder = placeholder;
-        inputElement.value = value || '';
-        inputElement.className = `w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all ${className}`;
-        
-        
-        inputElement.addEventListener('input', (e: any) => {
-          onChangeRef.current(e.target.value);
-        });
-
-        autocomplete.appendChild(inputElement);
-        containerRef.current.appendChild(autocomplete);
-
-        const listener = (e: any) => {
-          const place = e.place;
-          if (!place) return;
-          
-          place.fetchFields({ fields: ['displayName', 'formattedAddress'] }).then(() => {
-            if (place.formattedAddress) {
-              onChangeRef.current(place.formattedAddress);
-              inputElement.value = place.formattedAddress;
-            } else if (place.displayName) {
-              onChangeRef.current(place.displayName);
-              inputElement.value = place.displayName;
-            }
-          });
-        };
-
-        autocomplete.addEventListener('gmp-placeselect', listener);
+    const listener = autocompleteRef.current.addListener('place_changed', () => {
+      const place = autocompleteRef.current.getPlace();
+      if (!place) return;
+      
+      if (place.formatted_address) {
+        onChangeRef.current(place.formatted_address);
+      } else if (place.name) {
+        onChangeRef.current(place.name);
+      }
+    });
 
     return () => { 
-      autocomplete.removeEventListener('gmp-placeselect', listener); 
-    };
-  }, [isLoaded, placeholder, className]);
-
-  // Keeps the DOM input visually in sync when the parent fetches async profile data
-  useEffect(() => {
-    if (containerRef.current) {
-      const input = containerRef.current.querySelector('input');
-      if (input && input.value !== value && document.activeElement !== input) {
-        input.value = value || '';
+      if (listener) {
+        (window as any).google.maps.event.removeListener(listener);
       }
-    }
-  }, [value]);
+    };
+  }, [isLoaded]);
 
   return (
-    <>
-      <div ref={containerRef} className={`w-full min-h-[46px] ${className}`} />
-    </>
+    <input
+      ref={inputRef}
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all ${className}`}
+    />
   );
 }

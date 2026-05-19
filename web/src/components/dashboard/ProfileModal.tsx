@@ -7,14 +7,12 @@ import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
 import { TravelerProfile } from '@/types';
 import { parseProfileData } from '@/utils/profileUtils';
-import { APIProvider, useMapsLibrary } from '@vis.gl/react-google-maps';
+import LocationAutocomplete from './LocationAutocomplete';
 
 const getTodayString = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
-
-const MAPS_LIBRARIES: ("places")[] = ["places"];
 
 interface ProfileModalProps {
   sessionId: string;
@@ -433,12 +431,10 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
         <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
           <Navigation size={14} /> Starting Location
         </label>
-        <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || ''} libraries={MAPS_LIBRARIES as any}>
-          <LocationAutocomplete 
-            value={formData.preferences.starting_location || ''}
-            onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, starting_location: val}})}
-          />
-        </APIProvider>
+        <LocationAutocomplete 
+          value={formData.preferences.starting_location || ''}
+          onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, starting_location: val}})}
+        />
       </div>
 
       <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
@@ -503,73 +499,5 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
         </label>
       </div>
     </div>
-  );
-}
-
-function LocationAutocomplete({ value, onChange }: { value: string, onChange: (val: string) => void }) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const places = useMapsLibrary('places');
-  const onChangeRef = React.useRef(onChange);
-
-  React.useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  React.useEffect(() => {
-    if (!places || !containerRef.current) return;
-
-    containerRef.current.innerHTML = '';
-    const autocomplete = new (places as any).PlaceAutocompleteElement();
-
-    const inputElement = document.createElement('input');
-    inputElement.type = 'text';
-    inputElement.placeholder = 'e.g. New York, USA';
-    autocomplete.appendChild(inputElement);
-
-    containerRef.current.appendChild(autocomplete);
-
-    const listener = (e: any) => {
-      const place = e.place;
-      if (!place) return;
-      
-      place.fetchFields({ fields: ['displayName', 'formattedAddress'] }).then(() => {
-        if (place.formattedAddress) {
-          onChangeRef.current(place.formattedAddress);
-        } else if (place.displayName) {
-          onChangeRef.current(place.displayName);
-        }
-      });
-    };
-
-    autocomplete.addEventListener('gmp-placeselect', listener);
-
-    return () => {
-      autocomplete.removeEventListener('gmp-placeselect', listener);
-    };
-  }, [places]);
-
-  return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: `
-        gmp-place-autocomplete {
-          width: 100%;
-        }
-        gmp-place-autocomplete input {
-          width: 100%;
-          background-color: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 0.75rem;
-          padding: 0.75rem 1rem;
-          color: white;
-          transition: all 0.2s;
-        }
-        gmp-place-autocomplete input:focus {
-          outline: none;
-          box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.5);
-        }
-      ` }} />
-      {value && <div className="text-xs font-semibold text-primary mb-2">Selected: {value}</div>}
-      <div ref={containerRef} className="w-full" />
-    </>
   );
 }

@@ -12,12 +12,14 @@ describe('LocationAutocomplete', () => {
   let mockOnChange: jest.Mock;
   let mockAddEventListener: jest.Mock;
   let placeSelectListener: any;
+  let mockPlace: any;
 
   beforeEach(() => {
     mockOnChange = jest.fn();
     placeSelectListener = null;
+    mockPlace = {};
     mockAddEventListener = jest.fn((event, cb) => {
-      if (event === 'gmp-placeselect') {
+      if (event === 'place_changed') {
         placeSelectListener = cb;
       }
     });
@@ -25,12 +27,15 @@ describe('LocationAutocomplete', () => {
     // Mock the global Google Maps object that the component expects
     (window as any).google = {
       maps: {
+        event: {
+          removeListener: jest.fn(),
+        },
         places: {
-          PlaceAutocompleteElement: jest.fn().mockImplementation(() => {
-            const el = document.createElement('div');
-            el.addEventListener = mockAddEventListener as any;
-            el.removeEventListener = jest.fn() as any;
-            return el;
+          Autocomplete: jest.fn().mockImplementation(() => {
+            return {
+              addListener: mockAddEventListener,
+              getPlace: () => mockPlace
+            };
           }),
         },
       },
@@ -41,61 +46,47 @@ describe('LocationAutocomplete', () => {
     jest.clearAllMocks();
   });
 
-  it('initializes Google Maps PlaceAutocompleteElement', () => {
+  it('initializes classic Google Maps Autocomplete', () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} placeholder="Search City..." />);
     
-    expect((window as any).google.maps.places.PlaceAutocompleteElement).toHaveBeenCalledTimes(1);
-    expect(mockAddEventListener).toHaveBeenCalledWith('gmp-placeselect', expect.any(Function));
+    expect((window as any).google.maps.places.Autocomplete).toHaveBeenCalledTimes(1);
+    expect(mockAddEventListener).toHaveBeenCalledWith('place_changed', expect.any(Function));
   });
 
-  it('calls onChange when the user types in the injected input', () => {
+  it('calls onChange when the user types in the native input', () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} placeholder="Search City..." />);
     
     // Find the dynamically injected native <input> element
     const input = screen.getByPlaceholderText('Search City...');
-    fireEvent.input(input, { target: { value: 'Duluth, GA' } });
+    fireEvent.change(input, { target: { value: 'Duluth, GA' } });
     
     expect(mockOnChange).toHaveBeenCalledWith('Duluth, GA');
   });
 
-  it('integrates with Google Maps Place API and calls onChange with formattedAddress', async () => {
+  it('integrates with Google Maps Place API and calls onChange with formatted_address', async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} placeholder="Search City..." />);
     
     expect(placeSelectListener).toBeDefined();
 
-    const mockPlace = {
-      fetchFields: jest.fn().mockResolvedValue(undefined),
-      formattedAddress: 'Savannah, GA, USA',
-      displayName: 'Savannah',
+    mockPlace = {
+      formatted_address: 'Savannah, GA, USA',
+      name: 'Savannah',
     };
 
     // Simulate Google Maps firing the place select event
-    placeSelectListener({ place: mockPlace });
-
-    // Wait for the async place.fetchFields promise to resolve
-    await waitFor(() => {
-      expect(mockPlace.fetchFields).toHaveBeenCalledWith({ fields: ['displayName', 'formattedAddress'] });
-      expect(mockOnChange).toHaveBeenCalledWith('Savannah, GA, USA');
-    });
-    
-    // Verify the native input value was also updated
-    const input = screen.getByPlaceholderText('Search City...') as HTMLInputElement;
-    expect(input.value).toBe('Savannah, GA, USA');
+    placeSelectListener();
+    expect(mockOnChange).toHaveBeenCalledWith('Savannah, GA, USA');
   });
 
-  it('falls back to displayName if formattedAddress is missing', async () => {
+  it('falls back to name if formatted_address is missing', async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} placeholder="Search City..." />);
     
-    const mockPlace = {
-      fetchFields: jest.fn().mockResolvedValue(undefined),
-      formattedAddress: undefined,
-      displayName: 'Savannah',
+    mockPlace = {
+      formatted_address: undefined,
+      name: 'Savannah',
     };
 
-    placeSelectListener({ place: mockPlace });
-
-    await waitFor(() => {
-      expect(mockOnChange).toHaveBeenCalledWith('Savannah');
-    });
+    placeSelectListener();
+    expect(mockOnChange).toHaveBeenCalledWith('Savannah');
   });
 });
