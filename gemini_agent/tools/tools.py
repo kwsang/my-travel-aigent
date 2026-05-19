@@ -13,7 +13,8 @@ from .discovery import (
     save_destination_lodging,
     save_destination_activities,
     get_cached_lodging,
-    get_cached_activities
+    get_cached_activities,
+    vector_search_places
 )
 
 # Placeholder for itinerary and geo tools (to be implemented similarly)

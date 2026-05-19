@@ -89,3 +89,53 @@ steps:
         echo "🔗 Linking API CORS to: $$FINAL_WEB_URL"
         sed -i "/name: FRONTEND_URL/{n;s|value:.*|value: \"$$FINAL_WEB_URL\"|}" cloudrun-api.yml
         gcloud run services replace cloudrun-api.yml --region=us-central1
+
+  # 5. Build and push Sync Job image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-sync'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/sync:$BUILD_ID', '-f', 'Dockerfile.sync', '.']
+    env: ['DOCKER_BUILDKIT=1']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-sync'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/sync:$BUILD_ID']
+
+  # 6. Deploy Cloud Run Job & Scheduler
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-sync-job'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚀 Deploying Sync Places Job..."
+        
+        # Create or update the Cloud Run Job
+        gcloud run jobs update sync-places-job \
+          --image us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/sync:$BUILD_ID \
+          --region us-central1 \
+          --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1 \
+          --set-secrets="VOYAGE_API_KEY=VOYAGE_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest,MONGODB_URI=MONGODB_URI:latest" \
+          --service-account travel-aigent-runner@$PROJECT_ID.iam.gserviceaccount.com \
+          || \
+        gcloud run jobs create sync-places-job \
+          --image us-central1-docker.pkg.dev/$PROJECT_ID/travel-aigent/sync:$BUILD_ID \
+          --region us-central1 \
+          --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1 \
+          --set-secrets="VOYAGE_API_KEY=VOYAGE_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest,MONGODB_URI=MONGODB_URI:latest" \
+          --service-account travel-aigent-runner@$PROJECT_ID.iam.gserviceaccount.com
+          
+        echo "⏰ Configuring Cloud Scheduler Trigger..."
+        # Create or update the Scheduler Trigger
+        gcloud scheduler jobs update http sync-places-schedule \
+          --location us-central1 \
+          --schedule "0 2 * * *" \
+          --uri "https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$PROJECT_ID/jobs/sync-places-job:run" \
+          --http-method POST \
+          --oauth-service-account-email travel-aigent-runner@$PROJECT_ID.iam.gserviceaccount.com \
+          || \
+        gcloud scheduler jobs create http sync-places-schedule \
+          --location us-central1 \
+          --schedule "0 2 * * *" \
+          --uri "https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$PROJECT_ID/jobs/sync-places-job:run" \
+          --http-method POST \
+          --oauth-service-account-email travel-aigent-runner@$PROJECT_ID.iam.gserviceaccount.com

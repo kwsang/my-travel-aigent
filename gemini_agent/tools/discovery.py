@@ -147,7 +147,7 @@ async def _discover_new_destination_impl(vibe_or_city: str) -> str:
         if await destinations_collection.find_one(_build_destination_query(candidate)):
             return f"Destination '{candidate}' is already in the atlas."
 
-        mask = "places.displayName,places.location,places.formattedAddress,places.types,places.addressComponents"
+        mask = "places.displayName,places.location,places.formattedAddress,places.types,places.addressComponents,places.editorialSummary"
         request = {"text_query": candidate, "max_result_count": 1}
         
         response = await asyncio.to_thread(
@@ -160,8 +160,8 @@ async def _discover_new_destination_impl(vibe_or_city: str) -> str:
             return f"Google Maps could not verify '{candidate}' as a valid destination."
 
         place = response.places[0]
-        description = (f"The city of {place.display_name.text}. A destination discovered for its "
-                      f"'{vibe_or_city}' characteristics, located in {place.formatted_address}.")
+        summary = place.editorial_summary.text if place.editorial_summary else ""
+        base_description = (f"The city of {place.display_name.text}. A destination located in {place.formatted_address}. {summary}")
         
         state = ""
         country = ""
@@ -171,18 +171,38 @@ async def _discover_new_destination_impl(vibe_or_city: str) -> str:
             if "country" in component.types:
                 country = component.short_text
 
-        vibe_prompt = (
-            f"Given the destination '{place.display_name.text}' with description '{description}', "
-            f"choose 2 to 4 of the most appropriate vibe tags from this exact list: {', '.join(VALID_VIBES)}. "
-            f"Return ONLY the tags as a comma-separated list, nothing else."
-        )
         try:
+            vibe_prompt = (
+                f"Given the destination '{place.display_name.text}' with this background: '{base_description}', "
+                f"write a rich, engaging 2-3 sentence travel description highlighting its culture, scenery, and overall vibe. "
+                f"Also, choose 2 to 4 of the most appropriate vibe tags from this exact list: {', '.join(VALID_VIBES)}. "
+                f"Return the result strictly as a JSON object with two keys: 'description' (string) and 'tags' (list of strings)."
+            )
             vibe_response = await discovery_client.aio.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=vibe_prompt
             )
-            vibe_tags = [t for t in VALID_VIBES if t in vibe_response.text.lower()]
-        except Exception:
+            
+            # Clean potential markdown wrapping
+            raw_text = vibe_response.text.strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:]
+            elif raw_text.startswith("```"):
+                raw_text = raw_text[3:]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+                
+            parsed_resp = json.loads(raw_text.strip())
+            description = parsed_resp.get("description", base_description)
+            
+            raw_tags = parsed_resp.get("tags", [])
+            if isinstance(raw_tags, str):
+                raw_tags = raw_tags.split(",")
+            vibe_tags = [t for t in VALID_VIBES if any(t.lower() in str(rt).lower() for rt in raw_tags)]
+            
+        except Exception as e:
+            logger.warning(f"Failed to generate rich description/tags: {e}")
+            description = base_description
             vibe_tags = []
             
         if not vibe_tags:
@@ -292,7 +312,12 @@ async def save_destination_lodging(destination_name: str, lodging: str, tool_con
         if to_add:
             await destinations_collection.update_one(
                 {"_id": dest["_id"]},
-                {"$push": {"suggested_lodging": {"$each": to_add}}}
+                {"$push": {
+                    "suggested_lodging": {
+                        "$each": to_add,
+                        "$slice": -50
+                    }
+                }}
             )
             
         return f"SUCCESS: Lodgings saved to destination '{active_dest}'."
@@ -356,7 +381,12 @@ async def save_destination_activities(destination_name: str, activities: str, to
         if to_add:
             await destinations_collection.update_one(
                 {"_id": dest["_id"]},
-                {"$push": {"suggested_activities": {"$each": to_add}}}
+                {"$push": {
+                    "suggested_activities": {
+                        "$each": to_add,
+                        "$slice": -50
+                    }
+                }}
             )
             
         return f"SUCCESS: Activities saved to destination '{active_dest}'."
@@ -428,3 +458,92 @@ async def get_cached_activities(destination_name: str, tool_context: InvocationC
         return "No cached activities found. Please use the search_places tool instead."
     except Exception as e:
         return f"Error fetching cached activities: {str(e)}"
+    
+async def vector_search_places(destination_name: str, query: str, tool_context: InvocationContext) -> str:
+    """
+    Performs a Hybrid Search (Semantic + Keyword) for places within a specific destination.
+    Combines Voyage AI embeddings ($vectorSearch) with BM25 ($search) via Reciprocal Rank Fusion (RRF).
+    """
+    active_dest = _get_active_destination(destination_name, tool_context)
+    try:
+        if voyage_client is None:
+            return "Error: Voyage AI service is currently unavailable."
+        if destinations_collection is None:
+            return "Error: Database connection is currently unavailable."
+
+        db = destinations_collection.database
+
+        # 1. Fetch the semantic embedding for the user's query
+        embedding = await _get_embedding_with_retry(query, "query")
+        
+        # 2. Pipeline 1: Semantic Vector Search
+        vector_pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": "vector_index", 
+                    "path": "embedding",
+                    "queryVector": embedding,
+                    "numCandidates": 50,
+                    "limit": 10
+                }
+            },
+            { "$project": { "_id": 0, "embedding": 0 } }
+        ]
+        
+        # 3. Pipeline 2: Exact Keyword Match (BM25)
+        text_pipeline = [
+            {
+                "$search": {
+                    "index": "text_index", 
+                    "text": {
+                        "query": query,
+                        "path": ["name", "description", "types"]
+                    }
+                }
+            },
+            { "$limit": 10 },
+            { "$project": { "_id": 0, "embedding": 0 } }
+        ]
+        
+        # 4. Execute both searches concurrently
+        vector_results, text_results = await asyncio.gather(
+            db["places"].aggregate(vector_pipeline).to_list(length=10),
+            db["places"].aggregate(text_pipeline).to_list(length=10),
+            return_exceptions=True
+        )
+        
+        if isinstance(text_results, Exception):
+            logger.warning(f"Text search failed (missing text_index?): {text_results}")
+            text_results = []
+        if isinstance(vector_results, Exception):
+            logger.error(f"Vector search failed: {vector_results}")
+            return f"Error during vector search: {vector_results}"
+
+        # 5. Combine results using Reciprocal Rank Fusion (RRF)
+        # RRF Formula: Score = 1 / (rank + k)
+        rrf_k = 60
+        fused_scores = {}
+        fused_docs = {}
+        
+        def _apply_rrf(results_list):
+            for rank, doc in enumerate(results_list):
+                place_id = doc.get("place_id")
+                if not place_id: continue
+                if place_id not in fused_scores:
+                    fused_scores[place_id] = 0.0
+                    fused_docs[place_id] = doc
+                fused_scores[place_id] += 1.0 / (rank + rrf_k)
+
+        _apply_rrf(vector_results)
+        _apply_rrf(text_results)
+        
+        # 6. Sort by highest fused score and return top 5 to the Agent
+        ranked_place_ids = sorted(fused_scores.keys(), key=lambda pid: fused_scores[pid], reverse=True)
+        top_places = [fused_docs[pid] for pid in ranked_place_ids[:5]]
+        
+        if not top_places:
+            return f"No semantic matches found for '{query}' in {active_dest}."
+            
+        return json.dumps(top_places, default=str)
+    except Exception as e:
+        return f"Error during hybrid search for places: {str(e)}"

@@ -1,0 +1,12 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Set PYTHONPATH so python can resolve the 'gemini_agent' package
+ENV PYTHONPATH=/app
+
+CMD ["python", "gemini_agent/tools/sync_places_cron.py"]

@@ -1,57 +1,59 @@
-# 🌎 My Travel AIgent
+# My Travel Aigent 🗺️✈️
 
-Next-Gen Travel Planning powered by the Google Agent Development Kit (ADK) and Gemini 2.5 Flash.
+My Travel Aigent is an intelligent, multi-agent travel planning assistant built natively on Google Cloud. It leverages the **Google Agent Development Kit (ADK)**, **Gemini 2.5 Flash**, **Voyage AI**, and **MongoDB Atlas** to create highly personalized, context-aware travel itineraries.
 
-## ✨ Features
+## Features ✨
 
-- **Multi-Agent Orchestration:** A Travel Supervisor intelligently routes your natural language requests to specialized sub-agents (Architect, Pioneer, and Activity Planner) based on conversation context.
-- **Interactive Visual Workspace:** A dynamic Next.js dashboard featuring a drag-and-drop chronological timeline and an integrated Google Map that dynamically plots out your journey.
-- **Smart Logistics:** Leverages the Google Maps Routes and Distance Matrix APIs to automatically calculate driving times, plot flight paths, and prevent physically impossible schedules (e.g., dining in a city you haven't arrived in yet).
-- **Budget & Conflict Engine:** Validates the itinerary structure in real-time, tracking per-person or group budgets, flagging temporal overlaps, and adjusting for circadian rhythms.
-- **Autonomous Discovery & Caching:** Background processes autonomously search for and cache top-rated lodging and activities using Voyage AI semantic search embeddings to reduce API latency.
+*   **Multi-Agent Orchestration**: Specialized agents handle distinct parts of the travel planning lifecycle:
+    *   **Supervisor**: Intelligently routes user requests based on state and context.
+    *   **Concierge**: Welcomes the user, gathers travel preferences, and proactively suggests local events.
+    *   **Architect**: Builds high-fidelity itineraries, schedules events, and handles logistical constraints.
+*   **Semantic Hybrid Search**: Combines Voyage AI vector embeddings (`$vectorSearch`) with exact-match text search (BM25) using **Reciprocal Rank Fusion (RRF)** in MongoDB Atlas to find the perfect hotels, restaurants, and activities based on user vibes.
+*   **Proactive Discovery**: Background cron jobs automatically discover and cache top-rated Google Places for destinations, pre-computing embeddings to eliminate latency during live agent chats.
+*   **Constraint Validation**: The Architect agent dynamically respects user budgets, circadian preferences, and logistical proximity (powered by Google Maps APIs).
+*   **Cloud Native CI/CD**: Fully containerized and deployed on Google Cloud Run, orchestrated via Cloud Build, with background jobs triggered by Cloud Scheduler.
 
-## 🏗 Architecture
+## Architecture & Tech Stack 🏗️
 
-* **Frontend:** Next.js (React), Tailwind CSS, `@vis.gl/react-google-maps`
-* **Backend:** FastAPI (Python), Motor (Async MongoDB), Google Maps API, Google Places API
-* **AI Framework:** Google GenAI SDK, Google ADK (Agent Development Kit)
-* **Database:** MongoDB Atlas (with Vector Search)
+*   **Agent Framework**: Google ADK
+*   **LLM**: Google Gemini 2.5 Flash (`google-genai`)
+*   **Embeddings**: Voyage AI (`voyage-4`)
+*   **Database**: MongoDB Atlas (Vector Search, GeoJSON, TTL Indexes)
+*   **Backend**: FastAPI, Motor (Async MongoDB Driver)
+*   **External APIs**: Google Maps API, Google Places API
 
-## 🤖 The Agents
+## Project Structure 📁
 
-1. **Travel Supervisor:** Evaluates the state of the conversation and dynamically invokes transfer tools to route the user to the correct specialist.
-2. **Concierge:** Focuses on user profiling and data gathering to establish budgets and risk tolerances.
-3. **Travel Pioneer:** Specializes in geographic anchoring, calculating transportation routes, and locking down lodging and flights.
-4. **Activity Planner:** Fills the itinerary with incredible experiences and dining that match the user's vibe, adhering strictly to operating hours.
-5. **Architect:** Coordinates the overall itinerary, finalizing details and saving the drafts to the database.
+*   `/api`: FastAPI web server and routing (`chat.py`, `itinerary.py`, `destinations.py`, `profile.py`).
+*   `/gemini_agent`: Core Google ADK agent logic.
+    *   `agent_definition.py`: Defines the Multi-Agent App and routes.
+    *   `/tools`: Tools exposed to the agents (Discovery, Itinerary Management, Geo Tools).
+    *   `/prompts`: System and Agent-specific markdown prompts.
+*   `/docs`: Architecture and data modeling documentation.
+*   `/web`: Next.js frontend web application.
+*   `server.py`: FastAPI application entry point.
+*   `Dockerfile` & `Dockerfile.sync`: Container definitions for the API and the background sync cron job.
+*   `cloudbuild.yaml`: CI/CD pipeline definition for Google Cloud Build.
 
-## 🚀 Setup & Installation
+## Documentation 📚
+
+*   MongoDB Data Modeling Patterns
+
+## Setup & Deployment 🚀
 
 ### 1. Environment Variables
-Create a `.env` file in the root directory with the following keys:
-```env
-GOOGLE_CLOUD_PROJECT=your-google-project-id
-GOOGLE_MAPS_API_KEY=your-maps-api-key
-VOYAGE_API_KEY=your-voyage-api-key
-MONGODB_URI=your-mongodb-atlas-connection-string
-```
+Ensure the following are set in your `.env` or Google Cloud Secret Manager:
+*   `GOOGLE_CLOUD_PROJECT`
+*   `VOYAGE_API_KEY`
+*   `GOOGLE_MAPS_API_KEY`
+*   `MONGODB_URI`
 
-### 2. Backend (FastAPI)
-Make sure you have Python 3.10+ installed.
-```bash
-# Install dependencies
-pip install -r requirements.txt
+### 2. Database Indexes
+Requires MongoDB Atlas with standard collection indexes (including a TTL index on `sessions.updated_at`) and specific Atlas Search indexes (`vector_index` for semantic search and `text_index` for keyword search on the `places` collection).
 
-# Start the FastAPI server
-uvicorn server:app --reload --port 8000
-```
+### 3. Local Development
+*   **Interactive Terminal**: Run `python gemini_agent/main.py` for a fast, terminal-based MVP session.
+*   **REST API**: Run `uvicorn server:app --reload` to start the FastAPI backend locally.
 
-### 3. Frontend (Next.js)
-Open a new terminal window in the `/web` directory.
-```bash
-cd web
-npm install
-npm run dev
-```
-
-Visit `http://localhost:3000` in your browser to start planning!
+### 4. Cloud Deployment
+Push to your configured repository branch to trigger Google Cloud Build (`cloudbuild.yaml`). This pipeline automatically builds and deploys the FastAPI backend, the Next.js frontend, and the Cloud Run Job for background syncing.

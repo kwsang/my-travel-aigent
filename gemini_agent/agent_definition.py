@@ -31,7 +31,8 @@ from gemini_agent.tools.tools import (
     clone_itinerary,
     save_itinerary,
     finalize_itinerary,
-    search_local_events
+    search_local_events,
+    vector_search_places
 )
 from gemini_agent.logic.utils import get_state_context
 
@@ -52,6 +53,7 @@ def create_travel_agent():
     get_cached_act_tool = FunctionTool(func=get_cached_activities)
     places_search_tool = FunctionTool(func=search_places)
     events_tool = FunctionTool(func=search_local_events)
+    vector_search_tool = FunctionTool(func=vector_search_places)
     retrieve_itinerary_tool = FunctionTool(func=get_itinerary)
     list_versions_tool = FunctionTool(func=list_trip_versions)
     delete_itinerary_tool = FunctionTool(func=delete_itinerary)
@@ -62,6 +64,24 @@ def create_travel_agent():
     # Local Python-based versions of the MCP/API tools to avoid Protocol errors
     get_profile_tool = FunctionTool(func=query_user_profile)
     persist_tool = FunctionTool(func=save_itinerary)
+    
+    # Group tools by domain to easily share them across agents
+    ITINERARY_MANAGEMENT_TOOLS = [
+        persist_tool, 
+        retrieve_itinerary_tool,
+        list_versions_tool,
+        delete_itinerary_tool,
+        update_status_tool,
+        finalize_tool,
+        clone_tool
+    ]
+    
+    RESEARCH_TOOLS = [
+        places_search_tool,
+        vector_search_tool,
+        search_tool,
+        events_tool
+    ]
 
     # 3. Load Instruction Prompts
     prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
@@ -101,22 +121,21 @@ def create_travel_agent():
         instruction=get_concierge_instructions,
         tools=[
             record_profile_tool, 
-            get_profile_tool, 
-            events_tool, 
-            retrieve_itinerary_tool,
-            list_versions_tool,
-            delete_itinerary_tool,
-            update_status_tool,
-            finalize_tool,
-            clone_tool
+            get_profile_tool,
+            *ITINERARY_MANAGEMENT_TOOLS,
+            save_dest_acc_tool,
+            save_dest_act_tool,
+            get_cached_acc_tool,
+            get_cached_act_tool,
+            *RESEARCH_TOOLS
         ],
         description="Welcomes the user, gathers travel preferences, and proactively suggests local events to improve engagement."
     )
 
     # 4.2 Architect: Focused on logistics, search, and planning
     def get_architect_instructions(ctx: Context) -> str:
-        prompt = architect_goal
-        
+        prompt = f"{architect_goal}\n\n### Travel Pioneer Guidelines:\n{pioneer_goal}\n\n### Activity Planner Guidelines:\n{activity_planner_goal}"
+
         profile, itinerary = _get_safe_state(ctx)
         state = getattr(ctx, "state", getattr(ctx.session, "state", {})) # Keep for violations
         
@@ -139,70 +158,10 @@ def create_travel_agent():
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested a trip duration of {duration} Days. Ensure the itinerary covers exactly {duration} days."
 
+        prompt += "\n\n[TRANSIT RULE]\nDo NOT generate or schedule `TRANSPORT` segments for commuting between local activities. Only schedule the actual `EXPERIENCE` and `DINING` events, and primary transit (flights/driving to the destination)."
         prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."
         prompt += f"\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"
         return prompt
-
-    def get_pioneer_instructions(ctx: Context) -> str:
-        profile, itinerary = _get_safe_state(ctx)
-        prompt = pioneer_goal
-        
-        profile_model = TravelerProfile.model_validate(profile)
-        start_date = profile_model.preferences.start_date
-        end_date = profile_model.preferences.end_date
-        duration = profile_model.preferences.target_duration_days
-
-        if start_date and end_date:
-            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST be scheduled strictly between {start_date} and {end_date} (Duration: {duration} Days). Day 1 MUST begin on {start_date}."
-        elif duration:
-            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll logistics and flights MUST span exactly {duration} Days."
-            
-        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."
-
-        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"
-
-    def get_activity_planner_instructions(ctx: Context) -> str:
-        profile, itinerary = _get_safe_state(ctx)
-        prompt = activity_planner_goal
-        
-        # Use Pydantic to ensure default constraints are safely populated
-        profile_model = TravelerProfile.model_validate(profile)
-        start_date = profile_model.preferences.start_date
-        end_date = profile_model.preferences.end_date
-        duration = profile_model.preferences.target_duration_days
-
-        destination = itinerary.get("destination")
-        if destination:
-            prompt += f"\n\n[DESTINATION ANCHOR]\nThe user's confirmed destination is '{destination}'. You MUST restrict all activity, event, and dining searches strictly to this city, state, and country. Do not suggest venues from other similarly named cities."
-
-        if start_date and end_date:
-            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST be scheduled strictly between {start_date} and {end_date} (Duration: {duration} Days)."
-        elif duration:
-            prompt += f"\n\n[STRICT DATE CONSTRAINT]\nAll activities MUST span exactly {duration} Days."
-            
-        prompt += "\n\n[TRANSIT RULE]\nDo NOT generate or schedule `TRANSPORT` segments for commuting between activities or dining. Only schedule the actual `EXPERIENCE` and `DINING` events. Assume the user will handle point-to-point local transit ad-hoc."
-
-        prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."
-
-        return f"{prompt}\n\n### Current UI State\nProfile: {json.dumps(profile, default=str)}\nItinerary: {json.dumps(itinerary, default=str)}"
-
-    pioneer_agent = Agent(
-        name="travel_pioneer",
-        model="gemini-2.5-flash",
-        static_instruction=system_instructions,
-        instruction=get_pioneer_instructions,
-        tools=[search_tool, discovery_tool, get_cached_acc_tool, save_dest_acc_tool, places_search_tool, persist_tool],
-        description="Specializes in geographic anchoring, transportation, and finding the perfect destination and lodging."
-    )
-
-    activity_planner_agent = Agent(
-        name="activity_planner",
-        model="gemini-2.5-flash",
-        static_instruction=system_instructions,
-        instruction=get_activity_planner_instructions,
-        tools=[places_search_tool, events_tool, get_cached_act_tool, save_dest_act_tool, persist_tool],
-        description="Fills the itinerary with incredible EXPERIENCE and DINING segments that match the user's interests, vibe, and circadian rhythm."
-    )
 
     architect_agent = Agent(
         name="architect",
@@ -210,16 +169,12 @@ def create_travel_agent():
         static_instruction=system_instructions,
         instruction=get_architect_instructions,
         tools=[
-            persist_tool, 
-            retrieve_itinerary_tool,
-            list_versions_tool,
-            delete_itinerary_tool,
-            update_status_tool,
-            finalize_tool,
-            clone_tool
+            discovery_tool, get_cached_acc_tool, save_dest_acc_tool, 
+            get_cached_act_tool, save_dest_act_tool, 
+            *ITINERARY_MANAGEMENT_TOOLS, *RESEARCH_TOOLS
         ],
         output_key="final_itinerary",
-        description="Expert travel planner. Researches destinations, venues, and travel times to build high-fidelity itineraries."
+        description="Expert travel planner. Researches destinations, finds lodging, schedules activities, and builds high-fidelity itineraries."
     )
 
     # 4.3 Supervisor: The Root Agent that orchestrates handoffs
@@ -262,25 +217,15 @@ def create_travel_agent():
 
             events = itinerary_data.get("events") or []
             if len(events) > 0:
-                has_lodging = any(e.get("segment") == "LODGING" for e in events)
-                has_transport = any(e.get("segment") in ["TRANSPORT", "FLIGHT"] for e in events)
-                has_activities = any(e.get("segment") in ["EXPERIENCE", "DINING"] for e in events)
-                
                 target_duration = profile_data.get("preferences", {}).get("target_duration_days", 0)
                 max_day_planned = max([e.get("day", 0) for e in events if e.get("segment") in ["EXPERIENCE", "DINING"]], default=0)
                 
-                if has_lodging and has_transport and not has_activities:
-                    handoff_context += f"{map_context} Initial lodging and transport are settled. You MUST invoke the 'call_activity_planner' tool to schedule daily experiences and dining."
-                elif itinerary_data.get("lodging") and not has_lodging:
-                    handoff_context += f"{map_context} The user has selected their lodging, but lodging events have not been scheduled yet. You MUST invoke the 'call_travel_pioneer' tool to schedule lodging check-in/out and any missing transit."
-                elif has_activities and target_duration and max_day_planned < target_duration:
-                    handoff_context += f"{map_context} The itinerary is partially planned (activities scheduled up to Day {max_day_planned} of {target_duration}). You MUST invoke the 'call_activity_planner' tool to continue scheduling the remaining days."
+                if target_duration and max_day_planned < target_duration:
+                    handoff_context += f"{map_context} The itinerary is partially planned (up to Day {max_day_planned} of {target_duration}). Instruct the 'architect' to continue scheduling."
                 else:
-                    handoff_context += f"{map_context} A draft itinerary exists in 'final_itinerary'. Instruct the 'architect' to resume from this version."
-            elif itinerary_data.get("lodging"):
-                handoff_context += f"{map_context} The user has selected their lodging, but travel logistics have not been scheduled yet. You MUST invoke the 'call_travel_pioneer' tool to schedule flights, transit, and lodging check-in/out."
-            elif destination:
-                handoff_context += f"{map_context} The destination is set but events have not been fully planned yet. You MUST invoke the 'call_travel_pioneer' tool to schedule primary transit (flights/driving) and find lodging suggestions."
+                    handoff_context += f"{map_context} A draft itinerary exists. Instruct the 'architect' to review and refine it."
+            elif destination or itinerary_data.get("lodging"):
+                handoff_context += f"{map_context} The destination or lodging is set. Instruct the 'architect' to schedule transit and daily activities."
 
         logger.info(f"[SUPERVISOR] Handoff Context: {handoff_context}")
 
@@ -288,19 +233,15 @@ def create_travel_agent():
             f"You are the Travel Supervisor. {handoff_context} "
             "You MUST use your provided agent transfer tools to handoff the conversation. "
             "If the handoff context explicitly instructs you to invoke a specific tool, you MUST prioritize that instruction. "
-            "If the user asks to communicate with a specific agent, invoke their transfer tool. "
-            "If the user mentions or selects a destination, you MUST invoke the 'call_travel_pioneer' tool to plan lodging and travel logistics (flights/driving). "
-            "If the user asks specifically about travel, flights, or lodging, invoke the 'call_travel_pioneer' tool. "
-            "If the user asks specifically about activities or dining, invoke the 'call_activity_planner' tool. "
-            "Otherwise, invoke the 'call_architect' tool to handle overall research and itinerary coordination. "
+            "If the user asks specifically about planning, travel, lodging, activities, or dining, invoke the 'call_architect' tool to handle research and itinerary coordination. "
             "Once an itinerary is built, ensure the user is satisfied. NEVER just say you are transferring without actually invoking the tool."
         )
 
     supervisor = Agent(
-        name="travel_supervisor",
+        name="supervisor",
         model="gemini-2.5-flash", # gemini-1.5-flash is a hallucination
         instruction=supervisor_instructions,
-        sub_agents=[concierge_agent, architect_agent, pioneer_agent, activity_planner_agent],
+        sub_agents=[concierge_agent, architect_agent],
         description="Orchestrates the travel planning process between the Concierge, Architect, and Specialists."
     )
 

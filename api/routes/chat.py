@@ -82,7 +82,10 @@ async def chat(
             await session_db.sessions.update_one(
                 {"session_id": request.session_id, "user_id": user_id, "app_name": "my_travel_aigent"},
                 {
-                    "$set": update_state,
+                    "$set": {
+                        **update_state,
+                        "updated_at": datetime.now(timezone.utc)
+                    },
                     "$setOnInsert": {"data.events": []}
                 },
                 upsert=True
