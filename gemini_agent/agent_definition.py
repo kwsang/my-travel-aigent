@@ -146,11 +146,15 @@ def create_travel_agent():
         start_date = prefs.get("start_date")
         end_date = prefs.get("end_date")
         duration = prefs.get("target_duration_days")
+        min_rating = prefs.get("min_rating")
         
         if start_date and end_date:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested dates from {start_date} to {end_date} (Duration: {duration} Days). Every generated event MUST be scheduled strictly within this exact window. Day 1 MUST begin on {start_date}."
         elif duration:
             prompt += f"\n\n[STRICT DATE CONSTRAINT]\nThe user has explicitly requested a trip duration of {duration} Days. Ensure the itinerary covers exactly {duration} days."
+
+        if min_rating:
+            prompt += f"\n\n[QUALITY CONSTRAINT]\nThe user has explicitly requested a minimum rating of {min_rating} stars. You MUST strictly filter out and NEVER suggest any lodging, dining, or activity with a rating below {min_rating}."
 
         prompt += "\n\n[TRANSIT RULE]\nDo NOT generate or schedule `TRANSPORT` segments for commuting between local activities. Only schedule the actual `EXPERIENCE` and `DINING` events, and primary transit (flights/driving to the destination)."
         prompt += "\n\n[STATE PERSISTENCE]\nYou MUST use the `save_itinerary` tool to persist any updates to the itinerary directly to the global state. When calling `save_itinerary`, you MUST pass the FULL, complete `events` array (formatted as a JSON string) including all previously scheduled events. To save tokens, your `details` objects only need to include the `name`, `category`, and `price` of the venue; the system will automatically attach the remaining details. Do not pass a partial list of only new events, or the old events will be deleted! ONLY call this tool if you have actually modified the itinerary; do not call it redundantly if no changes were made."

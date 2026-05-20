@@ -65,6 +65,7 @@ class UserProfilePreferences(BaseModel):
     start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM-DD")
     end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM-DD")
     target_duration_days: Optional[int] = Field(default=None, description="Target trip duration")
+    min_rating: Optional[float] = Field(default=None, description="Soft threshold for highlighting vs. budget alternatives.")
 
 class TripBudget(BaseModel):
     total_limit: float = Field(default=0.0)
@@ -78,6 +79,9 @@ class TravelerProfile(BaseModel):
     room_sharing: bool = Field(default=False)
     people_per_room: int = Field(default=2)
     interests: List[str] = Field(default_factory=list)
+    home_airport: Optional[str] = None
+    loyalty_programs: Optional[Dict[str, str]] = Field(default_factory=dict)
+    search_history: List[str] = Field(default_factory=list)
 
     @field_validator('party_size', mode='before')
     @classmethod
@@ -195,6 +199,7 @@ class Itinerary(BaseModel):
     is_conflict: bool = Field(default=False, description="True if the itinerary has validation errors.")
     validation_errors: List[str] = Field(default_factory=list, description="List of human-readable rule violations.")
     traveler_profile: Optional[TravelerProfile] = None
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
     @field_validator('updated_at', mode='before')
     @classmethod
@@ -239,6 +244,7 @@ class ItineraryPatchRequest(BaseModel):
     trip_name: Optional[str] = Field(None, description="Manual override for the trip name.")
     status: Optional[Literal["draft", "final"]] = Field(None, description="Manual override for the trip status.")
     traveler_profile: Optional[TravelerProfile] = Field(None, description="Updated traveler profile.")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Manual override for the metadata.")
 
 class ValidationResponse(BaseModel):
     status: Literal["success", "warning", "error"] = Field(..., description="The outcome status of the validation.")

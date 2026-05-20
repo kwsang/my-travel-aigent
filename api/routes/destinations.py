@@ -1,5 +1,8 @@
 import random
-from fastapi import APIRouter, Depends, HTTPException
+import json
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from api.dependencies import get_db
 from gemini_agent.tools.discovery import discover_new_destination, _build_destination_query
@@ -88,3 +91,46 @@ async def get_destination(name: str, db: AsyncIOMotorDatabase = Depends(get_db))
         
     dest["_id"] = str(dest["_id"])
     return dest
+
+@router.get("/{name}/stream")
+async def stream_destination(name: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+    """
+    Server-Sent Events endpoint to stream destination updates to the client.
+    """
+    async def event_generator():
+        last_data_str = None
+        idle_time = 0
+        MAX_IDLE_TIME = 300  # Close stream after 5 minutes of inactivity
+
+        try:
+            while True:
+                # Break the loop if the client disconnects (closes the browser tab)
+                if await request.is_disconnected():
+                    break
+                
+                dest = await db.destinations.find_one(_build_destination_query(name))
+                if dest:
+                    dest["_id"] = str(dest["_id"])
+                    dest_str = json.dumps(dest)
+                    
+                    # Only push an event if the destination data has actually changed
+                    if dest_str != last_data_str:
+                        yield f"data: {dest_str}\n\n"
+                        last_data_str = dest_str
+                        idle_time = 0
+                    else:
+                        idle_time += 2.5
+                else:
+                    idle_time += 2.5
+
+                # Enforce idle timeout
+                if idle_time >= MAX_IDLE_TIME:
+                    print(f"[API] Stream for {name} closed due to {MAX_IDLE_TIME}s of inactivity.")
+                    yield "event: close\ndata: {}\n\n"
+                    break
+                
+                await asyncio.sleep(2.5)  # Poll MongoDB every 2.5 seconds
+        except asyncio.CancelledError:
+            print(f"[API] Client disconnected from stream for {name}")
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

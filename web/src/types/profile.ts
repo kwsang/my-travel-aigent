@@ -21,6 +21,10 @@ export interface ProfileFormData {
     start_date?: string | null;
     end_date?: string | null;
     target_duration_days?: number | null;
+    min_rating?: number | null;
   };
   interests: string[];
+  home_airport?: string | null;
+  loyalty_programs?: Record<string, string>;
+  search_history?: string[];
 }

@@ -29,7 +29,7 @@ To ensure consistent reasoning and reporting, the agent follows these standards:
 - `LOGISTICS`: Visas, travel insurance, and airport transfers.
 
 ### Scheduling Logic & Constraints
-To optimize for the user's "value for money" and "time-saving" goals, the agent follows these block scheduling rules:
+To optimize for the user's "value for money" and "time-saving" goals, the Architect agent follows these block scheduling rules:
 1. **Transit Buffers:**
    - **Post-Flight:** Minimum 90-minute buffer after `FLIGHT` arrival for deplaning, baggage, and transit.
    - **Traffic-Aware Commute:** Instead of a static 60 minutes, the agent calculates: `(Estimated Traffic Duration * 1.2) + 10 minutes`.
@@ -51,9 +51,9 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
    - **Early Bird:** Prioritize starts between 06:00-08:00 local time. Shift `DINING` windows earlier (e.g., Dinner at 17:30).
    - **Night Owl:** Avoid any non-essential segments before 10:00 local time. Prioritize `EXPERIENCE` segments with "nightlife" or "late-night" tags.
 8. **Budget Adherence & Scaling:**
-   - The agent must maintain a running total of the itinerary cost.
-   - For `DINING` and `EXPERIENCE` segments, the agent must scale per-person price estimates by the total `party_size` (adults + children).
-   - If the total exceeds the `budget_limit` in the `UserProfile`, the agent must prioritize finding "Budget Alternatives" for the remaining unbooked segments.
+   - The Architect must maintain a running total of the itinerary cost.
+   - For `DINING` and `EXPERIENCE` segments, the Architect must scale per-person price estimates by the total `party_size` (adults + children).
+   - If the total exceeds the `budget_limit` in the `UserProfile`, the Architect must prioritize finding "Budget Alternatives" for the remaining unbooked segments.
       - **Per-Person Toggle:** If `group_planning_per_person` is enabled, the budget limit comparison and final reporting must be calculated as `Total Cost / Total People`.
    - **Room Sharing:** When `room_sharing` is enabled, calculate the number of rooms needed (Total People / `people_per_room`, rounded up) and multiply by the per-room price before dividing by the total party size for the per-person estimate.
 9. **Quality vs. Value (Transparency Rule):**
@@ -76,6 +76,8 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     "travel_style": ["luxury", "adventure"],
     "preferred_airlines": ["United", "Lufthansa"],
     "starting_location": "Duluth, GA",
+    "start_date": "2024-07-01",
+    "end_date": "2024-07-07",
     "target_duration_days": 2,
     "min_rating": 4.5, // Treated as a soft threshold for highlighting vs. budget alternatives.
     "circadian_preference": "night_owl", // Supported values: "early_bird", "night_owl", "standard"
@@ -104,7 +106,7 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
 ---
 
 ### Destinations Collection
-*Purpose: City/Town-level discovery via Atlas Vector Search. Does not contain specific venues.*
+*Purpose: City/Town-level discovery via Atlas Vector Search. Populated asynchronously via Agent discovery tools and streamed to the UI via Server-Sent Events (SSE).*
 ```json
 {
   "name": "Savannah",
@@ -115,7 +117,21 @@ To optimize for the user's "value for money" and "time-saving" goals, the agent 
     "type": "Point",
     "coordinates": [-81.0912, 32.0761]
   },
-  "vibe_tags": ["historic", "coastal", "romantic", "southern"]
+  "vibe_tags": ["historic", "coastal", "romantic", "southern"],
+  "suggested_lodging": [
+    {
+      "name": "The Perry Lane Hotel",
+      "rating": 4.8,
+      "geo": { "latitude": 32.0761, "longitude": -81.0912 }
+    }
+  ],
+  "suggested_activities": [
+    {
+      "name": "Savannah Historic District Walking Tour",
+      "rating": 4.9,
+      "geo": { "latitude": 32.0750, "longitude": -81.0900 }
+    }
+  ]
 }
 
 ```

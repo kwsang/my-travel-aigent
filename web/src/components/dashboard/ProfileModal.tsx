@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles, Calendar, AlertCircle, Navigation } from 'lucide-react';
+import { X, Users, Wallet, Shield, SunMoon, Save, Loader2, Bed, Bus, Zap, ArrowRight, ArrowLeft, Sparkles, Calendar, AlertCircle, Navigation, Plane, Star } from 'lucide-react';
 import { API_CONFIG, PROFILE_OPTIONS } from '@/config/constants';
 import ThemedSelect from './ThemedSelect';
 import { ProfileFormData } from '@/types/profile';
@@ -37,11 +37,7 @@ export default function ProfileModal({ sessionId, userId, initialData, onClose, 
   useEffect(() => {
     if (initialData) {
       const parsed = parseProfileData(initialData);
-      // Ensure newly added fields aren't stripped by older parseProfileData utility
       parsed.preferences.start_date = initialData.preferences?.start_date || getTodayString();
-      parsed.preferences.end_date = initialData.preferences?.end_date ?? undefined;
-      parsed.preferences.target_duration_days = initialData.preferences?.target_duration_days ?? undefined;
-      parsed.preferences.activity_density = initialData.preferences?.activity_density ?? 'medium';
       
       setFormData(parsed);
       setStartDate(initialData.preferences?.start_date || getTodayString());
@@ -275,24 +271,41 @@ function ProfilePageOne({ formData, setFormData, toggleInterest }: ProfilePagePr
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-          <Wallet size={14} /> Target Budget
-        </label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">
-            {formData.budget?.currency === 'USD' ? '$' : formData.budget?.currency || '$'}
-          </span>
-          <input 
-            type="number"
-            min="0"
-            onKeyDown={(e) => { if (e.key === '-') e.preventDefault(); }}
-            value={formData.budget?.total_limit || ''}
-            onChange={(e) => setFormData({...formData, budget: { total_limit: Math.abs(parseFloat(e.target.value) || 0), currency: formData.budget?.currency || 'USD' }})}
-            className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-            placeholder="Total trip budget"
-          />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Wallet size={14} /> Target Budget
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">
+              {formData.budget?.currency === 'USD' ? '$' : formData.budget?.currency || '$'}
+            </span>
+            <input 
+              type="number"
+              min="0"
+              onKeyDown={(e) => { if (e.key === '-') e.preventDefault(); }}
+              value={formData.budget?.total_limit || ''}
+              onChange={(e) => setFormData({...formData, budget: { total_limit: Math.abs(parseFloat(e.target.value) || 0), currency: formData.budget?.currency || 'USD' }})}
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 text-white text-white-outline focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              placeholder="Total trip budget"
+            />
+          </div>
         </div>
+        
+        <ThemedSelect
+          label="Min Rating"
+          icon={Star}
+          value={formData.preferences.min_rating ? String(formData.preferences.min_rating) : ""}
+          onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, min_rating: val ? parseFloat(val) : null}})}
+          options={[
+            { value: '', label: 'Any Rating' },
+            { value: '3', label: '3+ Stars' },
+            { value: '3.5', label: '3.5+ Stars' },
+            { value: '4', label: '4+ Stars' },
+            { value: '4.5', label: '4.5+ Stars' },
+            { value: '5', label: '5 Stars' }
+          ]}
+        />
       </div>
 
       <div className="space-y-3">
@@ -421,16 +434,32 @@ function ProfilePageThree({ formData, setFormData, startDate, setStartDate, endD
 function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-      <div className="space-y-2">
-        <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-          <Navigation size={14} /> Starting Location
-        </label>
-        <LocationAutocomplete 
-          value={formData.preferences.starting_location || ''}
-          onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, starting_location: val}})}
-          includedPrimaryTypes={['locality', 'administrative_area_level_3']}
-          countryRestriction="us"
-        />
+      <div className="grid grid-cols-[2fr_1fr] gap-4">
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Navigation size={14} /> Starting Location
+          </label>
+          <LocationAutocomplete 
+            value={formData.preferences.starting_location || ''}
+            onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, starting_location: val}})}
+            includedPrimaryTypes={['locality', 'administrative_area_level_3']}
+            countryRestriction="us"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <label className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+            <Plane size={14} /> Airport
+          </label>
+          <input 
+            type="text"
+            value={formData.home_airport || ''}
+            onChange={(e) => setFormData({...formData, home_airport: e.target.value.toUpperCase()})}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:normal-case uppercase"
+            placeholder="e.g. ATL"
+            maxLength={3}
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10">

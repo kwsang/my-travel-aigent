@@ -181,8 +181,13 @@ async def search_places(
         )
         
         venues = []
+        min_rating = profile.get("preferences", {}).get("min_rating")
+
         for place in response.places:
             if not place.rating or not place.user_rating_count:
+                continue
+                
+            if min_rating is not None and place.rating < min_rating:
                 continue
                 
             venue = {

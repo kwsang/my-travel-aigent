@@ -101,36 +101,41 @@ function MapInner() {
   const [activeSuggestion, setActiveSuggestion] = React.useState<SuggestionPlace | null>(null);
 
   React.useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    let isFetching = false;
-    
-    const fetchDestInfo = () => {
-      if (itinerary.destination && !isFetching) {
-        isFetching = true;
-        fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
-          .then(res => res.ok ? res.json() : null)
-          .then(data => setDestinationInfo(data))
-          .catch(err => console.error("Failed to load destination info", err))
-          .finally(() => { isFetching = false; });
-      } else if (!itinerary.destination) {
-        setDestinationInfo(null);
-      }
-    };
+    if (!itinerary.destination) {
+      setDestinationInfo(null);
+      return;
+    }
 
-    fetchDestInfo();
+    // Initial fetch to get the current state
+    fetch(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setDestinationInfo(data))
+      .catch(err => console.error("Failed to load destination info", err));
 
-    // Poll every 10 seconds if a destination is set but lodging hasn't been chosen yet, 
-    // so we can dynamically show the new suggested lodgings if the agent updates them.
+    let eventSource: EventSource | null = null;
+
+    // Connect to SSE stream if we still need lodging suggestions
     if (itinerary.destination && !itinerary.lodging) {
-      intervalId = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          fetchDestInfo();
+      eventSource = new EventSource(`${API_CONFIG.BASE_URL}/destinations/${encodeURIComponent(itinerary.destination)}/stream`);
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setDestinationInfo(data);
+        } catch (err) {
+          console.error("Failed to parse SSE data", err);
         }
-      }, 10000);
+      };
+
+      eventSource.onerror = (err) => {
+        console.error("SSE connection error", err);
+      };
     }
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, [itinerary.destination, itinerary.lodging]);
 

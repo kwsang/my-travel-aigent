@@ -29,19 +29,24 @@ graph TD
         API_Itinerary[Itinerary Router]
         API_Profile[Profile Router]
         API_Chat[Chat Router]
-        Agent[Gemini AI Agent Logic]
+        API_Destinations[Destinations/SSE Router]
+        Agent[Google ADK Multi-Agent System]
     end
 
     subgraph Database [MongoDB]
         DB_Itineraries[(Itineraries Collection)]
         DB_Profiles[(User Profiles Collection)]
+        DB_Destinations[(Destinations / Vector Search)]
     end
 
     GoogleMaps[Google Maps API]
+    VoyageAI[Voyage AI Embeddings]
+    CloudScheduler[Cloud Scheduler / Cron]
 
     %% Connections
     Client --> Dashboard
     Map <-->|External API| GoogleMaps
+    Map <-->|Server-Sent Events| API_Destinations
     
     Context <-->|REST API /itinerary| API_Itinerary
     Context <-->|REST API /profile| API_Profile
@@ -49,9 +54,12 @@ graph TD
 
     API_Itinerary <--> DB_Itineraries
     API_Profile <--> DB_Profiles
+    API_Destinations <--> DB_Destinations
     
     API_Chat <--> Agent
     API_Itinerary <--> Agent
+    Agent <--> VoyageAI
+    CloudScheduler -->|Triggers Background Sync| DB_Destinations
 ```
 
 ## Core Components
@@ -70,3 +78,12 @@ graph TD
 
 ### 4. Database (MongoDB)
 * Stores documents utilizing `Motor` (Async MongoDB driver). Ensures that users can retrieve and sync asynchronous trip data or their global constraints independently.
+
+## Real-Time State Flow (Server-Sent Events)
+
+To provide a seamless, non-blocking user experience, the application uses **Server-Sent Events (SSE)** to sync the backend AI's asynchronous discovery process with the frontend state.
+
+1. **Trigger:** The user selects a destination on the map. The frontend optimistically updates the `ItineraryContext` and opens a persistent SSE connection via `GET /destinations/{name}/stream`.
+2. **Background Processing:** The AI Agents (or background cron jobs) asynchronously query Google Places and Voyage AI to discover localized lodgings and activities, saving the newly discovered results to the MongoDB `destinations` collection.
+3. **Push Updates:** The FastAPI backend monitors the database document for that destination. The moment it detects a change, it streams the updated JSON payload down the open SSE connection.
+4. **State Reconciliation:** The `MapHub` component receives the event, parses the new suggestions, and instantly populates the map markers and suggestion windows without requiring the user to refresh or the frontend to aggressively poll the API.

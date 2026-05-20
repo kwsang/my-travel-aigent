@@ -37,7 +37,10 @@ My Travel Aigent is an intelligent, multi-agent travel planning assistant built 
 
 ## Documentation 📚
 
-*   MongoDB Data Modeling Patterns
+*   [Architecture Overview](ARCHITECTURE.md)
+*   [Data Model & Market Segments](DATA_MODEL.md)
+*   [End-to-End Test Case: Destination Selection Data Flow](E2E_DESTINATION_TEST_CASE.md)
+*   [Test Suite: Risk Tolerance & Buffer Logic](gemini_agent/test/BUFFER_TEST_SUITE.md)
 
 ## Setup & Deployment 🚀
 

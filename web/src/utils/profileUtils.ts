@@ -16,7 +16,11 @@ export const parseProfileData = (data?: TravelerProfile): ProfileFormData => ({
     starting_location: data?.preferences?.starting_location ?? undefined,
     start_date: data?.preferences?.start_date ?? undefined,
     end_date: data?.preferences?.end_date ?? undefined,
-    target_duration_days: data?.preferences?.target_duration_days ?? undefined
+    target_duration_days: data?.preferences?.target_duration_days ?? undefined,
+    min_rating: data?.preferences?.min_rating ?? null
   },
-  interests: data?.interests || []
+  interests: data?.interests || [],
+  home_airport: data?.home_airport ?? null,
+  loyalty_programs: data?.loyalty_programs || {},
+  search_history: data?.search_history || []
 });

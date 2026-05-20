@@ -181,6 +181,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/destinations/{name}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Destination
+         * @description Server-Sent Events endpoint to stream destination updates to the client.
+         */
+        get: operations["stream_destination_destinations__name__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -424,6 +444,10 @@ export interface components {
              */
             validation_errors?: string[];
             traveler_profile?: components["schemas"]["TravelerProfile"] | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
         } & {
             [key: string]: unknown;
         };
@@ -460,6 +484,13 @@ export interface components {
             status?: ("draft" | "final") | null;
             /** @description Updated traveler profile. */
             traveler_profile?: components["schemas"]["TravelerProfile"] | null;
+            /**
+             * Metadata
+             * @description Manual override for the metadata.
+             */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** Price */
         Price: {
@@ -558,6 +589,14 @@ export interface components {
             people_per_room: number;
             /** Interests */
             interests?: string[];
+            /** Home Airport */
+            home_airport?: string | null;
+            /** Loyalty Programs */
+            loyalty_programs?: {
+                [key: string]: string;
+            } | null;
+            /** Search History */
+            search_history?: string[];
         };
         /** TripBudget */
         TripBudget: {
@@ -628,6 +667,11 @@ export interface components {
              * @description Target trip duration
              */
             target_duration_days?: number | null;
+            /**
+             * Min Rating
+             * @description Soft threshold for highlighting vs. budget alternatives.
+             */
+            min_rating?: number | null;
         } & {
             [key: string]: unknown;
         };
@@ -1016,6 +1060,37 @@ export interface operations {
         };
     };
     get_destination_destinations__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_destination_destinations__name__stream_get: {
         parameters: {
             query?: never;
             header?: never;
