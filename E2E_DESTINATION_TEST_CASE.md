@@ -22,7 +22,7 @@ At this exact millisecond, the application state splits into **Two Parallel Proc
 `MapHub.tsx` immediately fires `fetchDestInfo()` to the FastAPI backend, requesting `GET /destinations/Richmond, VA, USA`.
 
 ### Process B: The Agent Chat
-`ChatInterface.tsx` catches the event and sends a message to `POST /chat`. The Supervisor routes to the `travel_pioneer`, which calls the `get_cached_lodging` tool with the argument `{'destination_name': 'Richmond, VA, USA'}`.
+`ChatInterface.tsx` catches the event and sends a message to `POST /chat`. The Supervisor routes to the `architect`, which calls the `get_cached_lodging` tool with the argument `{'destination_name': 'Richmond, VA, USA'}`.
 
 ---
 

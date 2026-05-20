@@ -44,7 +44,7 @@ export function useChatEvents(
         const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
 
         sendMessage(
-          `I've selected ${destination} as my destination. Please communicate with the travel_pioneer to determine travel and lodging based on my traveler profile.`, 
+          `I've selected ${destination} as my destination. Please communicate with the architect to determine travel and lodging based on my traveler profile.`, 
           { destination, ...(isDefaultName ? { trip_name: `${destination} Trip` } : {}) },
           undefined,
           `I've selected ${destination}. Can you determine travel and lodging?`
@@ -66,8 +66,8 @@ export function useChatEvents(
         const isReplacement = !!itinerary.lodging;
 
         const hiddenMessage = isReplacement 
-          ? `I have changed my lodging to ${lodging.name}. Please communicate with the travel_pioneer to update any travel logistics and the activity_planner to rearrange my daily experiences based on this new location. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`
-          : `I've selected ${lodging.name} as my lodging. Please communicate with the travel_pioneer to schedule transit to the lodging and check-in/out events, and then the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`;
+          ? `I have changed my lodging to ${lodging.name}. Please communicate with the architect to update any travel logistics and the activity_planner to rearrange my daily experiences based on this new location. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`
+          : `I've selected ${lodging.name} as my lodging. Please communicate with the architect to schedule transit to the lodging and check-in/out events, and then the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`;
 
         const displayMessage = isReplacement
           ? `I've changed my lodging to ${lodging.name}. Can you update my trip?`

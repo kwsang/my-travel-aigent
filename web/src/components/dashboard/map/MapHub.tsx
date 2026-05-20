@@ -436,6 +436,7 @@ function MapInner() {
           placeholder="Search for a hotel or lodging..."
           onPlaceSelected={handleMapAddLodging}
           includedPrimaryTypes={['lodging']}
+          biasToMapBounds={true}
         />
       )}
 
@@ -461,6 +462,7 @@ function MapInner() {
             setActiveSegmentIndex(null);
           }}
           includedPrimaryTypes={['establishment']}
+          biasToMapBounds={true}
         />
       )}
 
