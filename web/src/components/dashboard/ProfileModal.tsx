@@ -434,6 +434,8 @@ function ProfilePageTwo({ formData, setFormData }: ProfilePageProps) {
         <LocationAutocomplete 
           value={formData.preferences.starting_location || ''}
           onChange={(val) => setFormData({...formData, preferences: {...formData.preferences, starting_location: val}})}
+          includedPrimaryTypes={['locality', 'administrative_area_level_3']}
+          countryRestriction="us"
         />
       </div>
 

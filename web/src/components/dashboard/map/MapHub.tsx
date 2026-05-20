@@ -425,6 +425,7 @@ function MapInner() {
           instruction="1. Select a Destination"
           placeholder="Where do you want to go?"
           onPlaceSelected={(place) => handleSelectDestination(place.formatted_address || place.name)}
+          includedPrimaryTypes={['locality', 'administrative_area_level_3']}
         />
       )}
 
@@ -434,6 +435,7 @@ function MapInner() {
           instruction="2. Choose Your Lodging"
           placeholder="Search for a hotel or lodging..."
           onPlaceSelected={handleMapAddLodging}
+          includedPrimaryTypes={['lodging']}
         />
       )}
 
@@ -458,6 +460,7 @@ function MapInner() {
             });
             setActiveSegmentIndex(null);
           }}
+          includedPrimaryTypes={['establishment']}
         />
       )}
 

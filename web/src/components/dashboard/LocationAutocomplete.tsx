@@ -8,13 +8,17 @@ interface LocationAutocompleteProps {
   onChange: (val: string) => void;
   placeholder?: string;
   className?: string;
+  includedPrimaryTypes?: string[];
+  countryRestriction?: string | string[];
 }
 
 export default function LocationAutocomplete({ 
   value, 
   onChange, 
   placeholder = "e.g. New York, USA", 
-  className = ""
+  className = "",
+  includedPrimaryTypes,
+  countryRestriction
 }: LocationAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<any>(null);
@@ -28,10 +32,20 @@ export default function LocationAutocomplete({
   useEffect(() => {
     if (!isLoaded || !inputRef.current) return;
 
+    const options: any = {
+      fields: ['formatted_address', 'name']
+    };
+
+    if (includedPrimaryTypes) {
+      options.types = includedPrimaryTypes;
+    }
+
+    if (countryRestriction) {
+      options.componentRestrictions = { country: countryRestriction };
+    }
+
     // Initialize Classic Google Maps Autocomplete on our native React input
-    autocompleteRef.current = new (window as any).google.maps.places.Autocomplete(inputRef.current, {
-      fields: ['formatted_address', 'name'],
-    });
+    autocompleteRef.current = new (window as any).google.maps.places.Autocomplete(inputRef.current, options);
 
     const listener = autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
@@ -49,7 +63,7 @@ export default function LocationAutocomplete({
         (window as any).google.maps.event.removeListener(listener);
       }
     };
-  }, [isLoaded]);
+  }, [isLoaded, includedPrimaryTypes, countryRestriction]);
 
   return (
     <input

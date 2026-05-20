@@ -6,9 +6,11 @@ interface MapSearchBarProps {
   placeholder: string;
   instruction?: string;
   onPlaceSelected: (place: SuggestionPlace) => void;
+  includedPrimaryTypes?: string[];
+  countryRestriction?: string | string[];
 }
 
-export default function MapSearchBar({ placeholder, instruction, onPlaceSelected }: MapSearchBarProps) {
+export default function MapSearchBar({ placeholder, instruction, onPlaceSelected, includedPrimaryTypes, countryRestriction }: MapSearchBarProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const autocompleteRef = React.useRef<any>(null);
   const isLoaded = useApiIsLoaded();
@@ -16,9 +18,19 @@ export default function MapSearchBar({ placeholder, instruction, onPlaceSelected
   React.useEffect(() => {
     if (!isLoaded || !inputRef.current) return;
 
-    autocompleteRef.current = new (window as any).google.maps.places.Autocomplete(inputRef.current, {
+    const options: any = {
       fields: ['name', 'formatted_address', 'geometry', 'rating', 'user_ratings_total', 'price_level', 'types', 'url']
-    });
+    };
+
+    if (includedPrimaryTypes) {
+      options.types = includedPrimaryTypes;
+    }
+
+    if (countryRestriction) {
+      options.componentRestrictions = { country: countryRestriction };
+    }
+
+    autocompleteRef.current = new (window as any).google.maps.places.Autocomplete(inputRef.current, options);
 
     const listener = autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
@@ -46,7 +58,7 @@ export default function MapSearchBar({ placeholder, instruction, onPlaceSelected
         (window as any).google.maps.event.removeListener(listener);
       }
     };
-  }, [isLoaded, onPlaceSelected]);
+  }, [isLoaded, onPlaceSelected, includedPrimaryTypes, countryRestriction]);
 
   return (
     <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 flex flex-col items-center gap-2 pointer-events-auto animate-in fade-in slide-in-from-top-4">
