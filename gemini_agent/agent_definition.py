@@ -95,12 +95,6 @@ def create_travel_agent():
     with open(os.path.join(prompts_dir, "ARCHITECT_PROMPT.md"), "r") as f:
         architect_goal = f.read()
 
-    with open(os.path.join(prompts_dir, "PIONEER_PROMPT.md"), "r") as f:
-        pioneer_goal = f.read()
-
-    with open(os.path.join(prompts_dir, "ACTIVITY_PLANNER_PROMPT.md"), "r") as f:
-        activity_planner_goal = f.read()
-
     # Helper to safely parse stringified JSON states for prompt injection
     def _get_safe_state(ctx: Context):
         itinerary, profile = get_state_context(ctx)
@@ -134,7 +128,7 @@ def create_travel_agent():
 
     # 4.2 Architect: Focused on logistics, search, and planning
     def get_architect_instructions(ctx: Context) -> str:
-        prompt = f"{architect_goal}\n\n### Travel Pioneer Guidelines:\n{pioneer_goal}\n\n### Activity Planner Guidelines:\n{activity_planner_goal}"
+        prompt = f"{architect_goal}"
 
         profile, itinerary = _get_safe_state(ctx)
         state = getattr(ctx, "state", getattr(ctx.session, "state", {})) # Keep for violations
@@ -234,7 +228,8 @@ def create_travel_agent():
             "You MUST use your provided agent transfer tools to handoff the conversation. "
             "If the handoff context explicitly instructs you to invoke a specific tool, you MUST prioritize that instruction. "
             "If the user asks specifically about planning, travel, lodging, activities, or dining, invoke the 'call_architect' tool to handle research and itinerary coordination. "
-            "Once an itinerary is built, ensure the user is satisfied. NEVER just say you are transferring without actually invoking the tool."
+            "Once an itinerary is built, ensure the user is satisfied. NEVER just say you are transferring without actually invoking the tool.\n"
+            "IMPORTANT: The ONLY valid agents you can transfer to are 'concierge' and 'architect'. Do not attempt to transfer to 'travel_pioneer'."
         )
 
     supervisor = Agent(

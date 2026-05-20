@@ -33,7 +33,7 @@ def test_supervisor_with_destination_no_events(supervisor_instructions):
     result = supervisor_instructions(ctx)
     
     assert "The user has explicitly selected 'Orlando, FL' as their destination" in result
-    assert "Transfer to the 'travel_pioneer'" in result
+    assert "Instruct the 'architect'" in result
 
 def test_supervisor_with_events(supervisor_instructions):
     ctx = DummyContext({
