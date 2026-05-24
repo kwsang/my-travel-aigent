@@ -20,3 +20,11 @@ from .discovery import (
 # Placeholder for itinerary and geo tools (to be implemented similarly)
 from .itinerary_tools import save_itinerary, get_itinerary, list_trip_versions, delete_itinerary, update_itinerary_status, clone_itinerary, finalize_itinerary
 from .geo_tools import google_maps_matrix, search_places, search_local_events
+
+# Phase 1: State Management & Scratchpad Tools
+from .phase1_state_tools import (
+    read_draft_itinerary,
+    calculate_budget,
+    save_to_scratchpad,
+    get_top_items_from_scratchpad
+)

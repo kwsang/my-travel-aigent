@@ -32,7 +32,11 @@ from gemini_agent.tools.tools import (
     save_itinerary,
     finalize_itinerary,
     search_local_events,
-    vector_search_places
+    vector_search_places,
+    read_draft_itinerary,
+    calculate_budget,
+    save_to_scratchpad,
+    get_top_items_from_scratchpad
 )
 from gemini_agent.logic.utils import get_state_context
 
@@ -65,6 +69,12 @@ def create_travel_agent():
     get_profile_tool = FunctionTool(func=query_user_profile)
     persist_tool = FunctionTool(func=save_itinerary)
     
+    # Phase 1 State Management & Scratchpad Tools
+    read_draft_tool = FunctionTool(func=read_draft_itinerary)
+    calc_budget_tool = FunctionTool(func=calculate_budget)
+    save_scratchpad_tool = FunctionTool(func=save_to_scratchpad)
+    get_scratchpad_tool = FunctionTool(func=get_top_items_from_scratchpad)
+    
     # Group tools by domain to easily share them across agents
     ITINERARY_MANAGEMENT_TOOLS = [
         persist_tool, 
@@ -73,14 +83,18 @@ def create_travel_agent():
         delete_itinerary_tool,
         update_status_tool,
         finalize_tool,
-        clone_tool
+        clone_tool,
+        read_draft_tool,
+        calc_budget_tool
     ]
     
     RESEARCH_TOOLS = [
         places_search_tool,
         vector_search_tool,
         search_tool,
-        events_tool
+        events_tool,
+        save_scratchpad_tool,
+        get_scratchpad_tool
     ]
 
     # 3. Load Instruction Prompts
