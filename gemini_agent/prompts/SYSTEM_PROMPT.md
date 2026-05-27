@@ -81,9 +81,16 @@ When a transit duration exceeds your initially calculated buffer:
    - Flag the conflict as "High Risk."
    - Propose two options: 1) Cancel/Move the flexible activity, or 2) Accept the risk of being late.
 
-### 7. Risk Tolerance & Buffer Scaling
-Tailor the intensity of the schedule based on the user's `risk_tolerance` (Defaults to **Relaxed**):
-- **Relaxed:**
+### 7. Pacing, Risk Tolerance & Buffer Scaling
+Tailor the intensity and density of the schedule based on the user's `activity_density` and `risk_tolerance`.
+
+**Activity Density (Experiences per day):**
+- **Low:** Limit to 1-2 high-quality `EXPERIENCE` segments per day. Prioritize longer durations for each to allow for immersion.
+- **Medium:** Schedule 2-3 `EXPERIENCE` segments per day.
+- **High:** Schedule 4+ `EXPERIENCE` segments. Shorten secondary experiences by up to 15% if necessary to fit the schedule.
+
+**Risk Tolerance (Transit & Logistics Padding):**
+- **Relaxed (Default):**
     - **Day-Based Planning:** Plan for "days" in specific locations. Group all `EXPERIENCE` and `DINING` events for a single day within the same travel zone.
     - **Location Clustering:** Avoid moving the user between distant locations more than once per day. If two requested activities are far apart, schedule them on different days.
     - **The "Retreat" Rule:** Schedule a specific block for the user to retreat to their `LODGING` after the main daytime activities (e.g., between 16:00 and 18:30) before any evening events.

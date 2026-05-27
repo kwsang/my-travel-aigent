@@ -15,10 +15,19 @@ from gemini_agent.tools.phase1_state_tools import (
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+class DummySession:
+    def __init__(self, session_id):
+        self.id = session_id
+
+class DummyContext:
+    def __init__(self, session_id):
+        self.session = DummySession(session_id)
+
 async def test_scratchpad():
     session_id = "test_massive_places_session_123"
     data_type = "restaurants"
     
+    ctx = DummyContext(session_id)
     logger.info(f"Generating massive payload for session '{session_id}'...")
     
     # Simulate a massive payload from Google Places API (50 restaurants with nested data)
@@ -46,12 +55,12 @@ async def test_scratchpad():
 
     # 1. Test Saving to Scratchpad
     logger.info("Saving to MongoDB scratchpad...")
-    save_result = await save_to_scratchpad(session_id, data_type, massive_places_payload)
+    save_result = await save_to_scratchpad(data_type, massive_places_payload, tool_context=ctx)
     logger.info(f"Save Result: {save_result}")
     
     # 2. Test Retrieving from Scratchpad (Limiting to top 3 to simulate saving LLM context)
     logger.info("Retrieving top 3 items from scratchpad to simulate Agent query...")
-    retrieved_items = await get_top_items_from_scratchpad(session_id, data_type, limit=3)
+    retrieved_items = await get_top_items_from_scratchpad(data_type, tool_context=ctx, limit=3)
     
     logger.info(f"Successfully retrieved {len(retrieved_items)} items!")
     for idx, item in enumerate(retrieved_items):

@@ -482,56 +482,9 @@ async def vector_search_places(destination_name: str, query: str, tool_context: 
             { "$project": { "_id": 0, "embedding": 0 } }
         ]
         
-        # 3. Pipeline 2: Exact Keyword Match (BM25)
-        text_pipeline = [
-            {
-                "$search": {
-                    "index": "text_index", 
-                    "text": {
-                        "query": query,
-                        "path": ["name", "description", "types"]
-                    }
-                }
-            },
-            { "$limit": 10 },
-            { "$project": { "_id": 0, "embedding": 0 } }
-        ]
-        
-        # 4. Execute both searches concurrently
-        vector_results, text_results = await asyncio.gather(
-            db["places"].aggregate(vector_pipeline).to_list(length=10),
-            db["places"].aggregate(text_pipeline).to_list(length=10),
-            return_exceptions=True
-        )
-        
-        if isinstance(text_results, Exception):
-            logger.warning(f"Text search failed (missing text_index?): {text_results}")
-            text_results = []
-        if isinstance(vector_results, Exception):
-            logger.error(f"Vector search failed: {vector_results}")
-            return f"Error during vector search: {vector_results}"
-
-        # 5. Combine results using Reciprocal Rank Fusion (RRF)
-        # RRF Formula: Score = 1 / (rank + k)
-        rrf_k = 60
-        fused_scores = {}
-        fused_docs = {}
-        
-        def _apply_rrf(results_list):
-            for rank, doc in enumerate(results_list):
-                place_id = doc.get("place_id")
-                if not place_id: continue
-                if place_id not in fused_scores:
-                    fused_scores[place_id] = 0.0
-                    fused_docs[place_id] = doc
-                fused_scores[place_id] += 1.0 / (rank + rrf_k)
-
-        _apply_rrf(vector_results)
-        _apply_rrf(text_results)
-        
-        # 6. Sort by highest fused score and return top 5 to the Agent
-        ranked_place_ids = sorted(fused_scores.keys(), key=lambda pid: fused_scores[pid], reverse=True)
-        top_places = [fused_docs[pid] for pid in ranked_place_ids[:5]]
+        # 3. Execute Vector Search
+        # Note: Hybrid Text search removed to stay within MongoDB Free Tier 3-index limit
+        top_places = await db["places"].aggregate(vector_pipeline).to_list(length=5)
         
         if not top_places:
             return f"No semantic matches found for '{query}' in {active_dest}."

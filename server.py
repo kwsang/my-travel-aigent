@@ -190,6 +190,28 @@ async def health_check():
 
     return {"status": "healthy", "checks": health_report}
 
+@app.post("/webhook/atlas-trigger", tags=["system"])
+async def atlas_trigger_webhook(request: Request):
+    """
+    Phase 5: Webhook target for MongoDB Atlas Database Triggers.
+    Triggered asynchronously when an itinerary is updated.
+    """
+    payload = await request.json()
+    full_doc = payload.get("fullDocument")
+    if not full_doc:
+        return JSONResponse(status_code=400, content={"error": "fullDocument missing from payload"})
+        
+    session_id = full_doc.get("session_id")
+    user_id = full_doc.get("user_id")
+    if not session_id or not user_id:
+        return JSONResponse(status_code=400, content={"error": "Missing routing IDs"})
+        
+    from gemini_agent.tools.itinerary_tools import _simulate_background_validation
+    # Run validation in the background
+    await _simulate_background_validation(session_id, user_id, full_doc)
+    
+    return {"status": "success", "message": "Async validation complete"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

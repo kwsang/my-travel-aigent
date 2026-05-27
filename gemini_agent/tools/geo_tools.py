@@ -205,6 +205,13 @@ async def search_places(
                 "utcOffsetMinutes": place.utc_offset_minutes,
                 "google_maps_uri": place.google_maps_uri
             }
+            
+            # Phase 4: Schema-less JIT Payload Normalization
+            try:
+                venue["raw_google_data"] = type(place).to_dict(place)
+            except Exception:
+                pass
+                
             venues.append(venue)
             
             if tool_context:

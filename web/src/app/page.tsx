@@ -54,7 +54,7 @@ export default function LandingPage() {
                 <BrainCircuit size={20} />
               </div>
               <h3 className="font-bold text-slate-900">Multi-Agent AI</h3>
-              <p className="text-sm text-slate-500">A Supervisor coordinates Pioneer, Architect, and Planner agents to build your perfect trip.</p>
+            <p className="text-sm text-slate-500">A Supervisor coordinates specialized Concierge and Architect agents to build your perfect trip.</p>
             </div>
             <div className="space-y-2">
               <div className="w-10 h-10 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center mx-auto text-indigo-600">

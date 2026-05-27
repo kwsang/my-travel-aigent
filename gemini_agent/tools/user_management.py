@@ -1,6 +1,7 @@
 import json
 import logging
 from typing import Any
+import datetime
 from gemini_agent.clients import destinations_collection
 from gemini_agent.logic.models import TravelerProfile
 from gemini_agent.logic.utils import get_state_context
@@ -87,6 +88,13 @@ async def record_user_profile(
             {"$set": {"traveler_profile": profile_model.model_dump()}},
             upsert=True
         )
+        
+        # Phase 3: Update global users collection for long-term memory across sessions
+        await db["users"].update_one(
+            {"user_id": user_id},
+            {"$set": {"preferences": profile_model.model_dump(), "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}},
+            upsert=True
+        )
     except Exception as e:
         logger.error(f"Failed to persist traveler profile to DB: {e}")
 
@@ -105,6 +113,14 @@ async def query_user_profile(tool_context: InvocationContext) -> str:
         user_id = tool_context.session.user_id
         session_id = tool_context.session.id
         db = destinations_collection.database
+        
+        # Phase 3: Fetch long-term memory first
+        user_doc = await db["users"].find_one({"user_id": user_id})
+        if user_doc and "preferences" in user_doc:
+            # Hydrate session state with remembered preferences
+            tool_context.state.update({"traveler_profile": user_doc["preferences"]})
+            return json.dumps(user_doc["preferences"], default=str)
+            
         itinerary = await db["itineraries"].find_one({"session_id": session_id, "user_id": user_id})
         if not itinerary or "traveler_profile" not in itinerary:
             return "No traveler profile found for this itinerary yet."

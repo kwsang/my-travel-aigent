@@ -36,7 +36,12 @@ from gemini_agent.tools.tools import (
     read_draft_itinerary,
     calculate_budget,
     save_to_scratchpad,
-    get_top_items_from_scratchpad
+    get_top_items_from_scratchpad,
+    save_places_to_cache,
+    find_nearby_cached_places,
+    cache_successful_itinerary,
+    search_past_itineraries,
+    query_raw_place_data
 )
 from gemini_agent.logic.utils import get_state_context
 
@@ -75,6 +80,17 @@ def create_travel_agent():
     save_scratchpad_tool = FunctionTool(func=save_to_scratchpad)
     get_scratchpad_tool = FunctionTool(func=get_top_items_from_scratchpad)
     
+    # Phase 2 Geospatial Tools
+    save_places_cache_tool = FunctionTool(func=save_places_to_cache)
+    find_nearby_places_tool = FunctionTool(func=find_nearby_cached_places)
+    
+    # Phase 3 Memory Tools
+    cache_itinerary_tool = FunctionTool(func=cache_successful_itinerary)
+    search_past_tool = FunctionTool(func=search_past_itineraries)
+    
+    # Phase 4 Schema Tools
+    query_raw_tool = FunctionTool(func=query_raw_place_data)
+    
     # Group tools by domain to easily share them across agents
     ITINERARY_MANAGEMENT_TOOLS = [
         persist_tool, 
@@ -85,7 +101,8 @@ def create_travel_agent():
         finalize_tool,
         clone_tool,
         read_draft_tool,
-        calc_budget_tool
+        calc_budget_tool,
+        cache_itinerary_tool
     ]
     
     RESEARCH_TOOLS = [
@@ -94,7 +111,11 @@ def create_travel_agent():
         search_tool,
         events_tool,
         save_scratchpad_tool,
-        get_scratchpad_tool
+        get_scratchpad_tool,
+        save_places_cache_tool,
+        find_nearby_places_tool,
+        search_past_tool,
+        query_raw_tool
     ]
 
     # 3. Load Instruction Prompts
@@ -152,6 +173,13 @@ def create_travel_agent():
         if violations:
             prompt += f"\n\n[SYSTEM MONITOR ALERT]\nThe following logistical violations were detected:\n{violations}\nYou MUST address these by finding closer alternatives."
         
+        # Phase 5: Inject async validation errors from MongoDB Trigger
+        is_conflict = itinerary.get("is_conflict", False)
+        val_errors = itinerary.get("validation_errors", [])
+        if is_conflict and val_errors:
+            errors_str = "\n".join([f"- {err}" for err in val_errors])
+            prompt += f"\n\n[SYSTEM MONITOR ALERT]\nThe background validation system detected the following errors in your saved draft:\n{errors_str}\nYou MUST fix these scheduling or budget conflicts immediately before finalizing the trip."
+
         # Add explicit formatting rules to ensure reliable UI splitting
         prompt += "\n\nFORMATTING RULE: Use Markdown H3 headers ('### Section Name') for all major itinerary components (e.g., '### Lodging', '### Transport', '### Dining', '### Day 1'). Do not use these headers for regular text."
         

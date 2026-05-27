@@ -28,7 +28,7 @@ export default function FeaturesPage() {
             </div>
             <h2 className="text-3xl font-bold text-slate-900">Multi-Agent Orchestration</h2>
             <p className="text-lg text-slate-600 leading-relaxed">
-              Instead of relying on a single AI that gets easily confused, our system uses a <strong>Supervisor</strong> to delegate tasks to specialized experts. The <strong>Travel Pioneer</strong> handles flights and hotels, while the <strong>Activity Planner</strong> books your dinners and experiences, ensuring perfect coordination.
+              Instead of relying on a single AI that gets easily confused, our system uses a <strong>Supervisor</strong> to route tasks between specialized experts. The <strong>Concierge</strong> handles your preferences, while the <strong>Architect</strong> plans logistics, hotels, and experiences, ensuring perfect coordination.
             </p>
             <ul className="space-y-3 pt-4">
               <li className="flex items-start gap-3 text-slate-700">
@@ -37,19 +37,14 @@ export default function FeaturesPage() {
               </li>
               <li className="flex items-start gap-3 text-slate-700">
                 <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 mt-0.5"><Check size={14} /></div>
-                <span><strong>Pioneer Agent:</strong> Discovers optimal destinations, hotels, and transit routes.</span>
-              </li>
-              <li className="flex items-start gap-3 text-slate-700">
-                <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 mt-0.5"><Check size={14} /></div>
-                <span><strong>Planner & Architect:</strong> Fills your days with vibe-matching activities and validates the final timeline.</span>
+                <span><strong>Architect Agent:</strong> Discovers optimal destinations, hotels, and fills your days with vibe-matching activities while validating the timeline.</span>
               </li>
             </ul>
           </div>
           <div className="bg-slate-200 p-8 rounded-3xl shadow-inner border border-slate-300 aspect-square md:aspect-auto md:h-80 flex flex-col items-center justify-center gap-4">
             <div className="bg-white px-4 py-2 rounded-lg shadow font-bold text-indigo-600 flex items-center gap-2"><BrainCircuit size={16}/> Travel Supervisor</div>
             <div className="flex gap-4">
-              <div className="bg-white px-4 py-2 rounded-lg shadow text-sm flex items-center gap-2 text-slate-700">Pioneer</div>
-              <div className="bg-white px-4 py-2 rounded-lg shadow text-sm flex items-center gap-2 text-slate-700">Planner</div>
+              <div className="bg-white px-4 py-2 rounded-lg shadow text-sm flex items-center gap-2 text-slate-700">Concierge</div>
               <div className="bg-white px-4 py-2 rounded-lg shadow text-sm flex items-center gap-2 text-slate-700">Architect</div>
             </div>
           </div>

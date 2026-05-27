@@ -3,11 +3,13 @@ import datetime
 import logging
 import re
 import ast
+import asyncio
 from typing import Any, Optional
 from gemini_agent.clients import destinations_collection
 from gemini_agent.logic.models import Itinerary
 from google.adk.agents.invocation_context import InvocationContext
 from gemini_agent.logic.utils import _parse_json_or_literal, _extract_list_from_payload
+from gemini_agent.logic.validate_buffers import validate_itinerary_structure, validate_itinerary_budget
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,9 @@ async def save_itinerary(
         
         # CRITICAL: Update the agent's memory state so subsequent agents see the saved events!
         tool_context.state.update({"final_itinerary": itinerary_data, "active_itinerary": itinerary_data})
+
+        # Phase 5: Local Simulated Trigger (Fires async validation without blocking the LLM)
+        asyncio.create_task(_simulate_background_validation(session_id, user_id, itinerary_data))
 
         if result.upserted_id:
             return f"SUCCESS: New draft itinerary created for session {session_id}."
@@ -345,3 +350,24 @@ async def finalize_itinerary(trip_name: str, tool_context: InvocationContext) ->
         
     except Exception as e:
         return f"Error finalizing itinerary: {str(e)}"
+
+
+async def _simulate_background_validation(session_id: str, user_id: str, itinerary_data: dict):
+    """Phase 5: Asynchronous validation logic intended to be triggered by MongoDB."""
+    user_prefs = itinerary_data.get("traveler_profile", {})
+    risk = user_prefs.get("preferences", {}).get("risk_tolerance", "relaxed")
+    circadian = user_prefs.get("preferences", {}).get("circadian_preference", "night_owl")
+    
+    # 1. Run business logic validations
+    struct_errors = validate_itinerary_structure(itinerary_data, risk, circadian, user_prefs)
+    _, budget_errors = validate_itinerary_budget(itinerary_data, user_prefs)
+    
+    all_errors = struct_errors + budget_errors
+    is_conflict = len(all_errors) > 0
+    
+    # 2. Asynchronously update the document with the validation results
+    db = destinations_collection.database
+    await db["itineraries"].update_one(
+        {"session_id": session_id, "user_id": user_id},
+        {"$set": {"is_conflict": is_conflict, "validation_errors": all_errors}}
+    )

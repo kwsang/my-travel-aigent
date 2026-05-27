@@ -36,25 +36,25 @@ export default function MapHub() {
   );
 }
 
+// Helper to format mixed price representations from the API
+const formatPrice = (p: any) => {
+  if (!p) return null;
+  if (typeof p === 'object' && p !== null) {
+    return `${p.currency === 'USD' ? '$' : (p.currency ? p.currency + ' ' : '')}${p.amount}`;
+  }
+  const s = String(p);
+  if (s === 'PRICE_LEVEL_FREE' || s === '0') return 'Free';
+  if (s === 'PRICE_LEVEL_INEXPENSIVE' || s === '1') return '$';
+  if (s === 'PRICE_LEVEL_MODERATE' || s === '2') return '$$';
+  if (s === 'PRICE_LEVEL_EXPENSIVE' || s === '3') return '$$$';
+  if (s === 'PRICE_LEVEL_VERY_EXPENSIVE' || s === '4') return '$$$$';
+  return s;
+};
+
 function MapInner() {
   const { segments, profile, isRelaxed, activeSegmentIndex, setActiveSegmentIndex, itinerary, setItinerary, hoveredSegmentIndex, setHoveredSegmentIndex, sessionId, userId } = useItineraryData();
   const map = useMap();
   const isLoaded = useApiIsLoaded();
-
-  // Helper to format mixed price representations from the API
-  const formatPrice = (p: any) => {
-    if (!p) return null;
-    if (typeof p === 'object' && p !== null) {
-      return `${p.currency === 'USD' ? '$' : (p.currency ? p.currency + ' ' : '')}${p.amount}`;
-    }
-    const s = String(p);
-    if (s === 'PRICE_LEVEL_FREE' || s === '0') return 'Free';
-    if (s === 'PRICE_LEVEL_INEXPENSIVE' || s === '1') return '$';
-    if (s === 'PRICE_LEVEL_MODERATE' || s === '2') return '$$';
-    if (s === 'PRICE_LEVEL_EXPENSIVE' || s === '3') return '$$$';
-    if (s === 'PRICE_LEVEL_VERY_EXPENSIVE' || s === '4') return '$$$$';
-    return s;
-  };
 
   const [popularDestinations, setPopularDestinations] = React.useState<{name: string; lat: number; lng: number; emoji: string}[]>([]);
 

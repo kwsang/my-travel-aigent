@@ -7,6 +7,12 @@ export function useChatEvents(
 ) {
   const profileUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Keep a ref to the latest itinerary to avoid re-binding window event listeners on every state change
+  const itineraryRef = useRef(itinerary);
+  useEffect(() => {
+    itineraryRef.current = itinerary;
+  }, [itinerary]);
+
   // Listen for manual timeline drag and drop events
   useEffect(() => {
     const handleTimelineDragDrop = (e: Event) => {
@@ -32,7 +38,7 @@ export function useChatEvents(
 
     window.addEventListener('travel_aigent_timeline_drag_drop', handleTimelineDragDrop);
     return () => window.removeEventListener('travel_aigent_timeline_drag_drop', handleTimelineDragDrop);
-  }, [sendMessage, isLoading, itinerary]);
+  }, [sendMessage]);
 
   // Listen for custom destination events from the map
   useEffect(() => {
@@ -41,7 +47,7 @@ export function useChatEvents(
       const destination = customEvent.detail;
       
       if (destination) {
-        const isDefaultName = !itinerary.trip_name || itinerary.trip_name === 'New Trip';
+        const isDefaultName = !itineraryRef.current.trip_name || itineraryRef.current.trip_name === 'New Trip';
 
         sendMessage(
           `I've selected ${destination} as my destination. Please communicate with the architect to determine travel and lodging based on my traveler profile.`, 
@@ -54,7 +60,7 @@ export function useChatEvents(
 
     window.addEventListener('travel_aigent_set_destination', handleSetDestination);
     return () => window.removeEventListener('travel_aigent_set_destination', handleSetDestination);
-  }, [sendMessage, isLoading, itinerary]);
+  }, [sendMessage]);
 
   // Listen for custom lodging events from the map
   useEffect(() => {
@@ -63,11 +69,11 @@ export function useChatEvents(
       const lodging = customEvent.detail;
       
       if (lodging) {
-        const isReplacement = !!itinerary.lodging;
+        const isReplacement = !!itineraryRef.current.lodging;
 
         const hiddenMessage = isReplacement 
-          ? `I have changed my lodging to ${lodging.name}. Please communicate with the architect to update any travel logistics and the activity_planner to rearrange my daily experiences based on this new location. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`
-          : `I've selected ${lodging.name} as my lodging. Please communicate with the architect to schedule transit to the lodging and check-in/out events, and then the activity_planner to schedule daily experiences and dining for my trip based on my traveler profile. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`;
+          ? `I have changed my lodging to ${lodging.name}. Please communicate with the architect to update any travel logistics and rearrange my daily experiences based on this new location. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`
+          : `I've selected ${lodging.name} as my lodging. Please communicate with the architect to schedule transit to the lodging and check-in/out events, and schedule daily experiences and dining for my trip based on my traveler profile. You MUST also use the save_destination_lodging tool to permanently save this lodging to the destination's atlas so it is cached for the future.`;
 
         const displayMessage = isReplacement
           ? `I've changed my lodging to ${lodging.name}. Can you update my trip?`
@@ -79,7 +85,7 @@ export function useChatEvents(
 
     window.addEventListener('travel_aigent_set_lodging', handleSetLodging);
     return () => window.removeEventListener('travel_aigent_set_lodging', handleSetLodging);
-  }, [sendMessage, isLoading, itinerary]);
+  }, [sendMessage]);
 
   // Listen for custom add activity events from the map
   useEffect(() => {
@@ -99,7 +105,7 @@ export function useChatEvents(
 
     window.addEventListener('travel_aigent_add_activity', handleAddActivity);
     return () => window.removeEventListener('travel_aigent_add_activity', handleAddActivity);
-  }, [sendMessage, isLoading, itinerary]);
+  }, [sendMessage]);
 
   // Listen for targeted profile update events from the profile modal
   useEffect(() => {
@@ -113,9 +119,10 @@ export function useChatEvents(
         }
         
         profileUpdateTimerRef.current = setTimeout(() => {
+          const formattedAgent = targetAgent.toLowerCase().replace(/\s+/g, '_');
           sendMessage(
-            `I've updated my ${changeDesc} in my traveler profile. Please communicate directly with the ${targetAgent} to review and adjust the itinerary if needed.`, 
-            { budget: updatedProfile.budget || itinerary.budget },
+            `I've updated my ${changeDesc} in my traveler profile. Please communicate directly with the ${formattedAgent} to review and adjust the itinerary if needed.`, 
+            { budget: updatedProfile.budget || itineraryRef.current.budget },
             updatedProfile,
             `I've updated my ${changeDesc}. Please review the itinerary.`
           );
@@ -130,5 +137,5 @@ export function useChatEvents(
         clearTimeout(profileUpdateTimerRef.current);
       }
     };
-  }, [sendMessage, isLoading, itinerary]);
+  }, [sendMessage]);
 }

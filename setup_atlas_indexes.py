@@ -46,6 +46,13 @@ async def setup_indexes():
     )
     logger.info("✅ Created 2dsphere index on 'places_cache.location'")
 
+    # ---------------------------------------------------------
+    # Phase 3: Contextual Memory 
+    # Fast lookup for traveler profiles across sessions
+    # ---------------------------------------------------------
+    await db["users"].create_index("user_id", unique=True)
+    logger.info("✅ Created unique index on 'users.user_id'")
+
     logger.info("🎉 All index operations completed successfully!")
 
 if __name__ == "__main__":
